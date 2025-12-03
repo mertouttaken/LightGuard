@@ -1,0 +1,19 @@
+name: LightGuard
+version: 1.0
+main: com.mertout.lightguard.LightGuard
+api-version: 1.16
+authors: [mertout]
+description: Advanced Packet-Based Anti-Crash & Exploit Protection System
+
+commands:
+  lg:
+    permission: lg.admin
+    usage: /lg <args>
+
+permissions:
+  lg.admin:
+    default: op
+  lg.alerts:
+    default: op
+  lg.bypass:
+    default: false

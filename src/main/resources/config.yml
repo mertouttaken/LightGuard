@@ -1,0 +1,262 @@
+settings:
+  prefix: "&8[&bLightGuard&8] &7"
+
+  kick-layout:
+    - "&4&m-----------------------------------------"
+    - "&c&lLIGHTGUARD SECURITY"
+    - ""
+    - "&fKullanıcı: &7%player%"
+    - "&fTespit: &c%check% &7(&e%packet%&7)"
+    - "&fGecikme: &e%ping%ms"
+    - ""
+    - "&4&l⛔ İŞLEM ENGELLENDİ ⛔"
+    - "&7Sunucu güvenliğini ihlal ettiniz."
+    - "&4&m-----------------------------------------"
+
+  sentinel:
+    enabled: true
+    silent-failures: false # Hata olursa sunucu çökmesin diye loglasın
+    geyser-support: true
+
+checks:
+  packet-size:
+    enabled: true
+    max-string-length: 10000
+    max-buffer-size: 16384
+
+  window:
+    enabled: true
+    strict-slots: true
+    prevent-lectern-spam: true
+    prevent-swap-in-gui: true
+
+  sign:
+    enabled: true
+    max-line-length: 45 # Bir satıra sığabilecek max karakter
+    block-json-syntax: true # {"text":"..."} gibi JSON enjeksiyonunu engeller
+
+  game-state:
+    enabled: true
+    check-inventory-open: true # Envanter kapalıyken tıklamayı engeller
+    check-teleport-confirm: true # Sahte ışınlanma onayını engeller
+
+  vehicle:
+    enabled: true
+    check-steer: true
+    prevent-invalid-move: true
+
+  bad-packets:
+    enabled: true
+    check-negative-values: true
+    prevent-self-interact: true
+
+  client-brand:
+    enabled: true
+    max-length: 20 # Marka ismini kısalttık (Örn: "Lunar-Client" sığar ama spam sığmaz)
+    block-invalid-chars: true
+
+  resource-pack:
+    enabled: true
+    max-status-length: 100 # Status paketi uzunluğu
+    block-invalid-status: true
+
+  flood:
+    enabled: true
+    max-bytes-per-sec: 40000
+    burst-limit: 400 # 1000 -> 400. Ani paket patlamalarına izin yok.
+    # Paket türü ne olursa olsun, bir oyuncu saniyede toplam bu kadar paket yollarsa engellenir.
+    max-global-pps: 600
+
+    adaptive:
+      enabled: true
+      low-tps-threshold: 18.0   # TPS 18'in altına düşerse
+      low-tps-multiplier: 0.7   # Limitleri %30 daralt (Daha sıkı)
+      high-tps-threshold: 19.8  # TPS 19.8 üzerindeyse
+      high-tps-multiplier: 1.2  # Limitleri %20 artır (Daha esnek - False Positive önler)
+      high-player-threshold: 50 # 50 oyuncu üzerindeyse
+      high-player-multiplier: 1.1 # Limitleri %10 artır (Kalabalık sunucu toleransı)
+
+      # Tekil paketler limite takılmasa bile, bu paketlerin toplam "Ağırlığı" (Weight)
+      # saniyede belirli bir puanı geçerse oyuncu engellenir.
+    matrix:
+      enabled: true
+      max-weight-per-sec: 1000.0 # Saniyede 1000 puan
+      weights:
+        PacketPlayInWindowClick: 50.0   # En ağır işlem (Envanter)
+        PacketPlayInBlockDig: 30.0      # Orta işlem (Kazı)
+        PacketPlayInUseItem: 20.0       # Hafif işlem
+        PacketPlayInArmAnimation: 5.0   # Çok hafif
+        PacketPlayInFlying: 2.0         # Pasif
+        PacketPlayInKeepAlive: 10.0     # Disabler potansiyeli
+        PacketPlayInTransaction: 10.0   # Disabler potansiyeli
+        default: 5.0                    # Diğerleri
+
+    limits:
+      PacketPlayInFlying: "22/1000"
+      PacketPlayInPosition: "22/1000"
+      PacketPlayInLook: "22/1000"
+      PacketPlayInPositionLook: "22/1000"
+      PacketPlayInArmAnimation: "40/1000"
+      PacketPlayInBlockDig: "60/1000"
+      PacketPlayInUseItem: "30/1000"
+      PacketPlayInWindowClick: "25/500"
+      PacketPlayInUseEntity: "15/1000"
+
+      # --- ANTI-CHEAT & DISABLER (Test 12, 15) ---
+      PacketPlayInKeepAlive: "10/1000"
+      PacketPlayInTransaction: "15/1000"
+      PacketPlayInTeleportAccept: "10/1000" # .lgtest-15 (Teleport Confirm)
+
+      # --- CREATIVE & ENVANTER (Test 27, 35) ---
+      PacketPlayInSetCreativeSlot: "20/1000" # .lgtest-35 (Slot Hash)
+      PacketPlayInPickItem: "10/1000"        # .lgtest-27 (Pick Item)
+
+      # --- TARİF & KİTAP (Test 14, 24, 33) ---
+      PacketPlayInAutoRecipe: "5/1000"       # .lgtest-24, 33 (Recipe Crash)
+      PacketPlayInRecipeSettings: "10/1000"  # Recipe Book spam
+      PacketPlayInTrSel: "10/1000"           # Merchant Trade spam
+
+      # --- SİSTEM & DURUM (Test 22, 29, 30, 32) ---
+      PacketPlayInClientCommand: "5/1000"    # .lgtest-22, 32 (Respawn/Stats spamı)
+      PacketPlayInSpectate: "5/1000"         # .lgtest-29 (Spectate spamı)
+      PacketPlayInAdvancements: "5/1000"     # .lgtest-23 (Advancement spamı)
+      PacketPlayInDifficultyLock: "5/1000"   # .lgtest-30 (Difficulty spamı)
+      PacketPlayInDifficultyChange: "5/1000" # (Alternatif isim)
+
+      # --- PAYLOAD & TAB (Test 3) ---
+      PacketPlayInCustomPayload: "15/1000"   # .lgtest-3 (Payload spamı)
+      PacketPlayInTabComplete: "10/1000"     # Tab spamı
+
+  block-place:
+    enabled: true
+    kick-on-illegal-block: true # Affetmek yok
+    max-pps: 12 # Saniyede 12 bloktan fazlası (Printer/FastPlace) engellenir.
+
+    # Printer Algılama
+    printer-check: true
+    printer-threshold: 8 # 8 PPS üstü şüpheli
+    printer-leave-delay: 5000 # Printer kapatınca 5sn bekleme cezası
+
+    velocity:
+      a: "80/500" # Velocity check sıkılaştırıldı
+      b: "50/1000"
+
+    prevent-illegal-blocks: true
+    illegal-blocks:
+      - "COMMAND_BLOCK"
+      - "REPEATING_COMMAND_BLOCK"
+      - "CHAIN_COMMAND_BLOCK"
+      - "STRUCTURE_VOID"
+      - "STRUCTURE_BLOCK"
+      - "JIGSAW"
+      - "LIGHT"
+
+  item:
+    enabled: true
+    max-item-depth: 3 # İç içe NBT (Shulker içi Shulker) yasak.
+    max-nbt-size: 8000
+    max-items-per-packet: 500 # Toplu paket gönderimini kıstık.
+    max-string-len: 200 # Lore/Name uzunluğu 200 karakteri geçemez.
+    max-list-size: 15 # Bir itemin max 15 satır lore'u olabilir.
+
+    illegal-keys:
+      - "run_command"
+      - "clickEvent"
+      - "hoverEvent"
+      - "Score" # Scoreboard exploit
+      - "Selector" # Selector exploit
+      - "translation.test.invalid"
+
+    nbt-occurrences:
+      - "extra:15"      # JSON bombası engeli
+      - "{:50"          # İç içe geçmiş NBT engeli
+      - "translate:5"   # Çeviri anahtarı spamı engeli
+      - "score:5"       # Scoreboard crash engeli
+
+  position:
+    enabled: true
+    max-offset: 100000.0 # Daha dar bir hareket alanı
+    out-of-world-limit: 30000000.0
+    check-teleport-delay: true
+    ignore-fly: true
+
+  book:
+    enabled: true
+    max-pages: 5 # Kimse roman yazmasın, 5 sayfa yeter.
+    max-bytes-per-page: 200
+    strip-ascii: true
+
+  payload:
+    enabled: true
+    max-size: 1500 # Büyük paketler (Harita vb. dışında) engellenir.
+    max-frequency: "5/1000" # Payload spamı bitti.
+    blocked-channels:
+      - "MC|BEdit"
+      - "MC|BSign"
+      - "MC|BOpen"
+      - "PacketPlayInUpdateSign"
+      - "WDL|INIT"
+      - "PERMISSIONS_REPL"
+      - "MC|TrList"
+      - "minecraft:bedit"
+      - "minecraft:bsign"
+      - "minecraft:bopen"
+  command:
+    enabled: true
+    block-syntax: true
+    blacklist:
+      - "/calc"
+      - "//calc"
+      - "/eval"
+      - "/solve"
+      - "/hd readtext"
+      - "/pex"
+      - "/op"
+      - "/deop"
+      - "/stop"
+      - "/minecraft:me"
+      - "/bukkit:me"
+      - "/me"
+
+  tab:
+    enabled: true
+    max-length: 48 # Uzun komut tamamlamaları engellendi.
+    block-chars: ["[", "]", "{", "}", "\\", ":", ";"]
+    block-contains:
+      - "targetoffset"
+      - "for("
+      - "selector"
+      - "run_command"
+      - "^(."
+      - "*."
+
+packet-logger:
+  enabled: false
+  heavy-packet-threshold: -1
+  output: FILE
+  players: []
+  packets: ["KEEP_ALIVE"]
+  packet-mode: BLACKLIST
+
+mechanics:
+  nether-portal-delay: true
+  nether-portal-cooldown-ms: 3000 # Portaldan geçince 3sn bekleme
+  max-arrow-velocity: 10.0 # Yay hızı iyice düşürüldü
+  shears-cooldown: true
+  break-close-inventory: true
+  trapdoor-rail-redstone: true
+  interact-container-delay: 200 # Sandık açma aralığı 200ms (Spam yok)
+  prevent-portal-break: true
+  prevent-mule-dupe: true
+  block-dead-packets: true
+  null_chunk: true
+  self_damage: true
+  bed_duplication: true
+  disable-piglin-trading: true
+  close-inventory-on-teleport: true
+  limit-falling-blocks: true
+  max-falling-blocks-per-chunk: 10
+  prevent-nether-roof: true
+  limit-map-creation: true
+  prevent-invalid-trade: true
+  prevent-piston-crash: true
