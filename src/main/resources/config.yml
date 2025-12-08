@@ -127,6 +127,9 @@ checks:
       PacketPlayInCustomPayload: "15/1000"   # .lgtest-3 (Payload spamı)
       PacketPlayInTabComplete: "10/1000"     # Tab spamı
 
+      PacketPlayInMap: "10/1000"           # Map Spam
+      PacketPlayInChat: "10/2000"          # Chat Spam (2 saniyede 10 mesaj)
+
   block-place:
     enabled: true
     kick-on-illegal-block: true # Affetmek yok

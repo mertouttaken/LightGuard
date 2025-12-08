@@ -2,7 +2,6 @@ package com.mertout.lightguard.checks.impl;
 
 import com.mertout.lightguard.checks.Check;
 import com.mertout.lightguard.data.PlayerData;
-import io.netty.buffer.ByteBuf;
 import net.minecraft.server.v1_16_R3.*;
 
 import java.lang.reflect.Field;
@@ -20,51 +19,51 @@ public class PacketSizeCheck extends Check {
         int maxString = plugin.getConfig().getInt("checks.packet-size.max-string-length", 10000);
         int maxBuffer = plugin.getConfig().getInt("checks.packet-size.max-buffer-size", 16384);
 
+        String packetName = packet.getClass().getSimpleName();
+
         // 1. Chat Packet Size
         if (packet instanceof PacketPlayInChat) {
             String msg = getStringField(packet, "a");
             if (msg != null && msg.length() > maxString) {
-                flag("Oversized Chat Packet");
+                flag("Oversized Chat Packet", packetName);
                 return false;
             }
         }
 
-        // 2. Custom Payload Size
+        // 2. Custom Payload Size (Birleştirilmiş & Fixlenmiş)
         if (packet instanceof PacketPlayInCustomPayload) {
             PacketPlayInCustomPayload payload = (PacketPlayInCustomPayload) packet;
+
+            // Boyut kontrolü
             if (payload.data != null && payload.data.readableBytes() > maxBuffer) {
-                flag("Oversized Payload Packet");
+                // WDL gibi modlara istisna tanınabilir, configden bakılabilir
+                // Şimdilik genel koruma:
+                flag("Oversized Payload (" + payload.data.readableBytes() + " bytes)", packetName);
                 return false;
             }
         }
 
         // 3. BEdit (Book Edit) Size
         if (packet instanceof PacketPlayInBEdit) {
-            // Kitap içeriği çok büyükse
-            ItemStack item = getItemField(packet, "a");
-            if (item != null && item.hasTag() && item.getTag().toString().length() > maxBuffer) {
-                flag("Oversized Book Packet");
-                return false;
-            }
-        }
-        if (packet instanceof PacketPlayInTabComplete) {
-            String text = getStringField(packet, "a");
-            // Tab tamamlama için 256 karakterden fazlası gereksizdir
-            if (text != null && text.length() > 256) {
-                flag("Oversized Tab Complete (" + text.length() + ")");
-                return false;
+            ItemStack item = getItemField(packet, "a"); // 1.16.5'te genelde 'a' itemdir
+            // Eğer item null değilse ve NBT string boyutu limiti aşıyorsa
+            if (item != null && item.hasTag()) {
+                if (item.getTag().toString().length() > maxBuffer) {
+                    flag("Oversized Book Packet", packetName);
+                    return false;
+                }
             }
         }
 
-        // ➤ FIX: Payload ve Diğerleri için Genel Buffer Check
-        // Eğer paket CustomPayload ise ayrıca kanal ismine bak (Test 3 - Minecraft:Bedit)
-        if (packet instanceof PacketPlayInCustomPayload) {
-            PacketPlayInCustomPayload p = (PacketPlayInCustomPayload) packet;
-            String channel = p.tag.toString();
-            // Config'deki yasaklı kanalları burada da kontrol et (veya PayloadCheck'te)
-            // Ama en önemlisi boyut kontrolü:
-            if (p.data.readableBytes() > maxBuffer) {
-                flag("Oversized Payload");
+        // 4. Tab Complete Size
+        if (packet instanceof PacketPlayInTabComplete) {
+            // 1.16.5'te 'a' TransactionID(int), 'b' String(text) olabilir.
+            // Önce 'b' (yaygın olan) sonra 'a' denenir.
+            String text = getStringField(packet, "b");
+            if (text == null) text = getStringField(packet, "a");
+
+            if (text != null && text.length() > 256) {
+                flag("Oversized Tab Complete (" + text.length() + ")", packetName);
                 return false;
             }
         }
@@ -76,7 +75,11 @@ public class PacketSizeCheck extends Check {
         try {
             Field f = obj.getClass().getDeclaredField(name);
             f.setAccessible(true);
-            return (String) f.get(obj);
+            Object value = f.get(obj);
+            if (value instanceof String) {
+                return (String) value;
+            }
+            return null;
         } catch (Exception e) { return null; }
     }
 
