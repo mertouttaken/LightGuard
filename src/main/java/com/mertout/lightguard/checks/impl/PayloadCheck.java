@@ -5,6 +5,7 @@ import com.mertout.lightguard.data.PlayerData;
 import net.minecraft.server.v1_16_R3.PacketPlayInCustomPayload;
 import io.netty.buffer.ByteBuf;
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 
 public class PayloadCheck extends Check {
 
@@ -18,40 +19,65 @@ public class PayloadCheck extends Check {
 
         if (packet instanceof PacketPlayInCustomPayload) {
             PacketPlayInCustomPayload p = (PacketPlayInCustomPayload) packet;
+            String packetName = "PacketPlayInCustomPayload";
 
-            // Kanal Adı (Örn: MC|Brand, WDL|INIT)
+            // Kanal Adı (Örn: MC|Brand, WDL|INIT, minecraft:register)
             String channel = p.tag.toString();
 
-            // 1. Yasaklı Kanallar (Blacklist)
-            if (plugin.getConfig().getStringList("checks.payload.blocked-channels").contains(channel)) {
-                flag("Blocked Channel: " + channel);
-                return false;
+            // ➤ 1. Yasaklı Kanallar (Blacklist)
+            List<String> blockedChannels = plugin.getConfig().getStringList("checks.payload.blocked-channels");
+            for (String blocked : blockedChannels) {
+                // "MC|BEdit" veya "minecraft:bedit" gibi
+                if (channel.equalsIgnoreCase(blocked) || channel.toLowerCase().contains(blocked.toLowerCase())) {
+                    flag("Blocked Channel: " + channel, packetName);
+                    return false;
+                }
             }
 
-            // 2. Boyut Kontrolü (Max Size)
-            // Config'den limiti al, yoksa varsayılan 2048
+            // ➤ 2. Channel Register Flood (YENİ EKLENEN KRİTİK KISIM)
+            // Hileciler binlerce rastgele kanal ismi kaydederek sunucu RAM'ini şişirir.
+            if (channel.equals("minecraft:register") || channel.equals("REGISTER")) {
+                try {
+                    // Veriyi oku (Kopyalamadan stringe çevir, performanslıdır)
+                    String channels = p.data.toString(StandardCharsets.UTF_8);
+
+                    // Kanallar "\0" (null byte) ile ayrılır.
+                    // Tek seferde 5'ten fazla kanal kaydetmek şüphelidir (Modlar genelde 1-2 tane yollar).
+                    if (channels.split("\0").length > 10) {
+                        flag("Channel Register Flood", packetName);
+                        return false;
+                    }
+                } catch (Exception e) {
+                    return false; // Veri bozuksa engelle
+                }
+            }
+
+            // ➤ 3. Boyut Kontrolü (Max Size)
             int maxSize = plugin.getConfig().getInt("checks.payload.max-size", 2048);
             if (p.data.readableBytes() > maxSize) {
-                flag("Oversized Payload (" + p.data.readableBytes() + " bytes)");
-                return false;
+                // Bazı harita modları (JourneyMap vb.) büyük veri yollayabilir, istisna eklenebilir.
+                // Ancak "WDL|INIT" hariç genellikle 2KB üstü gereksizdir.
+                if (!channel.equals("WDL|INIT")) {
+                    flag("Oversized Payload (" + p.data.readableBytes() + " bytes)", packetName);
+                    return false;
+                }
             }
 
-            // 3. Client Brand Protection (Marka Koruması)
+            // ➤ 4. Client Brand Protection (Marka Koruması)
             if (channel.equals("minecraft:brand") || channel.equals("MC|Brand")) {
                 if (plugin.getConfig().getBoolean("checks.client-brand.enabled")) {
-                    // ByteBuf'u kopyalayıp okuyalım (Orijinal veriyi bozmamak için)
-                    String brand = readString(p.data.copy());
+                    String brand = readString(p.data.copy()); // copy() önemli, buffer index bozulmasın
 
                     // Marka ismi çok uzunsa
                     if (brand.length() > plugin.getConfig().getInt("checks.client-brand.max-length", 20)) {
-                        flag("Oversized Client Brand");
+                        flag("Oversized Client Brand", packetName);
                         return false;
                     }
 
                     // Geçersiz karakterler
                     if (plugin.getConfig().getBoolean("checks.client-brand.block-invalid-chars")) {
                         if (!brand.matches("[a-zA-Z0-9_ .-]+")) {
-                            flag("Invalid Brand Characters");
+                            flag("Invalid Brand Characters", packetName);
                             return false;
                         }
                     }
@@ -65,7 +91,7 @@ public class PayloadCheck extends Check {
     private String readString(ByteBuf buf) {
         try {
             int len = readVarInt(buf);
-            if (len > 32767) return "";
+            if (len > 32767) return ""; // NMS String limiti
             byte[] bytes = new byte[len];
             buf.readBytes(bytes);
             return new String(bytes, StandardCharsets.UTF_8);
