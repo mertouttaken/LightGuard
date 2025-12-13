@@ -2,8 +2,8 @@ package com.mertout.lightguard.listeners;
 
 import com.mertout.lightguard.LightGuard;
 import org.bukkit.Material;
-import org.bukkit.entity.Arrow;
 import org.bukkit.entity.ChestedHorse;
+import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
@@ -11,15 +11,15 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.block.BlockBreakEvent;
 import org.bukkit.event.block.BlockFromToEvent;
 import org.bukkit.event.entity.EntityDamageEvent;
-import org.bukkit.event.entity.ProjectileLaunchEvent;
+import org.bukkit.event.entity.EntityDeathEvent;
 import org.bukkit.event.inventory.InventoryOpenEvent;
 import org.bukkit.event.inventory.InventoryType;
-import org.bukkit.event.player.AsyncPlayerPreLoginEvent;
-import org.bukkit.event.player.PlayerInteractEvent;
-import org.bukkit.event.player.PlayerPortalEvent;
-import org.bukkit.event.player.PlayerShearEntityEvent;
-import org.bukkit.event.world.StructureGrowEvent;
+import org.bukkit.event.player.*;
+import org.bukkit.event.world.ChunkUnloadEvent;
+import org.bukkit.inventory.Inventory;
+import org.bukkit.inventory.InventoryHolder;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
@@ -31,9 +31,7 @@ public class MechanicListener implements Listener {
     public MechanicListener(LightGuard plugin) { this.plugin = plugin; }
 
     @EventHandler
-    public void onPortal(PlayerPortalEvent e) {
-        if (plugin.getConfig().getBoolean("mechanics.nether-portal-delay") && checkCooldown(e.getPlayer().getUniqueId(), 2000)) e.setCancelled(true);
-    }
+    public void onPortal(PlayerPortalEvent e) { if (plugin.getConfig().getBoolean("mechanics.nether-portal-delay") && checkCooldown(e.getPlayer().getUniqueId(), 2000)) e.setCancelled(true);    }
 
     @EventHandler(priority = org.bukkit.event.EventPriority.LOW)
     public void onLaunch(org.bukkit.event.entity.ProjectileLaunchEvent event) {
@@ -211,22 +209,39 @@ public class MechanicListener implements Listener {
         }
     }
 
-    @EventHandler
-    public void onChunkUnload(org.bukkit.event.world.ChunkUnloadEvent event) {
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    public void onChunkUnload(ChunkUnloadEvent event) {
         if (!plugin.getConfig().getBoolean("mechanics.prevent-mule-dupe")) return;
 
-        for (org.bukkit.entity.Entity entity : event.getChunk().getEntities()) {
-            if (entity instanceof org.bukkit.inventory.InventoryHolder) {
-                org.bukkit.inventory.Inventory inventory = ((org.bukkit.inventory.InventoryHolder) entity).getInventory();
-                // Bu envantere bakan oyuncuları bul ve kapat
-                if (inventory != null && !inventory.getViewers().isEmpty()) {
-                    // Listeyi kopyalayarak işlem yap (ConcurrentModification hatası olmasın)
-                    new java.util.ArrayList<>(inventory.getViewers()).forEach(org.bukkit.entity.HumanEntity::closeInventory);
-                }
+        // Chunk içindeki entityleri al
+        for (Entity entity : event.getChunk().getEntities()) {
+            // Eğer entity bir envanter sahibi ise (Vagon, Eşek, Llama, Sandık)
+            if (entity instanceof InventoryHolder) {
+                closeInventoryForViewers(entity);
             }
         }
     }
+    @EventHandler(priority = EventPriority.LOWEST)
+    public void onEntityDeath(EntityDeathEvent event) {
+        if (!plugin.getConfig().getBoolean("mechanics.prevent-mule-dupe")) return;
 
+        Entity entity = event.getEntity();
+        if (entity instanceof InventoryHolder) {
+            closeInventoryForViewers(entity);
+        }
+    }
+    @EventHandler(priority = EventPriority.LOWEST)
+    public void onPlayerTeleport(PlayerTeleportEvent event) {
+        if (!plugin.getConfig().getBoolean("mechanics.close-inventory-on-teleport")) return;
+
+        Player player = event.getPlayer();
+        Inventory topInv = player.getOpenInventory().getTopInventory();
+
+        // Eğer oyuncu bir sandık/vagon/eşek arayüzüne bakıyorsa
+        if (topInv != null && topInv.getType() != InventoryType.CRAFTING) {
+            player.closeInventory();
+        }
+    }
     @EventHandler(ignoreCancelled = true)
     public void onEntityTeleport(org.bukkit.event.entity.EntityTeleportEvent event) {
         // Sadece END dünyasında
@@ -391,5 +406,20 @@ public class MechanicListener implements Listener {
         if (now - cooldowns.getOrDefault(uuid, 0L) < ms) return true;
         cooldowns.put(uuid, now);
         return false;
+    }
+    private void closeInventoryForViewers(Entity entity) {
+        if (entity instanceof InventoryHolder) {
+            Inventory inv = ((InventoryHolder) entity).getInventory();
+            if (inv != null && !inv.getViewers().isEmpty()) {
+                // Listeyi kopyala (ConcurrentModification hatası olmasın)
+                new ArrayList<>(inv.getViewers()).forEach(human -> {
+                    human.closeInventory();
+                    if (human instanceof Player) {
+                        // Opsiyonel bilgilendirme
+                        // ((Player) human).sendMessage("§cEntity unloaded/died.");
+                    }
+                });
+            }
+        }
     }
 }

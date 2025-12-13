@@ -13,6 +13,8 @@ public class PlayerData {
 
     private int currentPPS = 0;
 
+    private long lastVehicleJump;
+
     public int getPPS() { return currentPPS; }
     public void setPPS(int pps) { this.currentPPS = pps; }
 
@@ -20,8 +22,11 @@ public class PlayerData {
         this.player = player;
         this.uuid = player.getUniqueId();
         this.checkManager = new CheckManager(this);
+        this.lastVehicleJump = 0;
     }
+    public long getLastVehicleJump() { return lastVehicleJump; }
 
+    public void setLastVehicleJump(long lastVehicleJump) { this.lastVehicleJump = lastVehicleJump; }
     public Player getPlayer() { return player; }
     public UUID getUuid() { return uuid; }
     public CheckManager getCheckManager() { return checkManager; }

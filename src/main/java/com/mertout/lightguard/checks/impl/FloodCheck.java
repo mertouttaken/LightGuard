@@ -5,9 +5,9 @@ import com.mertout.lightguard.data.PlayerData;
 import net.minecraft.server.v1_16_R3.PacketPlayInCustomPayload;
 import net.minecraft.server.v1_16_R3.PacketPlayInFlying;
 import net.minecraft.server.v1_16_R3.PacketPlayInWindowClick;
-import org.bukkit.Bukkit;
 import org.bukkit.configuration.ConfigurationSection;
 
+import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -16,215 +16,210 @@ import java.util.concurrent.atomic.DoubleAdder;
 
 public class FloodCheck extends Check {
 
-    // --- ZAMANLAYICILAR (Thread-Safe AtomicLong) ---
-    // Son kontrol zamanlarını milisaniye cinsinden tutar
+    // ➤ CONFIG CACHE (Performans için final değişkenler)
+    private final boolean enabled;
+    private final int maxGlobalPPS;
+    private final int burstLimit;
+    private final int maxBytesPerSec;
+    private final boolean matrixEnabled;
+    private final double maxMatrixWeight;
+
+    // ➤ DATA CACHE (Ağırlıklar ve Limitler RAM'de tutulur)
+    private final Map<String, Double> weights = new HashMap<>();
+    private final Map<String, LimitConfig> limits = new HashMap<>();
+
+    // ➤ ATOMIC TRACKERS (Thread-Safe Sayaçlar)
     private final AtomicLong lastCheck = new AtomicLong(System.currentTimeMillis());
     private final AtomicLong lastBurstCheck = new AtomicLong(System.currentTimeMillis());
     private final AtomicLong lastByteCheck = new AtomicLong(System.currentTimeMillis());
 
-    // --- SAYAÇLAR (Thread-Safe Atomic Variables) ---
-    // DoubleAdder, çok sık yazılan double değerler için AtomicDouble'dan daha hızlıdır
+    private final AtomicInteger globalPacketCount = new AtomicInteger(0);
+    private final AtomicInteger burstCount = new AtomicInteger(0);
+    private final AtomicLong totalBytes = new AtomicLong(0);
     private final DoubleAdder currentWeight = new DoubleAdder();
 
-    // Global paket sayacı
-    private final AtomicInteger globalPacketCount = new AtomicInteger(0);
-
-    // Anlık (Burst) paket sayacı
-    private final AtomicInteger burstCount = new AtomicInteger(0);
-
-    // Byte (Bandwidth) sayacı
-    private final AtomicLong totalBytes = new AtomicLong(0);
-
-    // --- THREAD-SAFE HARİTALAR ---
-    // Paket ağırlıklarını okumak için
-    private final Map<String, Double> packetWeights = new ConcurrentHashMap<>();
-
-    // Her paket tipi için ayrı rate-limit takibi
+    // ➤ PAKET BAZLI TAKİP (ConcurrentMap)
     private final Map<String, PacketTracker> packetTrackers = new ConcurrentHashMap<>();
 
-    // --- TEMİZLİK ---
-    // RAM sızıntısını önlemek için uzun süre işlem görmeyen trackerları temizleriz
-    private static final long CLEANUP_THRESHOLD = 60000; // 60 saniye
-    private long lastCleanupTime = System.currentTimeMillis(); // Bu main thread'de veya nadiren çalışacağı için long kalabilir
+    // Temizlik zamanlayıcısı (RAM şişmesini önler)
+    private long lastCleanupTime = System.currentTimeMillis();
 
     public FloodCheck(PlayerData data) {
         super(data, "Flood");
+
+        // 1. Temel Ayarları Cache'le (Her pakette okumamak için)
+        this.enabled = plugin.getConfig().getBoolean("checks.flood.enabled");
+        this.maxGlobalPPS = plugin.getConfig().getInt("checks.flood.max-global-pps", 600);
+        this.burstLimit = plugin.getConfig().getInt("checks.flood.burst-limit", 400);
+        this.maxBytesPerSec = plugin.getConfig().getInt("checks.flood.max-bytes-per-sec", 40000);
+
+        this.matrixEnabled = plugin.getConfig().getBoolean("checks.flood.matrix.enabled");
+        this.maxMatrixWeight = plugin.getConfig().getDouble("checks.flood.matrix.max-weight-per-sec", 1000.0);
+
+        // 2. Ağırlıkları Yükle
         loadWeights();
+
+        // 3. Özel Limitleri Yükle (Parse işlemi burada yapılır, pakette değil)
+        loadLimits();
     }
 
     private void loadWeights() {
         ConfigurationSection sec = plugin.getConfig().getConfigurationSection("checks.flood.matrix.weights");
         if (sec != null) {
             for (String key : sec.getKeys(false)) {
-                packetWeights.put(key, sec.getDouble(key));
+                weights.put(key, sec.getDouble(key));
+            }
+        }
+    }
+
+    private void loadLimits() {
+        ConfigurationSection sec = plugin.getConfig().getConfigurationSection("checks.flood.limits");
+        if (sec != null) {
+            for (String key : sec.getKeys(false)) {
+                try {
+                    String val = sec.getString(key);
+                    String[] parts = val.split("/");
+                    int max = Integer.parseInt(parts[0]);
+                    int interval = Integer.parseInt(parts[1]);
+                    limits.put(key, new LimitConfig(max, interval));
+                } catch (Exception e) {
+                    plugin.getLogger().warning("Invalid limit format for " + key + ": " + sec.getString(key));
+                }
             }
         }
     }
 
     @Override
     public boolean check(Object packet) {
-        if (!plugin.getConfig().getBoolean("checks.flood.enabled")) return true;
+        if (!enabled) return true;
 
         long now = System.currentTimeMillis();
         String packetName = packet.getClass().getSimpleName();
 
-        // ➤ 0. MEMORY CLEANUP (Basit RAM Koruması)
-        // Çok sık çalışmaz (dakikada bir), thread-safe map üzerinde removeIf güvenlidir.
-        if (now - lastCleanupTime > CLEANUP_THRESHOLD) {
-            packetTrackers.entrySet().removeIf(entry -> (now - entry.getValue().lastTime.get()) > CLEANUP_THRESHOLD);
+        // ➤ 0. MEMORY CLEANUP (Dakikada bir)
+        if (now - lastCleanupTime > 60000) {
+            packetTrackers.entrySet().removeIf(entry -> (now - entry.getValue().lastTime.get()) > 60000);
             lastCleanupTime = now;
         }
 
-        // ➤ 1. ADAPTIVE CONTROL (TPS Duyarlı Çarpan)
-        double multiplier = calculateAdaptiveMultiplier();
+        // ➤ 1. ADAPTIVE TOLERANCE (Lag/TPS Koruması)
+        // Eğer TPS düşükse limitleri gevşet (False Positive önle)
+        double multiplier = 1.0;
+        double tps = plugin.getTPS(); // LightGuard.java'daki volatile değişkenden okur
 
-        // ➤ 2. GLOBAL FLOOD (Saniyelik Reset)
-        // Atomic compare işlemine gerek yok, basitçe zaman farkına bakıyoruz.
-        // Race condition olsa bile (iki thread aynı anda girse) en fazla bir kez fazladan sıfırlanır, güvenlik açığı yaratmaz.
+        if (tps < 18.0) {
+            multiplier = 1.5; // %50 daha fazla paket izni
+        } else if (tps < 19.5) {
+            multiplier = 1.2; // %20 daha fazla paket izni
+        }
+
+        // ➤ 2. GLOBAL PPS CHECK
         if (now - lastCheck.get() > 1000) {
-            data.setPPS(globalPacketCount.get()); // İstatistik için kaydet
-
-            // Atomik Resetleme İşlemleri
+            data.setPPS(globalPacketCount.get()); // İstatistik için
             globalPacketCount.set(0);
-            currentWeight.reset(); // DoubleAdder sıfırlama
+            currentWeight.reset();
             lastCheck.set(now);
         }
 
-        // Atomik Artırma (Lock-free)
         int currentGlobal = globalPacketCount.incrementAndGet();
-        int globalLimit = (int) (plugin.getConfig().getInt("checks.flood.max-global-pps", 800) * multiplier);
-
-        if (currentGlobal > globalLimit) {
-            // Global limit genelde lag spike yaratır, sessizce iptal ediyoruz.
+        if (currentGlobal > (maxGlobalPPS * multiplier)) {
+            // Global limit genelde lag spike yüzünden de tetiklenebilir,
+            // direkt kicklemek yerine paketi iptal etmek daha güvenlidir.
             return false;
         }
 
-        // ➤ 3. INTERACTION MATRIX (Ağırlıklı Kontrol)
-        if (plugin.getConfig().getBoolean("checks.flood.matrix.enabled")) {
-            double weight = packetWeights.getOrDefault(packetName, packetWeights.getOrDefault("default", 5.0));
+        // ➤ 3. MATRIX (WEIGHT) CHECK
+        if (matrixEnabled) {
+            double weight = weights.getOrDefault(packetName, weights.getOrDefault("default", 5.0));
             currentWeight.add(weight);
 
-            double maxWeight = plugin.getConfig().getDouble("checks.flood.matrix.max-weight-per-sec", 1000.0) * multiplier;
-            if (currentWeight.sum() > maxWeight) {
+            if (currentWeight.sum() > (maxMatrixWeight * multiplier)) {
                 return false;
             }
         }
 
-        // ➤ 4. BURST DETECTOR (Anlık Patlama)
-        if (now - lastBurstCheck.get() > 500) { // Yarım saniyelik pencereler
+        // ➤ 4. BURST CHECK (Anlık Patlama)
+        if (now - lastBurstCheck.get() > 500) { // Yarım saniye
             burstCount.set(0);
             lastBurstCheck.set(now);
         }
 
         int currentBurst = burstCount.incrementAndGet();
-        int burstLimit = (int) (plugin.getConfig().getInt("checks.flood.burst-limit", 500) * multiplier);
-
-        if (currentBurst > burstLimit) {
-            flag("Packet Burst Detected (" + currentBurst + ")", packetName);
+        if (currentBurst > (burstLimit * multiplier)) {
+            flag("Packet Burst (" + currentBurst + ")", packetName);
             return false;
         }
 
-        // ➤ 5. BYTE/BANDWIDTH LIMITER (Veri Boyutu)
+        // ➤ 5. BANDWIDTH (BYTE) CHECK
         if (now - lastByteCheck.get() > 1000) {
             totalBytes.set(0);
             lastByteCheck.set(now);
         }
 
-        // Paket boyutunu tahmin et
-        long packetSize = estimatePacketSize(packet);
-        long currentBytes = totalBytes.addAndGet(packetSize); // Atomik ekle ve oku
+        long size = estimatePacketSize(packet);
+        long currentBytes = totalBytes.addAndGet(size);
 
-        int byteLimit = (int) (plugin.getConfig().getInt("checks.flood.max-bytes-per-sec", 35000) * multiplier);
-        if (currentBytes > byteLimit) {
-            flag("High Traffic Flood (" + currentBytes + " bytes/s)", packetName);
+        if (currentBytes > (maxBytesPerSec * multiplier)) {
+            flag("High Traffic (" + currentBytes/1024 + " KB/s)", packetName);
             return false;
         }
 
-        // ➤ 6. PER-TYPE LIMITS (Paket Bazlı Tracker)
-        if (!checkPerTypeLimit(packetName, now, multiplier)) {
-            return false;
+        // ➤ 6. PER-TYPE LIMITS (Özel Paket Limitleri)
+        // Cache'lenmiş "LimitConfig" kullanıyoruz, her seferinde parse etmiyoruz.
+        LimitConfig limitConfig = limits.get(packetName);
+        if (limitConfig != null) {
+            PacketTracker tracker = packetTrackers.computeIfAbsent(packetName, k -> new PacketTracker());
+
+            long lastTime = tracker.lastTime.get();
+            if (now - lastTime > limitConfig.interval) {
+                tracker.count.set(0);
+                tracker.lastTime.set(now);
+            }
+
+            int count = tracker.count.incrementAndGet();
+            int maxAllowed = (int) (limitConfig.max * multiplier);
+
+            if (count > maxAllowed) {
+                // Anti-Disabler ve Crash paketleri için özel uyarı
+                if (packetName.contains("KeepAlive") || packetName.contains("Transaction")) {
+                    flag("Disabler Attempt", packetName);
+                } else {
+                    flag("Rate Limit: " + count + "/" + limitConfig.interval + "ms", packetName);
+                }
+                return false;
+            }
         }
 
         return true;
-    }
-
-    // Paket bazlı limit kontrolü (Ayrı metoda alındı)
-    private boolean checkPerTypeLimit(String packetName, long now, double multiplier) {
-        String configKey = "checks.flood.limits." + packetName;
-
-        // Config kontrolü her seferinde yapmak maliyetli olabilir,
-        // production'da bu map cache'lenmelidir. Şimdilik güvenli yolu seçiyoruz.
-        if (plugin.getConfig().contains(configKey)) {
-            try {
-                String limitStr = plugin.getConfig().getString(configKey);
-                String[] parts = limitStr.split("/");
-                int maxPackets = (int) (Integer.parseInt(parts[0]) * multiplier);
-                int timeWindow = Integer.parseInt(parts[1]);
-
-                // Atomik Tracker Oluşturma/Alma
-                PacketTracker tracker = packetTrackers.computeIfAbsent(packetName, k -> new PacketTracker());
-
-                // Zaman penceresi kontrolü
-                long lastTime = tracker.lastTime.get();
-                if (now - lastTime > timeWindow) {
-                    // Pencere doldu, sıfırla
-                    tracker.count.set(0);
-                    tracker.lastTime.set(now);
-                }
-
-                int typeCount = tracker.count.incrementAndGet();
-
-                if (typeCount > maxPackets) {
-                    // Özel mesajlar
-                    if (packetName.contains("KeepAlive") || packetName.contains("Transaction")) {
-                        flag("Anticheat Disabler Attempt", packetName);
-                    } else {
-                        flag("Rate Limit: " + typeCount + "/" + timeWindow + "ms", packetName);
-                    }
-                    return false;
-                }
-            } catch (Exception ignored) {}
-        }
-        return true;
-    }
-
-    private double calculateAdaptiveMultiplier() {
-        if (!plugin.getConfig().getBoolean("checks.flood.adaptive.enabled")) return 1.0;
-
-        double tps = plugin.getTPS();
-        double multiplier = 1.0;
-
-        double lowTps = plugin.getConfig().getDouble("checks.flood.adaptive.low-tps-threshold", 18.0);
-
-        if (tps < lowTps) {
-            multiplier = plugin.getConfig().getDouble("checks.flood.adaptive.low-tps-multiplier", 0.7);
-        } else if (tps > 19.8) {
-            multiplier = plugin.getConfig().getDouble("checks.flood.adaptive.high-tps-multiplier", 1.2);
-        }
-
-        if (Bukkit.getOnlinePlayers().size() > plugin.getConfig().getInt("checks.flood.adaptive.high-player-threshold", 50)) {
-            multiplier *= plugin.getConfig().getDouble("checks.flood.adaptive.high-player-multiplier", 1.1);
-        }
-        return multiplier;
     }
 
     private int estimatePacketSize(Object packet) {
         if (packet instanceof PacketPlayInCustomPayload) {
             try {
-                // Readable bytes Netty metodudur
                 return ((PacketPlayInCustomPayload) packet).data.readableBytes();
-            } catch (Exception e) {
-                return 0;
-            }
+            } catch (Exception e) { return 0; }
         }
         if (packet instanceof PacketPlayInWindowClick) return 32;
         if (packet instanceof PacketPlayInFlying) return 24;
-        return 10; // Varsayılan küçük boyut
+        return 10;
     }
 
-    // Thread-Safe İç İçe Sınıf
+    // --- YARDIMCI SINIFLAR ---
+
+    // Thread-Safe Takipçi
     private static class PacketTracker {
         final AtomicLong lastTime = new AtomicLong(System.currentTimeMillis());
         final AtomicInteger count = new AtomicInteger(0);
+    }
+
+    // Limit Ayarları Cache Yapısı
+    private static class LimitConfig {
+        final int max;
+        final int interval;
+
+        LimitConfig(int max, int interval) {
+            this.max = max;
+            this.interval = interval;
+        }
     }
 }

@@ -11,6 +11,14 @@ public class CommandCheck extends Check {
         if (!plugin.getConfig().getBoolean("checks.command.enabled")) return true;
         if (packet instanceof PacketPlayInChat) {
             String msg = getMessage((PacketPlayInChat) packet);
+            if (msg.length() > 256) {
+                flag("Oversized Chat Message", "Chat");
+                return false;
+            }
+            if (msg.codePointCount(0, msg.length()) > 256) {
+                flag("Oversized Unicode Message", "Chat");
+                return false;
+            }
             if (msg != null && msg.startsWith("/")) {
                 List<String> bl = plugin.getConfig().getStringList("checks.command.blacklist");
                 String cmd = msg.split(" ")[0].toLowerCase();

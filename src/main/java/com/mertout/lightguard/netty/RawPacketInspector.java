@@ -27,31 +27,16 @@ public class RawPacketInspector extends ChannelInboundHandlerAdapter {
     public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
         if (msg instanceof ByteBuf) {
             ByteBuf buf = (ByteBuf) msg;
-
-            // --- 1. RAW SIZE KONTROLÜ ---
-            // Readable bytes, paketin şu anki boyutudur.
             int size = buf.readableBytes();
 
             int limit = plugin.getConfig().getInt("checks.raw-packet.max-raw-size", MAX_PACKET_SIZE);
             if (size > limit) {
-                plugin.getLogger().warning("§c[LightGuard] " + playerName + " sent oversized raw packet (" + size + " bytes). Disconnecting.");
+                plugin.getLogger().warning("§c[LightGuard] " + playerName + " sent oversized raw packet (" + size + " bytes).");
 
-                // Güvenli kapatma: Önce buffer'ı temizle (Memory leak önle), sonra kapat
-                buf.release();
                 ctx.close();
-                return; // Zinciri kır, paketi aşağıya iletme
+                return;
             }
-
-            // --- 2. PACKET ID KONTROLÜ (OPSİYONEL) ---
-            // Bu kısım biraz risklidir çünkü compression varsa ID okumak zordur.
-            // Sadece boyut kontrolü çoğu exploit'i engeller.
-            // Gelişmiş ID okuma için buffer'ı bozmadan (peek) okumamız gerekir.
-
-            // Eğer isterseniz buraya ID okuma eklenebilir ama şu an için
-            // sadece boyut kontrolü en kritik olanıdır.
         }
-
-        // Güvenliyse bir sonraki handler'a (Decoder/Decompressor) ilet
         super.channelRead(ctx, msg);
     }
 

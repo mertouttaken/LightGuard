@@ -131,27 +131,21 @@ public class PacketInjector implements Listener {
 
     public void remove(Player player) {
         try {
+            // Player handle alırken null check
+            if (player == null || !player.isOnline()) return;
+
             Channel channel = ((CraftPlayer) player).getHandle().playerConnection.networkManager.channel;
 
-            // Kanal zaten kapanmışsa veya yoksa işlem yapma
-            if (channel == null || !channel.isOpen()) return;
-
-            channel.eventLoop().submit(() -> {
-                ChannelPipeline pipeline = channel.pipeline();
-
-                // 1. Main Handler'ı sil
-                if (pipeline.get("lightguard_handler") != null) {
-                    pipeline.remove("lightguard_handler");
-                }
-
-                // 2. YENİ: Raw Inspector'ı sil (Bunu eklemeyi unutma!)
-                if (pipeline.get("lightguard_raw") != null) {
-                    pipeline.remove("lightguard_raw");
-                }
-                return null;
-            });
-        } catch (Exception ignored) {
-            // Oyuncu çoktan düşmüş olabilir, hatayı yutuyoruz.
+            if (channel != null && channel.isOpen()) {
+                // Netty thread'ine işi güvenli şekilde atıyoruz
+                channel.eventLoop().execute(() -> {
+                    ChannelPipeline pipeline = channel.pipeline();
+                    if (pipeline.get("lightguard_handler") != null) pipeline.remove("lightguard_handler");
+                    if (pipeline.get("lightguard_raw") != null) pipeline.remove("lightguard_raw");
+                });
+            }
+        } catch (Exception e) {
+            // Oyuncu çıkarken channel zaten kapanmış olabilir, loglamaya gerek yok.
         }
     }
 

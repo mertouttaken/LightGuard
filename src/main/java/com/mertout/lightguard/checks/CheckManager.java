@@ -44,6 +44,9 @@ public class CheckManager {
         checks.add(new BadPacketCheck(data));
         checks.add(new ResourcePackCheck(data));
         checks.add(new EntityCheck(data));
+        checks.add(new BookExploitCheck(data));
+        checks.add(new MapExploitCheck(data));
+        checks.add(new ChatSecurityCheck(data));
     }
 
     public boolean handlePacket(Object packet) {
@@ -106,11 +109,9 @@ public class CheckManager {
                             );
                         }
 
-                        return false; // PAKETİ İPTAL ET (Güvenlik Önceliği)
+                        return false;
                     }
                 }
-
-                // Kritik değilse devam et (Fail-Open -> Oyuncu etkilenmez)
             }
         }
         return true;
