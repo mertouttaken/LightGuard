@@ -11,25 +11,15 @@ public class ConfigManager {
         this.plugin = plugin;
     }
 
-    /**
-     * config.yml dosyasına erişimi sağlar.
-     */
     public FileConfiguration getConfig() {
         return plugin.getConfig();
     }
 
-    /**
-     * Config dosyasını diskten tekrar yükler.
-     * /lpx reload komutu burayı tetikler.
-     */
     public void reload() {
         plugin.reloadConfig();
         plugin.getLogger().info("Configuration reloaded successfully.");
     }
 
-    /**
-     * Yapılan değişiklikleri diske kaydeder (Runtime değişiklikler için).
-     */
     public void save() {
         plugin.saveConfig();
     }

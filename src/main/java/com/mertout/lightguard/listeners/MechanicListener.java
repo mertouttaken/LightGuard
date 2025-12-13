@@ -25,7 +25,6 @@ public class MechanicListener implements Listener {
     private final LightGuard plugin;
     private final Map<UUID, Long> cooldowns = new HashMap<>();
 
-    // ➤ YENİ: Ses çıkaran ve spamlanınca crash yapan blokların listesi
     private static final Set<Material> NOISY_BLOCKS = EnumSet.of(
             Material.NOTE_BLOCK, Material.BELL,
             Material.OAK_TRAPDOOR, Material.SPRUCE_TRAPDOOR, Material.BIRCH_TRAPDOOR,
@@ -76,7 +75,6 @@ public class MechanicListener implements Listener {
     @EventHandler(priority = org.bukkit.event.EventPriority.LOWEST)
     public void onBlockInteract(org.bukkit.event.player.PlayerInteractEvent event) {
         if (event.getClickedBlock() != null) {
-            // Chunk Load Check (Optimizasyonlu)
             int x = event.getClickedBlock().getX() >> 4;
             int z = event.getClickedBlock().getZ() >> 4;
             if (!event.getClickedBlock().getWorld().isChunkLoaded(x, z)) {
@@ -136,7 +134,6 @@ public class MechanicListener implements Listener {
         if (plugin.getConfig().getBoolean("mechanics.shears-cooldown") && checkCooldown(e.getPlayer().getUniqueId(), 500)) e.setCancelled(true);
     }
 
-    // ➤ GÜNCELLENEN: SOUND SPAM & INTERACT KORUMASI
     @EventHandler(priority = EventPriority.LOWEST)
     public void onInteract(PlayerInteractEvent e) {
         if (e.getClickedBlock() == null) return;
@@ -144,7 +141,6 @@ public class MechanicListener implements Listener {
         Material type = e.getClickedBlock().getType();
         UUID uuid = e.getPlayer().getUniqueId();
 
-        // 1. Sandık Spam (Mevcut kodun) - Diğer sandık tipleri de eklendi
         if (type == Material.CHEST || type == Material.TRAPPED_CHEST || type == Material.ENDER_CHEST) {
             long delay = plugin.getConfig().getLong("mechanics.interact-container-delay", 200);
             if (checkCooldown(uuid, delay)) {
@@ -153,11 +149,7 @@ public class MechanicListener implements Listener {
             }
         }
 
-        // 2. Sound Spam Fix (YENİ)
-        // Eğer tıklanan blok ses çıkaranlar listesindeyse (Kapı, NoteBlock, Zil...)
         if (NOISY_BLOCKS.contains(type)) {
-            // 100ms cooldown (Saniyede 10 tıklama limiti)
-            // Bu, normal oyuncuyu etkilemez ama Nuker/Spammer'ı durdurur.
             if (checkCooldown(uuid, 100)) {
                 e.setCancelled(true);
             }
@@ -200,7 +192,6 @@ public class MechanicListener implements Listener {
     @EventHandler
     public void onMove(org.bukkit.event.player.PlayerMoveEvent event) {
         if (plugin.getConfig().getBoolean("mechanics.null_chunk")) {
-            // Optimizasyon: Chunk objesi oluşturmadan World üzerinden kontrol
             int x = event.getTo().getBlockX() >> 4;
             int z = event.getTo().getBlockZ() >> 4;
             if (!event.getTo().getWorld().isChunkLoaded(x, z)) {
@@ -337,9 +328,7 @@ public class MechanicListener implements Listener {
 
     private boolean checkCooldown(UUID uuid, long ms) {
         long now = System.currentTimeMillis();
-        // Cooldown bitmediyse TRUE dön (Engelle)
         if (now - cooldowns.getOrDefault(uuid, 0L) < ms) return true;
-        // Süre dolduysa zamanı güncelle ve FALSE dön (İzin ver)
         cooldowns.put(uuid, now);
         return false;
     }
@@ -348,7 +337,6 @@ public class MechanicListener implements Listener {
         if (entity instanceof InventoryHolder) {
             Inventory inv = ((InventoryHolder) entity).getInventory();
             if (inv != null && !inv.getViewers().isEmpty()) {
-                // Listeyi kopyala (ConcurrentModification hatası olmasın)
                 new ArrayList<>(inv.getViewers()).forEach(org.bukkit.entity.HumanEntity::closeInventory);
             }
         }

@@ -8,24 +8,20 @@ import java.lang.reflect.Field;
 
 public class BadPacketCheck extends Check {
 
-    // Cache
     private final boolean preventSelfInteract;
 
     public BadPacketCheck(PlayerData data) {
         super(data, "BadPacket", "bad-packets");
-        // Ayarı hafızaya al
         this.preventSelfInteract = plugin.getConfig().getBoolean("checks.bad-packets.prevent-self-interact");
     }
 
     @Override
     public boolean check(Object packet) {
-        // 1. Ana şalter kapalıysa direkt çık
         if (!isEnabled()) return true;
 
         if (packet instanceof PacketPlayInUseEntity) {
             PacketPlayInUseEntity useEntity = (PacketPlayInUseEntity) packet;
 
-            // 2. Self Interact Kontrolü (Sadece bu ayar açıksa çalışır)
             int entityId = getEntityId(useEntity);
             if (entityId == data.getPlayer().getEntityId()) {
                 if (preventSelfInteract) {
@@ -34,7 +30,6 @@ public class BadPacketCheck extends Check {
                 }
             }
 
-            // 3. Vector Crash Fix (Bu ayardan bağımsız her zaman çalışmalı!)
             Vec3D target = getTargetVector(useEntity);
             if (target != null) {
                 if (!Double.isFinite(target.x) || !Double.isFinite(target.y) || !Double.isFinite(target.z)) {

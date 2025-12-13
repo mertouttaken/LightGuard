@@ -16,7 +16,6 @@ import java.util.concurrent.atomic.DoubleAdder;
 
 public class FloodCheck extends Check {
 
-    // Cache
     private final int maxGlobalPPS;
     private final int burstLimit;
     private final int maxBytesPerSec;

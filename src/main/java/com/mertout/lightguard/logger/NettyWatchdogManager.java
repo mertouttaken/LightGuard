@@ -36,7 +36,6 @@ public class NettyWatchdogManager {
                     long now = System.currentTimeMillis();
                     for (Map.Entry<Thread, Long> entry : threadProcessingStartTimes.entrySet()) {
                         if (now - entry.getValue() > config.getWatchdogMaxTime()) {
-                            // Basit loglama, dump sistemi eklenebilir
                             plugin.getLogger().warning("Netty thread blocked for " + (now - entry.getValue()) + "ms!");
                         }
                     }

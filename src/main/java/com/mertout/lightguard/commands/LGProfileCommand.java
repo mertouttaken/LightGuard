@@ -27,12 +27,11 @@ public class LGProfileCommand {
         task = new BukkitRunnable() {
             @Override
             public void run() {
-                // Oyuncuları PPS değerine göre çoktan aza sırala
                 List<PlayerData> topPlayers = Bukkit.getOnlinePlayers().stream()
                         .map(p -> LightGuard.getInstance().getPlayerDataManager().getData(p.getUniqueId()))
                         .filter(data -> data != null)
                         .sorted(Comparator.comparingInt(PlayerData::getPPS).reversed())
-                        .limit(10) // İlk 10 kişiyi göster
+                        .limit(10)
                         .collect(Collectors.toList());
 
                 sender.sendMessage("\n§8§m---------§r §bLightGuard Live Profiler §8§m---------");
@@ -44,16 +43,15 @@ public class LGProfileCommand {
 
                 for (PlayerData data : topPlayers) {
                     int pps = data.getPPS();
-                    String color = "§a"; // Yeşil (Güvenli)
-                    if (pps > 50) color = "§e"; // Sarı (Orta)
-                    if (pps > 100) color = "§c"; // Kırmızı (Tehlike)
-                    if (pps > 300) color = "§4§l"; // Bordo (CRITICAL)
+                    String color = "§a";
+                    if (pps > 50) color = "§e";
+                    if (pps > 100) color = "§c";
+                    if (pps > 300) color = "§4§l";
 
                     sender.sendMessage("§7- " + data.getPlayer().getName() + ": " + color + pps + " PPS");
                 }
             }
         };
-        // 40 Tick = 2 Saniye
         task.runTaskTimer(LightGuard.getInstance(), 0L, 40L);
     }
 }

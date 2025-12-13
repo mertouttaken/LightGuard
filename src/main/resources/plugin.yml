@@ -3,7 +3,7 @@ version: 1.0
 main: com.mertout.lightguard.LightGuard
 api-version: 1.16
 authors: [mertout]
-description: Advanced Packet-Based Anti-Crash & Exploit Protection System
+description: Advanced Packet-Based Anti-Crash & Exploit Protection System By AI
 
 commands:
   lg:

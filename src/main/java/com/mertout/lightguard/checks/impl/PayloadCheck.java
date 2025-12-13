@@ -13,7 +13,6 @@ public class PayloadCheck extends Check {
     private static final Map<UUID, Set<String>> playerChannels = new ConcurrentHashMap<>();
     private static final int MAX_CHANNELS_PER_PLAYER = 124;
 
-    // Cache
     private final List<String> blockedChannels;
     private final int maxPayloadSize;
     private final boolean brandCheckEnabled;

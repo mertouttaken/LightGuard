@@ -12,7 +12,7 @@ public abstract class Check {
     protected final LightGuard plugin;
     protected final PlayerData data;
     protected final String name;
-    protected final boolean enabled; // Cache Değişkeni
+    protected final boolean enabled;
 
     public Check(PlayerData data, String name, String configName) {
         this.plugin = LightGuard.getInstance();
@@ -28,14 +28,14 @@ public abstract class Check {
     public boolean isEnabled() { return enabled; }
 
     protected void flag(String info, String packetName) {
-        // Sentinel Modu
+        // Sentinel
         if(plugin.getConfig().getBoolean("settings.sentinel.enabled") &&
                 plugin.getConfig().getBoolean("settings.sentinel.silent-failures")) {
             plugin.getLogger().warning(data.getPlayer().getName() + " failed " + name + " (" + packetName + "): " + info);
             return;
         }
 
-        // Kick İşlemi
+        // Kick
         Bukkit.getScheduler().runTask(plugin, () -> {
             String kickMessage = buildKickMessage(packetName);
             data.getPlayer().kickPlayer(kickMessage);

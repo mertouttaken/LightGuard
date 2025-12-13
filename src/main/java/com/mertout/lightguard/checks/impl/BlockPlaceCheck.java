@@ -11,13 +11,11 @@ import java.util.List;
 
 public class BlockPlaceCheck extends Check {
 
-    // Takip Değişkenleri
     private long lastPlaceTime;
     private int placePackets;
     private long lastPrinterCheck;
     private int printerPackets;
 
-    // ➤ CACHE DEĞİŞKENLERİ (Performans İçin)
     private final int maxPPS;
     private final boolean printerCheckEnabled;
     private final int printerThreshold;
@@ -28,10 +26,8 @@ public class BlockPlaceCheck extends Check {
     private final int maxItemDepth;
 
     public BlockPlaceCheck(PlayerData data) {
-        // "checks.block-place.enabled" ayarını otomatik okur
         super(data, "BlockPlace", "block-place");
 
-        // Ayarları 1 kere oku, hafızaya at
         this.maxPPS = plugin.getConfig().getInt("checks.block-place.max-pps", 15);
         this.printerCheckEnabled = plugin.getConfig().getBoolean("checks.block-place.printer-check");
         this.printerThreshold = plugin.getConfig().getInt("checks.block-place.printer-threshold", 10);
@@ -44,7 +40,6 @@ public class BlockPlaceCheck extends Check {
 
     @Override
     public boolean check(Object packet) {
-        // RAM'den hızlı kontrol (Hot Path Optimization)
         if (!isEnabled()) return true;
 
         if (packet instanceof PacketPlayInUseItem) {
@@ -52,7 +47,6 @@ public class BlockPlaceCheck extends Check {
             String packetName = "PacketPlayInUseItem";
             long now = System.currentTimeMillis();
 
-            // --- 1. Flood Control ---
             if (now - lastPlaceTime > 1000) {
                 placePackets = 0;
                 lastPlaceTime = now;
@@ -63,7 +57,6 @@ public class BlockPlaceCheck extends Check {
                 return false;
             }
 
-            // --- 2. Printer Mode ---
             if (printerCheckEnabled) {
                 if (now - lastPrinterCheck > 1000) {
                     printerPackets = 0;
@@ -75,17 +68,14 @@ public class BlockPlaceCheck extends Check {
                 }
             }
 
-            // --- 3. Verileri Alma ---
             MovingObjectPositionBlock position = p.c();
 
             if (position == null || position.getDirection() == null) {
                 return false;
             }
 
-            // ➤ KOORDİNAT KONTROLLERİ (Cached Variable)
             if (checkCoordinates) {
 
-                // A. Vektör (Vec3D) NaN/Finite Kontrolü
                 Vec3D vec = position.getPos();
                 if (!Double.isFinite(vec.x) || !Double.isFinite(vec.y) || !Double.isFinite(vec.z)) {
                     flag("Invalid Cursor Vector (NaN/Infinity)", packetName);
@@ -94,7 +84,6 @@ public class BlockPlaceCheck extends Check {
 
                 BlockPosition pos = position.getBlockPosition();
 
-                // B. Vektör Tutarlılık Kontrolü (Offset)
                 double dX = vec.x - pos.getX();
                 double dY = vec.y - pos.getY();
                 double dZ = vec.z - pos.getZ();
@@ -104,7 +93,6 @@ public class BlockPlaceCheck extends Check {
                     return false;
                 }
 
-                // C. World Boundary
                 if (Math.abs(pos.getX()) > 30000000 || Math.abs(pos.getZ()) > 30000000 ||
                         pos.getY() < -100 || pos.getY() > 500) {
                     flag("Invalid Coordinates (OOB)", packetName);
@@ -112,10 +100,8 @@ public class BlockPlaceCheck extends Check {
                 }
             }
 
-            // Eğer koordinat check kapalıysa bile BlockPosition nesnesini almalıyız
             BlockPosition pos = position.getBlockPosition();
 
-            // --- 5. Item ve Blok Kontrolü ---
             EnumHand hand = p.b();
 
             org.bukkit.inventory.ItemStack item = (hand == EnumHand.MAIN_HAND) ?
@@ -125,7 +111,6 @@ public class BlockPlaceCheck extends Check {
             if (item != null && item.getType() != Material.AIR) {
                 Material type = item.getType();
 
-                // ➤ Dispenser Fix
                 if (type == Material.DISPENSER || type == Material.DROPPER) {
                     int y = pos.getY();
                     EnumDirection face = position.getDirection();
@@ -135,7 +120,6 @@ public class BlockPlaceCheck extends Check {
                     }
                 }
 
-                // ➤ Illegal Blocks (Cached List)
                 if (preventIllegalBlocks) {
                     if (illegalBlocks.contains(type.name())) {
                         if (kickOnIllegal) {
@@ -149,11 +133,9 @@ public class BlockPlaceCheck extends Check {
                     }
                 }
 
-                // ➤ NBT Check
                 net.minecraft.server.v1_16_R3.ItemStack nms = CraftItemStack.asNMSCopy(item);
 
                 if (nms.hasTag()) {
-                    // Cached MaxDepth kullanıyoruz
                     if (NBTChecker.isNBTDangerous(nms.getTag(), maxItemDepth)) {
                         flag("Dangerous NBT Data", packetName);
                         return false;

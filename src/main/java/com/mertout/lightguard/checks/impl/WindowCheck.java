@@ -30,7 +30,6 @@ public class WindowCheck extends Check {
         } catch (Exception e) { throw new RuntimeException("Failed to init WindowCheck", e); }
     }
 
-    // Cache
     private final boolean preventLecternSpam;
     private final boolean preventSwapInGui;
     private long lastQuickMoveTime;

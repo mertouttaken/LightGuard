@@ -22,7 +22,6 @@ public class ChatSecurityCheck extends Check {
         } catch (Exception e) { e.printStackTrace(); }
     }
 
-    // Cache
     private final boolean blockZalgo;
 
     public ChatSecurityCheck(PlayerData data) {

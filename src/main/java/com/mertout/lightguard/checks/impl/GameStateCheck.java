@@ -9,7 +9,6 @@ import java.lang.reflect.Field;
 
 public class GameStateCheck extends Check {
 
-    // Cache
     private final boolean checkInvOpen;
 
     public GameStateCheck(PlayerData data) {
@@ -24,7 +23,6 @@ public class GameStateCheck extends Check {
         if (packet instanceof PacketPlayInWindowClick) {
             if (checkInvOpen) {
                 int windowId = getWindowId((PacketPlayInWindowClick) packet);
-                // Oyuncu null veya offline olabilir kontrolü eklenebilir ama PlayerData bunu genelde yönetir.
                 InventoryType currentType = data.getPlayer().getOpenInventory().getType();
 
                 if (windowId > 0 && currentType == InventoryType.CRAFTING) {

@@ -17,9 +17,7 @@ public class CheckManager {
     private final LightGuard plugin;
     private final PlayerData data;
 
-    // ➤ OPTİMİZASYON: Paket sınıfına göre check listesi
     private final Map<Class<?>, List<Check>> packetMap = new HashMap<>();
-    // Her pakette çalışması gerekenler (Flood vb.)
     private final List<Check> globalChecks = new ArrayList<>();
 
     private final boolean isBedrock;
@@ -54,13 +52,11 @@ public class CheckManager {
         register(PacketPlayInItemName.class, new AnvilCheck(data));
     }
 
-    // Check'i map'e kaydeden yardımcı metot
     private void register(Class<?> packetClass, Check... checks) {
         packetMap.computeIfAbsent(packetClass, k -> new ArrayList<>()).addAll(List.of(checks));
     }
 
     public boolean handlePacket(Object packet) {
-        // Config ayarları
         boolean sentinelEnabled = plugin.getConfig().getBoolean("settings.sentinel.enabled", true);
         List<String> criticalChecks = plugin.getConfig().getStringList("settings.sentinel.critical-checks");
 
@@ -74,16 +70,11 @@ public class CheckManager {
             }
         }
 
-        // ➤ OPTİMİZE EDİLMİŞ DÖNGÜ
-        // Önce Global Checkler
         if (!runChecks(globalChecks, packet, sentinelEnabled, criticalChecks)) return false;
 
-        // Sonra sadece bu paketle ilgilenen Checkler
-        // Flying alt sınıfları (Position, Look) için özel kontrol
         Class<?> clazz = packet.getClass();
         List<Check> specificChecks = packetMap.get(clazz);
 
-        // Eğer paket PacketPlayInFlying türeviyse (Look, Position) ve haritada yoksa, ana sınıfı dene
         if (specificChecks == null && packet instanceof PacketPlayInFlying) {
             specificChecks = packetMap.get(PacketPlayInFlying.class);
         }

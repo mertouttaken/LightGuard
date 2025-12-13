@@ -24,7 +24,6 @@ public class CommandCheck extends Check {
             String msg = getMessage((PacketPlayInChat) packet);
             if (msg == null) return true;
 
-            // Uzunluk kontrolleri (Hardcoded limitler genelde güvenlidir ama confige de bağlanabilir)
             if (msg.length() > 256) {
                 flag("Oversized Chat Message", "Chat");
                 return false;
@@ -37,7 +36,6 @@ public class CommandCheck extends Check {
             if (msg.startsWith("/")) {
                 String cmd = msg.split(" ")[0].toLowerCase();
 
-                // Cached List kullanımı (Hızlı)
                 for (String b : blacklist) {
                     if (cmd.equals(b) || cmd.endsWith(":" + b.replace("/", ""))) {
                         flag("Blacklisted Command", "Chat");

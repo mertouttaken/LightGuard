@@ -11,7 +11,7 @@ public class PositionCheck extends Check {
     private double lastZ = -1;
 
     public PositionCheck(PlayerData data) {
-        super(data, "Position", "position"); // Config: checks.position.enabled
+        super(data, "Position", "position");
     }
 
     @Override
@@ -24,7 +24,7 @@ public class PositionCheck extends Check {
             return true;
         }
 
-        if (!isEnabled()) return true; // HIZLI KONTROL
+        if (!isEnabled()) return true;
 
         if (packet instanceof PacketPlayInFlying) {
             PacketPlayInFlying p = (PacketPlayInFlying) packet;

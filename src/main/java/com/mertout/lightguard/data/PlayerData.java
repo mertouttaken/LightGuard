@@ -10,7 +10,6 @@ public class PlayerData {
     private final Player player;
     private final CheckManager checkManager;
 
-    // Değişkenler farklı threadlerden erişildiği için 'volatile' olmalı
     private volatile boolean printerMode = false;
     private volatile long lastTeleportTime;
     private volatile int currentPPS = 0;

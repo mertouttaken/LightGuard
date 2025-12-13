@@ -23,7 +23,6 @@ public class SignCheck extends Check {
         } catch (Exception e) { e.printStackTrace(); }
     }
 
-    // Cache
     private final int maxLineLength;
     private final boolean blockJson;
 
