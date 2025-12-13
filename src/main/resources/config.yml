@@ -33,9 +33,8 @@ checks:
   raw-packet:
     enabled: true
     # Maximum raw packet size (in Bytes).
-    # 2MB (2097152) is the safe limit for vanilla.
     # Book Ban or Map exploits push this limit.
-    max-raw-size: 2097152
+    max-raw-size: 40960
 
   packet-size:
     enabled: true
@@ -294,7 +293,18 @@ checks:
   tab:
     enabled: true
     max-length: 48 # Long command completions blocked.
-    block-chars: ["[", "]", "{", "}", "\\", ":", ";"]
+    block-chars:
+      - "["
+      - "]"
+      - "{"
+      - "}"
+      - "\\"
+      - ":"
+      - ";"
+      - "@"
+      - "="
+      - "\""
+      - "'"
     block-contains:
       - "targetoffset"
       - "for("
@@ -304,6 +314,8 @@ checks:
       - "*."
       - "execute"
       - "summon"
+      - "nbt"
+      - "tag"
     blacklisted-commands:
       - "/ver"
       - "/version"
@@ -332,14 +344,13 @@ mechanics:
   max-arrow-velocity: 15.0 # Bow speed significantly reduced
   shears-cooldown: true
   break-close-inventory: true
-  trapdoor-rail-redstone: true
   interact-container-delay: 200 # Chest opening interval 200ms (No spam)
   prevent-portal-break: true
   prevent-mule-dupe: true
   block-dead-packets: true
-  null_chunk: true
-  self_damage: true
-  bed_duplication: true
+  null-chunk: true
+  self-damage: true
+  bed-duplication: true
   disable-piglin-trading: false
   close-inventory-on-teleport: true
   limit-falling-blocks: true
@@ -348,3 +359,4 @@ mechanics:
   limit-map-creation: true
   prevent-invalid-trade: true
   prevent-piston-crash: true
+  trapdoor-rail-redstone: true

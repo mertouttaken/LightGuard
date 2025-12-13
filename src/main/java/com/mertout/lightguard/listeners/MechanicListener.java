@@ -10,6 +10,7 @@ import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.block.BlockBreakEvent;
 import org.bukkit.event.block.BlockFromToEvent;
+import org.bukkit.event.block.BlockRedstoneEvent;
 import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.event.entity.EntityDeathEvent;
 import org.bukkit.event.inventory.InventoryOpenEvent;
@@ -158,14 +159,14 @@ public class MechanicListener implements Listener {
 
     @EventHandler
     public void onBedEnter(org.bukkit.event.player.PlayerBedEnterEvent event) {
-        if (plugin.getConfig().getBoolean("mechanics.bed_duplication")) {
+        if (plugin.getConfig().getBoolean("mechanics.bed-duplication")) {
             event.getPlayer().closeInventory();
         }
     }
 
     @EventHandler
     public void onDamage(org.bukkit.event.entity.EntityDamageByEntityEvent event) {
-        if (plugin.getConfig().getBoolean("mechanics.self_damage")) {
+        if (plugin.getConfig().getBoolean("mechanics.self-damage")) {
             if (event.getDamager().equals(event.getEntity())) {
                 event.setCancelled(true);
             }
@@ -191,7 +192,7 @@ public class MechanicListener implements Listener {
 
     @EventHandler
     public void onMove(org.bukkit.event.player.PlayerMoveEvent event) {
-        if (plugin.getConfig().getBoolean("mechanics.null_chunk")) {
+        if (plugin.getConfig().getBoolean("mechanics.null-chunk")) {
             int x = event.getTo().getBlockX() >> 4;
             int z = event.getTo().getBlockZ() >> 4;
             if (!event.getTo().getWorld().isChunkLoaded(x, z)) {
@@ -306,6 +307,25 @@ public class MechanicListener implements Listener {
                 case DISPENSER: case DROPPER: case HOPPER: case BEACON: case ENDER_CHEST: case ENCHANTING_TABLE:
                     event.setCancelled(true);
                     return;
+            }
+        }
+    }
+    @EventHandler(priority = EventPriority.LOWEST, ignoreCancelled = true)
+    public void onRedstone(BlockRedstoneEvent event) {
+        if (!plugin.getConfig().getBoolean("mechanics.trapdoor-rail-redstone")) return;
+
+        Material type = event.getBlock().getType();
+        String name = type.name();
+
+        if (name.contains("TRAPDOOR") || name.contains("RAIL") ||
+                type == Material.COMPARATOR || type == Material.OBSERVER) {
+
+            long key = ((long) event.getBlock().getX() & 0xFFFFFFF) | (((long) event.getBlock().getZ() & 0xFFFFFFF) << 28);
+
+            if (event.getOldCurrent() > 0 && event.getNewCurrent() > 0) {
+                if (Math.random() > 0.8) {
+                    event.setNewCurrent(0);
+                }
             }
         }
     }

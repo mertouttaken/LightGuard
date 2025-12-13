@@ -4,19 +4,13 @@ import com.mertout.lightguard.LightGuard;
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
-import java.util.List;
 
-/**
- * Netty Pipeline üzerinde Decoder'dan önce çalışan güvenlik katmanı.
- * ByteBuf seviyesinde boyut ve ID kontrolü yapar.
- */
 public class RawPacketInspector extends ChannelInboundHandlerAdapter {
 
     private final LightGuard plugin;
     private final String playerName;
 
-    // Config'den alınacak limitler (Performans için constructor'da veya static cache'de tutulabilir)
-    private static final int MAX_PACKET_SIZE = 2097152; // 2MB (Varsayılan)
+    private static final int MAX_PACKET_SIZE = 2097152;
 
     public RawPacketInspector(LightGuard plugin, String playerName) {
         this.plugin = plugin;
@@ -42,8 +36,6 @@ public class RawPacketInspector extends ChannelInboundHandlerAdapter {
 
     @Override
     public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
-        // Netty seviyesinde hata olursa (örn: Decoder hatası)
-        // LightGuard burada hatayı yakalayıp sunucunun çökmesini engelleyebilir.
         plugin.getLogger().warning("[RawInspector] Netty error for " + playerName + ": " + cause.getMessage());
         ctx.close();
     }
