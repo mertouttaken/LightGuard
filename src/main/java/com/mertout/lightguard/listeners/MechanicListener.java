@@ -74,6 +74,7 @@ public class MechanicListener implements Listener {
 
     @EventHandler
     public void onTeleport(org.bukkit.event.player.PlayerTeleportEvent event) {
+        plugin.getPlayerDataManager().getData(event.getPlayer().getUniqueId()).setLastTeleportTime(System.currentTimeMillis());
         if (plugin.getConfig().getBoolean("mechanics.close-inventory-on-teleport")) {
             event.getPlayer().closeInventory();
         }

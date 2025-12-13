@@ -24,6 +24,9 @@ settings:
       - "Flood"           # Packet flooding
 
 checks:
+  anvil:
+    enabled: true
+
   raw-packet:
     enabled: true
     # Maximum raw packet size (in Bytes).
@@ -38,6 +41,7 @@ checks:
     per-packet-limit: 32000
     excluded-packets:
       - "PacketPlayInCustomPayload"
+      - "PacketPlayInBEdit"
 
   window:
     enabled: true
@@ -112,63 +116,79 @@ checks:
     # Scoring system based on packet processing cost
     matrix:
       enabled: true
-      max-weight-per-sec: 1000.0
+      max-weight-per-sec: 1200.0
       weights:
-        PacketPlayInWindowClick: 50.0   # Heaviest operation (Inventory)
-        PacketPlayInBlockDig: 30.0      # Block breaking
-        PacketPlayInUseItem: 20.0       # Item usage
-        PacketPlayInArmAnimation: 5.0   # Hand swinging
-        PacketPlayInFlying: 2.0         # Movement (Position/Look)
-        PacketPlayInKeepAlive: 10.0     # Disabler potential
-        PacketPlayInTransaction: 10.0   # Disabler potential
-        default: 5.0                    # Undefined packets
+        PacketPlayInWindowClick: 50.0
+        PacketPlayInSetCreativeSlot: 45.0
+        PacketPlayInBlockDig: 35.0
+        PacketPlayInUseItem: 25.0
+        PacketPlayInBEdit: 40.0
+        PacketPlayInUseEntity: 15.0
+        PacketPlayInArmAnimation: 5.0
+        PacketPlayInEntityAction: 8.0
+        PacketPlayInFlying: 2.0
+        PacketPlayInPosition: 2.0
+        PacketPlayInLook: 1.5
+        PacketPlayInPositionLook: 2.5
+        PacketPlayInKeepAlive: 12.0
+        PacketPlayInTransaction: 12.0
+        default: 5.0
 
     limits:
-      PacketPlayInFlying: "22/1000"
-      PacketPlayInPosition: "22/1000"
-      PacketPlayInLook: "22/1000"
-      PacketPlayInPositionLook: "22/1000"
-      PacketPlayInArmAnimation: "40/1000"
-      PacketPlayInBlockDig: "60/1000"
-      PacketPlayInUseItem: "30/1000"
-      PacketPlayInWindowClick: "25/500"
-      PacketPlayInUseEntity: "15/1000"
+      # Movement
+      PacketPlayInFlying: "25/1000"
+      PacketPlayInPosition: "25/1000"
+      PacketPlayInLook: "30/1000"
+      PacketPlayInPositionLook: "25/1000"
 
-      # --- ANTI-CHEAT & DISABLER (Test 12, 15) ---
-      PacketPlayInKeepAlive: "10/1000"
-      PacketPlayInTransaction: "15/1000"
-      PacketPlayInTeleportAccept: "10/1000" # (Teleport Confirm)
+      # Actions
+      PacketPlayInArmAnimation: "50/1000"
+      PacketPlayInBlockDig: "70/1000"
+      PacketPlayInUseItem: "35/1000"
+      PacketPlayInUseEntity: "20/1000"
+      PacketPlayInEntityAction: "25/1000"
 
-      # --- CREATIVE & INVENTORY (Test 27, 35) ---
-      PacketPlayInSetCreativeSlot: "20/1000" # (Slot Hash)
-      PacketPlayInPickItem: "10/1000"        # (Pick Item)
+      # Inventory (Dupe-sensitive)
+      PacketPlayInWindowClick: "30/500"
+      PacketPlayInSetCreativeSlot: "25/1000"
+      PacketPlayInPickItem: "12/1000"
+      PacketPlayInCloseWindow: "15/1000"
 
-      # --- RECIPE & BOOK (Test 14, 24, 33) ---
-      PacketPlayInAutoRecipe: "5/1000"       # (Recipe Crash)
-      PacketPlayInRecipeSettings: "10/1000"  # Recipe Book spam
-      PacketPlayInTrSel: "10/1000"           # Merchant Trade spam
+      # Anticheat bypass detection
+      PacketPlayInKeepAlive: "12/1000"
+      PacketPlayInTransaction: "18/1000"
+      PacketPlayInTeleportAccept: "12/1000"
 
-      # --- SYSTEM & STATE (Test 22, 29, 30, 32) ---
-      PacketPlayInClientCommand: "5/1000"    # (Respawn/Stats spam)
-      PacketPlayInSpectate: "5/1000"         # (Spectate spam)
-      PacketPlayInAdvancements: "5/1000"     # (Advancement spam)
-      PacketPlayInDifficultyLock: "5/1000"   # (Difficulty spam)
-      PacketPlayInDifficultyChange: "5/1000" # (Alternative name)
-
-      # --- PAYLOAD & TAB (Test 3) ---
-      PacketPlayInCustomPayload: "15/1000"   # (Payload spam)
-      PacketPlayInTabComplete: "10/1000"     # Tab spam
-
-      PacketPlayInMap: "10/1000"           # Map Spam
-      PacketPlayInChat: "10/2000"          # Chat Spam (10 messages in 2 seconds)
-
-      PacketPlayInEntityAction: "20/1000"
-      PacketPlayInVehicleMove: "22/1000"
-      PacketPlayInAbilities: "10/1000"
+      # Recipe & Book
+      PacketPlayInAutoRecipe: "8/1000"
+      PacketPlayInRecipeDisplayed: "8/1000"
+      PacketPlayInRecipeSettings: "12/1000"
       PacketPlayInBEdit: "5/2000"
+
+      # Trading & Merchants
+      PacketPlayInTrSel: "12/1000"
+
+      # System commands
+      PacketPlayInClientCommand: "8/1000"
+      PacketPlayInSpectate: "8/1000"
+      PacketPlayInAdvancements: "8/1000"
+      PacketPlayInDifficultyLock: "5/2000"
+      PacketPlayInDifficultyChange: "5/2000"
+
+      # Communication
+      PacketPlayInCustomPayload: "20/1000"
+      PacketPlayInTabComplete: "15/1000"
+      PacketPlayInChat: "12/2000"
+
+      # Misc
+      PacketPlayInVehicleMove: "25/1000"
+      PacketPlayInSteerVehicle: "25/1000"
+      PacketPlayInAbilities: "10/1000"
       PacketPlayInBeacon: "10/1000"
-      PacketPlayInEnchantItem: "10/1000"
-      PacketPlayInResourcePackStatus: "5/1000"
+      PacketPlayInEnchantItem: "15/1000"
+      PacketPlayInResourcePackStatus: "5/2000"
+      PacketPlayInUpdateSign: "8/1000"
+      PacketPlayInItemName: "10/1000"
 
   block-place:
     enabled: true
@@ -265,6 +285,8 @@ checks:
       - "/minecraft:me"
       - "/bukkit:me"
       - "/me"
+      - "/execute"
+      - "/function"
 
   tab:
     enabled: true
@@ -277,19 +299,23 @@ checks:
       - "run_command"
       - "^(."
       - "*."
+      - "execute"
+      - "summon"
 
 packet-logger:
   enabled: false
-  heavy-packet-threshold: -1
+  heavy-packet-threshold: 1000000 # 1ms (nanoseconds)
   output: FILE
   players: []
-  packets: ["KEEP_ALIVE"]
-  packet-mode: BLACKLIST
+  packet-mode: BLACKLIST # WHITELIST or BLACKLIST
+  packets:
+    - "PacketPlayInKeepAlive"
+    - "PacketPlayInFlying"
 
 mechanics:
   nether-portal-delay: true
   nether-portal-cooldown-ms: 3000 # 3s cooldown after passing through portal
-  max-arrow-velocity: 10.0 # Bow speed significantly reduced
+  max-arrow-velocity: 15.0 # Bow speed significantly reduced
   shears-cooldown: true
   break-close-inventory: true
   trapdoor-rail-redstone: true
@@ -300,10 +326,10 @@ mechanics:
   null_chunk: true
   self_damage: true
   bed_duplication: true
-  disable-piglin-trading: true
+  disable-piglin-trading: false
   close-inventory-on-teleport: true
   limit-falling-blocks: true
-  max-falling-blocks-per-chunk: 10
+  max-falling-blocks-per-chunk: 15
   prevent-nether-roof: true
   limit-map-creation: true
   prevent-invalid-trade: true

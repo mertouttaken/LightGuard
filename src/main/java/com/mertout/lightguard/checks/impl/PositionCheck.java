@@ -17,33 +17,43 @@ public class PositionCheck extends Check {
 
     @Override
     public boolean check(Object packet) {
+
+        // ➤ TELEPORT FIX: Oyuncu ışınlandıysa (Admin TP, Spawn vb.)
+        // PositionCheck'i 1-2 saniye devre dışı bırakıyoruz ki "Hızlı hareket ettin" diye geri atmasın.
+        if (data.isTeleporting()) {
+            // Eğer paket konum içeriyorsa, son konumu güncelle ki sonraki hesaplamalar doğru olsun.
+            if (packet instanceof PacketPlayInFlying && ((PacketPlayInFlying) packet).hasPos) {
+                PacketPlayInFlying p = (PacketPlayInFlying) packet;
+                updateLastPos(p.a(0), p.b(0), p.c(0));
+            }
+            return true; // Kontrol etme, geçmesine izin ver
+        }
+
         if (!plugin.getConfig().getBoolean("checks.position.enabled")) return true;
 
         if (packet instanceof PacketPlayInFlying) {
             PacketPlayInFlying p = (PacketPlayInFlying) packet;
 
             // 1.16.5 NMS: 'hasPos' alanı paketin koordinat içerip içermediğini belirtir.
-            // p.a(0) != 0 kontrolü hatalıdır, çünkü oyuncu X=0 noktasında olabilir.
             if (p.hasPos) {
                 double x = p.a(0); // getX
                 double y = p.b(0); // getY
                 double z = p.c(0); // getZ
 
-                // --- 1. NaN & Infinity Check (Senin Mevcut Kodun) ---
+                // --- 1. NaN & Infinity Check ---
                 if (!Double.isFinite(x) || !Double.isFinite(y) || !Double.isFinite(z)) {
                     flag("NaN/Infinity Coordinate");
                     return false;
                 }
 
-                // --- 2. World Border Check (Senin Mevcut Kodun - İsim düzeltildi) ---
-                // "max-offset" genelde hız limiti için kullanılır, dünya sınırı için "out-of-world-limit" daha doğrudur.
+                // --- 2. World Border Check ---
                 double worldLimit = plugin.getConfig().getDouble("checks.position.out-of-world-limit", 30000000.0);
                 if (Math.abs(x) > worldLimit || Math.abs(z) > worldLimit) {
                     flag("Out of World Limit");
                     return false;
                 }
 
-                // --- 3. HIZ VEKTÖRÜ HESAPLAMA (YENİ) ---
+                // --- 3. HIZ VEKTÖRÜ HESAPLAMA ---
                 // İlk girişte hesap yapamayız, lastX -1 ise kaydet ve çık.
                 if (lastX != -1) {
                     double deltaX = x - lastX;
@@ -53,11 +63,10 @@ public class PositionCheck extends Check {
                     // 3D Hız (Vektör Uzunluğu)
                     double speed = Math.sqrt(deltaX * deltaX + deltaY * deltaY + deltaZ * deltaZ);
 
-                    // --- 4. ELYTRA CRASH FIX (YENİ) ---
+                    // --- 4. ELYTRA CRASH FIX ---
                     // Sadece Elytra ile uçuyorsa hızını kısıtla (Chunk Load Crash Fix)
                     if (data.getPlayer().isGliding()) {
-                        // Configden limiti al (Varsayılan 3.5 blok/tick = ~70 blok/sn)
-                        double elytraLimit = plugin.getConfig().getDouble("checks.position.elytra-speed-limit", 3.5);
+                        double elytraLimit = plugin.getConfig().getDouble("checks.position.elytra-speed-limit", 4.0);
 
                         if (speed > elytraLimit) {
                             flag("Elytra Speed Limit (" + String.format("%.2f", speed) + ")");
@@ -65,10 +74,9 @@ public class PositionCheck extends Check {
                         }
                     }
 
-                    // --- 5. TELEPORT HACK FIX (YENİ) ---
-                    // Yürümeye karışmıyoruz ama bir anda 10 blok öteye ışınlanamaz (Teleport Hack)
-                    // "max-offset" ayarını burada kullanıyoruz.
-                    double maxOffset = plugin.getConfig().getDouble("checks.position.max-offset", 10.0);
+                    // --- 5. TELEPORT HACK FIX ---
+                    // Yürümeye karışmıyoruz ama bir anda 20 blok öteye ışınlanamaz (Teleport Hack)
+                    double maxOffset = plugin.getConfig().getDouble("checks.position.max-offset", 20.0);
 
                     if (speed > maxOffset) {
                         flag("Moved too fast / Teleport Hack (" + String.format("%.2f", speed) + ")");
@@ -76,12 +84,16 @@ public class PositionCheck extends Check {
                     }
                 }
 
-                // Son konumu güncelle
-                lastX = x;
-                lastY = y;
-                lastZ = z;
+                // Son konumu güncelle (Metodu aşağıda tanımladık)
+                updateLastPos(x, y, z);
             }
         }
         return true;
+    }
+
+    private void updateLastPos(double x, double y, double z) {
+        this.lastX = x;
+        this.lastY = y;
+        this.lastZ = z;
     }
 }

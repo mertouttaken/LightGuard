@@ -47,6 +47,7 @@ public class CheckManager {
         checks.add(new BookExploitCheck(data));
         checks.add(new MapExploitCheck(data));
         checks.add(new ChatSecurityCheck(data));
+        checks.add(new AnvilCheck(data));
     }
 
     public boolean handlePacket(Object packet) {
