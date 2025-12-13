@@ -12,21 +12,21 @@ public abstract class Check {
     protected final LightGuard plugin;
     protected final PlayerData data;
     protected final String name;
+    protected final boolean enabled; // Cache Değişkeni
 
-    public Check(PlayerData data, String name) {
+    public Check(PlayerData data, String name, String configName) {
         this.plugin = LightGuard.getInstance();
         this.data = data;
         this.name = name;
+        this.enabled = plugin.getConfig().getBoolean("checks." + configName + ".enabled");
     }
 
     public abstract boolean check(Object packet);
-    public String getName() { return name; }
-    // --- ESKİ METOT (Geriye uyumluluk için kalsın) ---
-    protected void flag(String info) {
-        flag(info, "UnknownPacket");
-    }
 
-    // --- YENİ METOT (Paket ismi alan) ---
+    public String getName() { return name; }
+
+    public boolean isEnabled() { return enabled; }
+
     protected void flag(String info, String packetName) {
         // Sentinel Modu
         if(plugin.getConfig().getBoolean("settings.sentinel.enabled") &&
@@ -47,22 +47,19 @@ public abstract class Check {
     private String buildKickMessage(String packetName) {
         List<String> layout = plugin.getConfig().getStringList("settings.kick-layout");
 
-        // Ping al
         int ping = 0;
         try {
             ping = ((CraftPlayer) data.getPlayer()).getHandle().ping;
         } catch (Exception e) {
             ping = -1;
         }
-
         int finalPing = ping;
 
-        // Mesajı oluştur ve %packet% yerini doldur
         return layout.stream()
                 .map(line -> line
                         .replace("%player%", data.getPlayer().getName())
                         .replace("%check%", name)
-                        .replace("%packet%", packetName) // <-- BURASI EKLENDİ
+                        .replace("%packet%", packetName)
                         .replace("%ping%", String.valueOf(finalPing))
                         .replace("&", "§"))
                 .collect(Collectors.joining("\n"));

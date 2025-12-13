@@ -8,44 +8,45 @@ import java.lang.reflect.Field;
 
 public class BadPacketCheck extends Check {
 
+    // Cache
+    private final boolean preventSelfInteract;
+
     public BadPacketCheck(PlayerData data) {
-        super(data, "BadPacket");
+        super(data, "BadPacket", "bad-packets");
+        // Ayarı hafızaya al
+        this.preventSelfInteract = plugin.getConfig().getBoolean("checks.bad-packets.prevent-self-interact");
     }
 
     @Override
     public boolean check(Object packet) {
-        if (!plugin.getConfig().getBoolean("checks.bad-packets.enabled")) return true;
+        // 1. Ana şalter kapalıysa direkt çık
+        if (!isEnabled()) return true;
 
         if (packet instanceof PacketPlayInUseEntity) {
             PacketPlayInUseEntity useEntity = (PacketPlayInUseEntity) packet;
 
-            // 1. Entity Self-Interact (Kendine Tıklama)
+            // 2. Self Interact Kontrolü (Sadece bu ayar açıksa çalışır)
             int entityId = getEntityId(useEntity);
             if (entityId == data.getPlayer().getEntityId()) {
-                if (plugin.getConfig().getBoolean("checks.bad-packets.prevent-self-interact")) {
-                    flag("Self Interaction");
+                if (preventSelfInteract) {
+                    flag("Self Interaction", "PacketPlayInUseEntity");
                     return false;
                 }
             }
 
-            // ➤ YENİ: Vector (InteractAt) Crash Fix (Zırh Askısı)
-            // Eğer etkileşim "INTERACT_AT" türündeyse, bir hedef vektörü (Vec3D) içerir.
-            // Bu vektör NaN veya Infinity olursa sunucu çöker.
+            // 3. Vector Crash Fix (Bu ayardan bağımsız her zaman çalışmalı!)
             Vec3D target = getTargetVector(useEntity);
             if (target != null) {
                 if (!Double.isFinite(target.x) || !Double.isFinite(target.y) || !Double.isFinite(target.z)) {
-                    flag("Invalid Interaction Vector (NaN/Infinity)");
+                    flag("Invalid Interaction Vector (NaN/Infinity)", "PacketPlayInUseEntity");
                     return false;
                 }
-
-                // Ekstra: Vektör çok büyükse (Örn: 30 blok öteye tıklama)
                 if (Math.abs(target.x) > 30 || Math.abs(target.y) > 30 || Math.abs(target.z) > 30) {
-                    flag("Interaction Vector Out of Range");
+                    flag("Interaction Vector Out of Range", "PacketPlayInUseEntity");
                     return false;
                 }
             }
         }
-
         return true;
     }
 
@@ -57,11 +58,8 @@ public class BadPacketCheck extends Check {
         } catch (Exception e) { return -1; }
     }
 
-    // Reflection ile Vec3D (Hedef noktası) verisini okuma
     private Vec3D getTargetVector(PacketPlayInUseEntity packet) {
         try {
-            // 1.16.5'te hedef vektör 'c' (Vec3D) field'ında tutulur (InteractAt için).
-            // Field ismi farklı olabilir, garanti yöntem 'Vec3D' tipindeki field'ı aramaktır.
             for (Field f : packet.getClass().getDeclaredFields()) {
                 if (f.getType() == Vec3D.class) {
                     f.setAccessible(true);

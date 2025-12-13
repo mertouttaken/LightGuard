@@ -27,6 +27,9 @@ checks:
   anvil:
     enabled: true
 
+  recipe:
+    enabled: true
+
   raw-packet:
     enabled: true
     # Maximum raw packet size (in Bytes).

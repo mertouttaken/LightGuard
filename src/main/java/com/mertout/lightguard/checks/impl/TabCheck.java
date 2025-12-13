@@ -7,28 +7,34 @@ import java.util.List;
 
 public class TabCheck extends Check {
 
+    private final int maxLength;
+    private final List<String> blockedChars;
+    private final List<String> blockedSubstrings;
+    private final List<String> blacklistedCmds;
+
     public TabCheck(PlayerData data) {
-        super(data, "Tab");
+        super(data, "Tab", "tab");
+        this.maxLength = plugin.getConfig().getInt("checks.tab.max-length", 256);
+        this.blockedChars = plugin.getConfig().getStringList("checks.tab.block-chars");
+        this.blockedSubstrings = plugin.getConfig().getStringList("checks.tab.block-contains");
+        this.blacklistedCmds = plugin.getConfig().getStringList("checks.tab.blacklisted-commands");
     }
 
     @Override
     public boolean check(Object packet) {
-        if (!plugin.getConfig().getBoolean("checks.tab.enabled")) return true;
+        if (!isEnabled()) return true;
 
         if (packet instanceof PacketPlayInTabComplete) {
             String buffer = getBuffer((PacketPlayInTabComplete) packet);
-            String packetName = "PacketPlayInTabComplete"; // Flag için isim
+            String packetName = "PacketPlayInTabComplete";
 
             if (buffer == null) return true;
 
-            // 1. Uzunluk Kontrolü
-            if (buffer.length() > plugin.getConfig().getInt("checks.tab.max-length", 256)) {
+            if (buffer.length() > maxLength) {
                 flag("Oversized Tab Request (" + buffer.length() + ")", packetName);
                 return false;
             }
 
-            // 2. Yasaklı Karakterler (Crash/Exploit)
-            List<String> blockedChars = plugin.getConfig().getStringList("checks.tab.block-chars");
             for (String s : blockedChars) {
                 if (buffer.contains(s)) {
                     flag("Illegal Character in Tab", packetName);
@@ -36,8 +42,6 @@ public class TabCheck extends Check {
                 }
             }
 
-            // 3. Advanced Filter (Kelime Bazlı Exploit)
-            List<String> blockedSubstrings = plugin.getConfig().getStringList("checks.tab.block-contains");
             String lowerBuffer = buffer.toLowerCase();
             for (String s : blockedSubstrings) {
                 if (lowerBuffer.contains(s.toLowerCase())) {
@@ -46,13 +50,8 @@ public class TabCheck extends Check {
                 }
             }
 
-            // ➤ 4. GİZLİ KOMUT ENGELLEME (YENİ)
-            // Sunucu bilgilerini sızdıran komutların tab tamamlamasını engeller.
-            List<String> blacklistedCmds = plugin.getConfig().getStringList("checks.tab.blacklisted-commands");
             for (String cmd : blacklistedCmds) {
-                // Eğer oyuncu "/ver" yazıp tab'a bastıysa ve listede "/ver" varsa
                 if (lowerBuffer.startsWith(cmd.toLowerCase())) {
-                    // Flag atmaya gerek yok, sadece tamamlamayı iptal et (Sessiz koruma)
                     return false;
                 }
             }

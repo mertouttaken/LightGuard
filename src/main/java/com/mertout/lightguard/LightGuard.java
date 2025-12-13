@@ -22,7 +22,6 @@ public class LightGuard extends JavaPlugin {
     private PacketInjector packetInjector;
     private PacketLoggerManager packetLoggerManager;
 
-    // Adaptive Flood için TPS sayacı
     private double currentTps = 20.0;
 
     @Override
@@ -38,21 +37,16 @@ public class LightGuard extends JavaPlugin {
         getServer().getPluginManager().registerEvents(new MechanicListener(this), this);
         getCommand("lg").setExecutor(new LGCommand(this));
 
-        // Netty Injection (En son başlat)
+        // Netty Injection
         this.packetInjector = new PacketInjector(this);
 
-        // ➤ TPS İZLEME GÖREVİ (DÜZELTİLDİ)
-        // Her 2 saniyede (40 tick) bir TPS'i günceller.
         getServer().getScheduler().runTaskTimer(this, () -> {
             try {
-                // 1.16.5 NMS üzerinden son 1 dakikalık TPS ortalamasını alıyoruz.
-                // recentTps[0] = 1dk, [1] = 5dk, [2] = 15dk
                 double recentTps = net.minecraft.server.v1_16_R3.MinecraftServer.getServer().recentTps[0];
 
-                // Değeri 0 ile 20 arasında sınırla (Bazen başlangıçta 20 üstü çıkabilir)
                 this.currentTps = Math.min(20.0, Math.max(0.0, recentTps));
             } catch (Exception e) {
-                this.currentTps = 20.0; // Hata olursa varsayılan değer
+                this.currentTps = 20.0;
             }
         }, 40L, 40L);
 
@@ -70,6 +64,5 @@ public class LightGuard extends JavaPlugin {
     public PlayerDataManager getPlayerDataManager() { return playerDataManager; }
     public PacketLoggerManager getPacketLoggerManager() { return packetLoggerManager; }
 
-    // Diğer sınıflar TPS'i buradan alacak
     public double getTPS() { return currentTps; }
 }

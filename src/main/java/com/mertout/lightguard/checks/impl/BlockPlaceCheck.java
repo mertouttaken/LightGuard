@@ -7,21 +7,45 @@ import net.minecraft.server.v1_16_R3.*;
 import org.bukkit.craftbukkit.v1_16_R3.inventory.CraftItemStack;
 import org.bukkit.Material;
 import org.bukkit.Bukkit;
+import java.util.List;
 
 public class BlockPlaceCheck extends Check {
 
+    // Takip Değişkenleri
     private long lastPlaceTime;
     private int placePackets;
     private long lastPrinterCheck;
     private int printerPackets;
 
+    // ➤ CACHE DEĞİŞKENLERİ (Performans İçin)
+    private final int maxPPS;
+    private final boolean printerCheckEnabled;
+    private final int printerThreshold;
+    private final boolean checkCoordinates;
+    private final boolean preventIllegalBlocks;
+    private final boolean kickOnIllegal;
+    private final List<String> illegalBlocks;
+    private final int maxItemDepth;
+
     public BlockPlaceCheck(PlayerData data) {
-        super(data, "BlockPlace");
+        // "checks.block-place.enabled" ayarını otomatik okur
+        super(data, "BlockPlace", "block-place");
+
+        // Ayarları 1 kere oku, hafızaya at
+        this.maxPPS = plugin.getConfig().getInt("checks.block-place.max-pps", 15);
+        this.printerCheckEnabled = plugin.getConfig().getBoolean("checks.block-place.printer-check");
+        this.printerThreshold = plugin.getConfig().getInt("checks.block-place.printer-threshold", 10);
+        this.checkCoordinates = plugin.getConfig().getBoolean("checks.block-place.check-coordinates", true);
+        this.preventIllegalBlocks = plugin.getConfig().getBoolean("checks.block-place.prevent-illegal-blocks");
+        this.kickOnIllegal = plugin.getConfig().getBoolean("checks.block-place.kick-on-illegal-block", false);
+        this.illegalBlocks = plugin.getConfig().getStringList("checks.block-place.illegal-blocks");
+        this.maxItemDepth = plugin.getConfig().getInt("checks.item.max-depth", 15);
     }
 
     @Override
     public boolean check(Object packet) {
-        if (!plugin.getConfig().getBoolean("checks.block-place.enabled")) return true;
+        // RAM'den hızlı kontrol (Hot Path Optimization)
+        if (!isEnabled()) return true;
 
         if (packet instanceof PacketPlayInUseItem) {
             PacketPlayInUseItem p = (PacketPlayInUseItem) packet;
@@ -34,19 +58,19 @@ public class BlockPlaceCheck extends Check {
                 lastPlaceTime = now;
             }
             placePackets++;
-            if (placePackets > plugin.getConfig().getInt("checks.block-place.max-pps", 15)) {
+            if (placePackets > maxPPS) {
                 flag("Block Place Flood", packetName);
                 return false;
             }
 
             // --- 2. Printer Mode ---
-            if (plugin.getConfig().getBoolean("checks.block-place.printer-check")) {
+            if (printerCheckEnabled) {
                 if (now - lastPrinterCheck > 1000) {
                     printerPackets = 0;
                     lastPrinterCheck = now;
                 }
                 printerPackets++;
-                if (printerPackets > plugin.getConfig().getInt("checks.block-place.printer-threshold", 10)) {
+                if (printerPackets > printerThreshold) {
                     data.setPrinterMode(true);
                 }
             }
@@ -58,8 +82,8 @@ public class BlockPlaceCheck extends Check {
                 return false;
             }
 
-            // ➤ KOORDİNAT KONTROLLERİ (Config'e bağlandı)
-            if (plugin.getConfig().getBoolean("checks.block-place.check-coordinates", true)) {
+            // ➤ KOORDİNAT KONTROLLERİ (Cached Variable)
+            if (checkCoordinates) {
 
                 // A. Vektör (Vec3D) NaN/Finite Kontrolü
                 Vec3D vec = position.getPos();
@@ -89,7 +113,6 @@ public class BlockPlaceCheck extends Check {
             }
 
             // Eğer koordinat check kapalıysa bile BlockPosition nesnesini almalıyız
-            // (Aşağıdaki kontroller için gerekli)
             BlockPosition pos = position.getBlockPosition();
 
             // --- 5. Item ve Blok Kontrolü ---
@@ -112,10 +135,10 @@ public class BlockPlaceCheck extends Check {
                     }
                 }
 
-                // ➤ Illegal Blocks
-                if (plugin.getConfig().getBoolean("checks.block-place.prevent-illegal-blocks")) {
-                    if (plugin.getConfig().getStringList("checks.block-place.illegal-blocks").contains(type.name())) {
-                        if (plugin.getConfig().getBoolean("checks.block-place.kick-on-illegal-block", false)) {
+                // ➤ Illegal Blocks (Cached List)
+                if (preventIllegalBlocks) {
+                    if (illegalBlocks.contains(type.name())) {
+                        if (kickOnIllegal) {
                             flag("Illegal Block Placement: " + type.name(), packetName);
                         } else {
                             Bukkit.getScheduler().runTask(plugin, () -> {
@@ -128,10 +151,10 @@ public class BlockPlaceCheck extends Check {
 
                 // ➤ NBT Check
                 net.minecraft.server.v1_16_R3.ItemStack nms = CraftItemStack.asNMSCopy(item);
-                int maxDepth = plugin.getConfig().getInt("checks.item.max-depth", 15);
 
                 if (nms.hasTag()) {
-                    if (NBTChecker.isNBTDangerous(nms.getTag(), maxDepth)) {
+                    // Cached MaxDepth kullanıyoruz
+                    if (NBTChecker.isNBTDangerous(nms.getTag(), maxItemDepth)) {
                         flag("Dangerous NBT Data", packetName);
                         return false;
                     }

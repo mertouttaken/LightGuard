@@ -1,16 +1,30 @@
 package com.mertout.lightguard.checks.impl;
+
 import com.mertout.lightguard.checks.Check;
 import com.mertout.lightguard.data.PlayerData;
 import net.minecraft.server.v1_16_R3.PacketPlayInChat;
 import java.util.List;
 
 public class CommandCheck extends Check {
-    public CommandCheck(PlayerData data) { super(data, "Command"); }
+
+    private final boolean blockSyntax;
+    private final List<String> blacklist;
+
+    public CommandCheck(PlayerData data) {
+        super(data, "Command", "command");
+        this.blockSyntax = plugin.getConfig().getBoolean("checks.command.block-syntax");
+        this.blacklist = plugin.getConfig().getStringList("checks.command.blacklist");
+    }
+
     @Override
     public boolean check(Object packet) {
-        if (!plugin.getConfig().getBoolean("checks.command.enabled")) return true;
+        if (!isEnabled()) return true;
+
         if (packet instanceof PacketPlayInChat) {
             String msg = getMessage((PacketPlayInChat) packet);
+            if (msg == null) return true;
+
+            // Uzunluk kontrolleri (Hardcoded limitler genelde güvenlidir ama confige de bağlanabilir)
             if (msg.length() > 256) {
                 flag("Oversized Chat Message", "Chat");
                 return false;
@@ -19,18 +33,32 @@ public class CommandCheck extends Check {
                 flag("Oversized Unicode Message", "Chat");
                 return false;
             }
-            if (msg != null && msg.startsWith("/")) {
-                List<String> bl = plugin.getConfig().getStringList("checks.command.blacklist");
+
+            if (msg.startsWith("/")) {
                 String cmd = msg.split(" ")[0].toLowerCase();
-                for(String b : bl) if(cmd.equals(b) || cmd.endsWith(":" + b.replace("/",""))) { flag("Blacklist"); return false; }
-                if(plugin.getConfig().getBoolean("checks.command.block-syntax") && (msg.contains("::") || msg.startsWith("//"))) {
-                    flag("Syntax"); return false;
+
+                // Cached List kullanımı (Hızlı)
+                for (String b : blacklist) {
+                    if (cmd.equals(b) || cmd.endsWith(":" + b.replace("/", ""))) {
+                        flag("Blacklisted Command", "Chat");
+                        return false;
+                    }
+                }
+
+                if (blockSyntax && (msg.contains("::") || msg.startsWith("//"))) {
+                    flag("Invalid Command Syntax", "Chat");
+                    return false;
                 }
             }
         }
         return true;
     }
+
     private String getMessage(PacketPlayInChat p) {
-        try { java.lang.reflect.Field f = p.getClass().getDeclaredField("a"); f.setAccessible(true); return (String) f.get(p); } catch (Exception e) { return null; }
+        try {
+            java.lang.reflect.Field f = p.getClass().getDeclaredField("a");
+            f.setAccessible(true);
+            return (String) f.get(p);
+        } catch (Exception e) { return null; }
     }
 }

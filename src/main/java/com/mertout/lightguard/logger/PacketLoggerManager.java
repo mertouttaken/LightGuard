@@ -26,8 +26,9 @@ public class PacketLoggerManager {
         String packetName = PacketFilter.getPacketName(packet);
         if (!PacketFilter.isAllowed(packetName, config)) return;
 
-        String logLine = String.format("[PacketLogger] Player: %s | Packet: %s | Time: %dns",
-                player.getName(), packetName, durationNs);
+        String logLine = "[PacketLogger] Player: " + player.getName() +
+                " | Packet: " + packetName +
+                " | Time: " + durationNs + "ns";
 
         if (config.getOutputMode() == PacketLoggerConfig.OutputMode.CONSOLE || config.getOutputMode() == PacketLoggerConfig.OutputMode.BOTH) {
             Bukkit.getConsoleSender().sendMessage("§e" + logLine);

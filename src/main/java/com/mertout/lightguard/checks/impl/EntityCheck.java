@@ -7,43 +7,37 @@ import org.bukkit.craftbukkit.v1_16_R3.entity.CraftPlayer;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.EntityType;
 import org.bukkit.entity.Player;
-
 import java.lang.reflect.Field;
 
 public class EntityCheck extends Check {
 
-    private long lastArmorStandInteract = 0; // Zırh askısı zamanlayıcısı
+    private long lastArmorStandInteract = 0;
+    private final boolean preventInvalidEntity;
+    private final boolean preventArmorStandSpam;
 
     public EntityCheck(PlayerData data) {
-        super(data, "EntitySecurity");
+        super(data, "EntitySecurity", "entity");
+        this.preventInvalidEntity = plugin.getConfig().getBoolean("checks.entity.prevent-invalid-entity");
+        this.preventArmorStandSpam = plugin.getConfig().getBoolean("checks.entity.prevent-armorstand-spam");
     }
 
     @Override
     public boolean check(Object packet) {
-        if (!plugin.getConfig().getBoolean("checks.entity.enabled")) return true;
+        if (!isEnabled()) return true;
 
         if (packet instanceof PacketPlayInUseEntity) {
             PacketPlayInUseEntity useEntity = (PacketPlayInUseEntity) packet;
-            Player player = data.getPlayer();
-
             int entityId = getEntityId(useEntity);
 
-            if (plugin.getConfig().getBoolean("checks.entity.prevent-invalid-entity")) {
-                net.minecraft.server.v1_16_R3.Entity nmsEntity = ((CraftPlayer) player).getHandle().world.getEntity(entityId);
+            if (preventInvalidEntity) {
+                net.minecraft.server.v1_16_R3.Entity nmsEntity = ((CraftPlayer) data.getPlayer()).getHandle().world.getEntity(entityId);
+                if (nmsEntity == null) return false;
 
-                if (nmsEntity == null) {
-                    return false;
-                }
-
-                if (plugin.getConfig().getBoolean("checks.entity.prevent-armorstand-spam")) {
+                if (preventArmorStandSpam) {
                     Entity bukkitEntity = nmsEntity.getBukkitEntity();
                     if (bukkitEntity.getType() == EntityType.ARMOR_STAND) {
                         long now = System.currentTimeMillis();
-
-                        if (now - lastArmorStandInteract < 200) {
-                            return false;
-                        }
-
+                        if (now - lastArmorStandInteract < 200) return false;
                         lastArmorStandInteract = now;
                     }
                 }
@@ -54,7 +48,7 @@ public class EntityCheck extends Check {
 
     private int getEntityId(PacketPlayInUseEntity packet) {
         try {
-            Field f = packet.getClass().getDeclaredField("a"); // 1.16.5'te 'a' field'ı entityId'dir
+            Field f = packet.getClass().getDeclaredField("a");
             f.setAccessible(true);
             return f.getInt(packet);
         } catch (Exception e) { return 0; }
