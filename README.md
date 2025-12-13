@@ -1,4 +1,4 @@
-# 🛡️ LightGuardAdvanced
+# 🛡️ LightGuard
 ### Packet-Based Anti-Exploit & Crash Protection
 
 **LightGuardAdvanced** is a high-performance, lightweight security plugin designed to protect Minecraft servers (**Spigot/Paper 1.16.5**) from crashers, exploit clients, lag machines, and malicious packets.
