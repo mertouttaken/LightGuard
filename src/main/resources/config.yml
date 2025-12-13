@@ -301,6 +301,17 @@ checks:
       - "*."
       - "execute"
       - "summon"
+    blacklisted-commands:
+      - "/ver"
+      - "/version"
+      - "/about"
+      - "/?"
+      - "/help"
+      - "/pl"
+      - "/plugins"
+      - "/bukkit:ver"
+      - "/bukkit:pl"
+      - "/minecraft:me"
 
 packet-logger:
   enabled: false
