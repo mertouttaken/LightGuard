@@ -6,7 +6,13 @@ import com.mertout.lightguard.data.PlayerDataManager;
 import com.mertout.lightguard.listeners.MechanicListener;
 import com.mertout.lightguard.logger.PacketLoggerManager;
 import com.mertout.lightguard.netty.PacketInjector;
+import com.mertout.lightguard.utils.NBTChecker;
+import net.minecraft.server.v1_16_R3.NBTBase;
+import net.minecraft.server.v1_16_R3.NBTTagCompound;
 import org.bukkit.plugin.java.JavaPlugin;
+
+import java.lang.reflect.Field;
+import java.util.Map;
 
 public class LightGuard extends JavaPlugin {
 
@@ -52,7 +58,6 @@ public class LightGuard extends JavaPlugin {
 
         getLogger().info("LightGuard (mert.out) Packet Protection Enabled!");
     }
-
     @Override
     public void onDisable() {
         if (packetInjector != null) packetInjector.ejectAll();

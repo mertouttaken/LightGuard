@@ -5,6 +5,7 @@ import net.minecraft.server.v1_16_R3.*;
 
 public class RecipeCheck extends Check {
     private long lastTime; private int count;
+    private static final int MAX_RECIPE_PACKETS = 5;
     public RecipeCheck(PlayerData data) { super(data, "Recipe"); }
     @Override
     public boolean check(Object packet) {
@@ -13,7 +14,7 @@ public class RecipeCheck extends Check {
             long now = System.currentTimeMillis();
             if (now - lastTime > 1000) { count = 0; lastTime = now; }
             count++;
-            if (count > 5) { flag("Flood"); return false; }
+            if (count > MAX_RECIPE_PACKETS) { flag("Flood"); return false; }
         }
         return true;
     }

@@ -20,7 +20,7 @@ public abstract class Check {
     }
 
     public abstract boolean check(Object packet);
-
+    public String getName() { return name; }
     // --- ESKİ METOT (Geriye uyumluluk için kalsın) ---
     protected void flag(String info) {
         flag(info, "UnknownPacket");

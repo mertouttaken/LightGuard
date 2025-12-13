@@ -5,6 +5,7 @@ import com.mertout.lightguard.data.PlayerData;
 import net.minecraft.server.v1_16_R3.*;
 
 import java.lang.reflect.Field;
+import java.util.List;
 
 public class PacketSizeCheck extends Check {
 
@@ -16,49 +17,35 @@ public class PacketSizeCheck extends Check {
     public boolean check(Object packet) {
         if (!plugin.getConfig().getBoolean("checks.packet-size.enabled")) return true;
 
+        String packetName = packet.getClass().getSimpleName();
+
+        // ➤ 1. Hardcoded İstisnalar (Performans İçin)
+        // CustomPayload zaten PayloadCheck ile korunuyor.
+        if (packet instanceof PacketPlayInCustomPayload) {
+            return true;
+        }
+
+        // ➤ 2. Config İstisnaları (Esneklik İçin - YENİ)
+        // Kullanıcı config'e "PacketPlayInMap" yazarsa onu da atlarız.
+        List<String> excluded = plugin.getConfig().getStringList("checks.packet-size.excluded-packets");
+        if (excluded.contains(packetName)) {
+            return true;
+        }
+
         int maxString = plugin.getConfig().getInt("checks.packet-size.max-string-length", 10000);
         int maxBuffer = plugin.getConfig().getInt("checks.packet-size.max-buffer-size", 16384);
 
-        String packetName = packet.getClass().getSimpleName();
-
-        // 1. Chat Packet Size
+        // ➤ 3. Chat Packet Size
         if (packet instanceof PacketPlayInChat) {
             String msg = getStringField(packet, "a");
             if (msg != null && msg.length() > maxString) {
-                flag("Oversized Chat Packet", packetName);
+                flag("Oversized Chat Packet (" + msg.length() + ")", packetName);
                 return false;
             }
         }
 
-        // 2. Custom Payload Size (Birleştirilmiş & Fixlenmiş)
-        if (packet instanceof PacketPlayInCustomPayload) {
-            PacketPlayInCustomPayload payload = (PacketPlayInCustomPayload) packet;
-
-            // Boyut kontrolü
-            if (payload.data != null && payload.data.readableBytes() > maxBuffer) {
-                // WDL gibi modlara istisna tanınabilir, configden bakılabilir
-                // Şimdilik genel koruma:
-                flag("Oversized Payload (" + payload.data.readableBytes() + " bytes)", packetName);
-                return false;
-            }
-        }
-
-        // 3. BEdit (Book Edit) Size
-        if (packet instanceof PacketPlayInBEdit) {
-            ItemStack item = getItemField(packet, "a"); // 1.16.5'te genelde 'a' itemdir
-            // Eğer item null değilse ve NBT string boyutu limiti aşıyorsa
-            if (item != null && item.hasTag()) {
-                if (item.getTag().toString().length() > maxBuffer) {
-                    flag("Oversized Book Packet", packetName);
-                    return false;
-                }
-            }
-        }
-
-        // 4. Tab Complete Size
+        // ➤ 4. Tab Complete Size
         if (packet instanceof PacketPlayInTabComplete) {
-            // 1.16.5'te 'a' TransactionID(int), 'b' String(text) olabilir.
-            // Önce 'b' (yaygın olan) sonra 'a' denenir.
             String text = getStringField(packet, "b");
             if (text == null) text = getStringField(packet, "a");
 
@@ -68,7 +55,34 @@ public class PacketSizeCheck extends Check {
             }
         }
 
+        // ➤ 5. BEdit (Book Edit) Size
+        if (packet instanceof PacketPlayInBEdit) {
+            ItemStack item = getItemField(packet, "a");
+            if (item != null && item.hasTag()) {
+                if (item.getTag().toString().length() > maxBuffer) {
+                    flag("Oversized Book Packet", packetName);
+                    return false;
+                }
+            }
+        }
+
+        // ➤ 6. Genel Boyut Tahmini
+        long estimatedSize = estimateSize(packet);
+        int globalLimit = plugin.getConfig().getInt("checks.packet-size.per-packet-limit", 32000);
+
+        if (estimatedSize > globalLimit) {
+            flag("Oversized Packet (" + estimatedSize + " bytes estimate)", packetName);
+            return false;
+        }
+
         return true;
+    }
+
+    private long estimateSize(Object packet) {
+        if (packet instanceof PacketPlayInSetCreativeSlot) return 1500;
+        if (packet instanceof PacketPlayInUpdateSign) return 500;
+        if (packet instanceof PacketPlayInJigsawGenerate || packet instanceof PacketPlayInStruct) return 2048;
+        return 20;
     }
 
     private String getStringField(Object obj, String name) {
@@ -76,9 +90,7 @@ public class PacketSizeCheck extends Check {
             Field f = obj.getClass().getDeclaredField(name);
             f.setAccessible(true);
             Object value = f.get(obj);
-            if (value instanceof String) {
-                return (String) value;
-            }
+            if (value instanceof String) return (String) value;
             return null;
         } catch (Exception e) { return null; }
     }

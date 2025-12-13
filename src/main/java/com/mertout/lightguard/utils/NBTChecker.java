@@ -1,122 +1,104 @@
-package com.mertout.lightguard.utils;
+package com.mertout.lightguard.utils; // Kendi paket isminize göre düzenleyin
 
-import net.minecraft.server.v1_16_R3.*;
-import org.bukkit.configuration.file.FileConfiguration;
+import net.minecraft.server.v1_16_R3.NBTBase;
+import net.minecraft.server.v1_16_R3.NBTTagCompound;
+import net.minecraft.server.v1_16_R3.NBTTagList;
 
-import java.util.List;
+import java.util.Collections;
+import java.util.IdentityHashMap;
+import java.util.Set;
 
+/**
+ * NBT verilerindeki güvenlik açıklarını tarayan yardımcı sınıf.
+ * Özellikle Cyclic Reference ve Excessive Depth exploitlerine karşı korur.
+ */
 public class NBTChecker {
 
-    public static boolean isNBTDangerous(NBTTagCompound tag, FileConfiguration config) {
-        if (tag == null) return false;
+    // Config'den alınacak değerler için varsayılanlar
+    private static final int DEFAULT_MAX_DEPTH = 15;
 
-        // Ayarları al
-        List<String> illegalKeys = config.getStringList("checks.item.illegal-keys");
-        int maxDepth = config.getInt("checks.item.max-item-depth", 4);
-        int maxListSize = config.getInt("checks.item.max-list-size", 15);
-        int maxStringLen = config.getInt("checks.item.max-string-len", 200);
+    /**
+     * Verilen NBTTagCompound içinde döngüsel referans veya aşırı derinlik olup olmadığını kontrol eder.
+     *
+     * @param rootTag Kontrol edilecek ana NBT etiketi.
+     * @param maxDepth İzin verilen maksimum derinlik.
+     * @return true ise NBT ZARARLIDIR (Exploit tespit edildi), false ise güvenlidir.
+     */
+    public static boolean isNBTDangerous(NBTTagCompound rootTag, int maxDepth) {
+        if (rootTag == null) return false;
 
-        // 1. Genel Yapısal Kontrol (Derinlik, Uzunluk, Yasaklı Kelimeler)
-        if (checkRecursively(tag, 0, maxDepth, maxListSize, maxStringLen, illegalKeys)) {
+        // IdentityHashMap kullanarak Set oluşturuyoruz.
+        // Bu, objelerin içeriğine değil, bellekteki adreslerine (referanslarına) bakar.
+        // Performans: O(1) lookup.
+        Set<NBTBase> visited = Collections.newSetFromMap(new IdentityHashMap<>());
+
+        try {
+            return checkRecursively(rootTag, visited, 0, maxDepth);
+        } catch (Exception e) {
+            // NBT okurken herhangi bir hata (ClassCastException vs.) oluşursa
+            // güvenli tarafta kalarak paketi zararlı kabul ediyoruz.
             return true;
         }
-
-        // 2. Spesifik Eşya Kontrolleri (SpigotGuard Mantığı)
-        if (checkSpecificItems(tag)) {
-            return true;
-        }
-
-        return false;
     }
 
-    private static boolean checkRecursively(NBTTagCompound tag, int depth, int maxDepth, int maxList, int maxStr, List<String> bannedKeys) {
-        // Derinlik Limiti (StackOverflow Koruması)
-        if (depth > maxDepth) return true;
+    /**
+     * Rekürsif tarama metodu.
+     */
+    private static boolean checkRecursively(NBTBase current, Set<NBTBase> visited, int depth, int maxDepth) {
+        // 1. Derinlik Limiti Kontrolü
+        // StackOverflowError oluşmadan önce biz durduruyoruz.
+        if (depth > maxDepth) {
+            return true; // Zararlı: Aşırı derinlik
+        }
 
-        for (String key : tag.getKeys()) {
-            // Yasaklı Anahtar Kelimeler (Exploit Koruması)
-            for (String banned : bannedKeys) {
-                if (key.contains(banned)) return true;
-            }
+        // 2. Cyclic Reference Kontrolü
+        // Eğer bu nesne şu anki yolda (path) zaten varsa, bir döngü var demektir.
+        if (visited.contains(current)) {
+            return true; // Zararlı: Döngü tespit edildi
+        }
 
-            NBTBase base = tag.get(key);
+        // Şu anki nesneyi ziyaret edildi olarak işaretle
+        visited.add(current);
 
-            // NaN ve Infinity Kontrolü (Crash Koruması)
-            if (base instanceof NBTTagDouble) {
-                double val = ((NBTTagDouble) base).asDouble();
-                if (!Double.isFinite(val)) return true;
-            }
-            if (base instanceof NBTTagFloat) {
-                float val = ((NBTTagFloat) base).asFloat();
-                if (!Float.isFinite(val)) return true;
-            }
+        try {
+            // 3. Tip Kontrolü ve Alt Elemanlara İniş
 
-            // String Uzunluk Kontrolü
-            if (base instanceof NBTTagString) {
-                if (base.asString().length() > maxStr) return true;
-            }
+            // Durum A: NBTTagCompound (Map benzeri yapı)
+            if (current instanceof NBTTagCompound) {
+                NBTTagCompound compound = (NBTTagCompound) current;
 
-            // Liste Boyut Kontrolü
-            if (base instanceof NBTTagList) {
-                NBTTagList list = (NBTTagList) base;
-                if (list.size() > maxList) return true;
-
-                // Listenin içindeki Compound'ları da tara
-                // (Basit tipler için derinlik artırmıyoruz, sadece Compound için)
-                for (int i = 0; i < list.size(); i++) {
-                    // 1.16.5 NBTTagList get metodu bazen farklı olabilir, NBTBase döner
-                    // Reflection veya NMS tipine göre gerekirse cast edilir.
-                    // Basitlik adına burada recursive çağırmıyoruz, çünkü
-                    // NBTTagList genellikle aynı tip verileri tutar.
-                    // Ancak Compound listesi ise manuel bakmak gerekir:
-                     /*
-                     if (list.get(i) instanceof NBTTagCompound) {
-                         if (checkRecursively((NBTTagCompound) list.get(i), depth + 1, ...)) return true;
-                     }
-                     */
+                // Compound içindeki tüm anahtarları geziyoruz
+                for (String key : compound.getKeys()) {
+                    NBTBase child = compound.get(key);
+                    // Alt eleman için rekürsif çağrı
+                    if (checkRecursively(child, visited, depth + 1, maxDepth)) {
+                        return true; // Alt daldan zararlı sinyali geldiyse yukarı taşı
+                    }
                 }
             }
+            // Durum B: NBTTagList (Liste yapısı)
+            else if (current instanceof NBTTagList) {
+                NBTTagList list = (NBTTagList) current;
 
-            // İç İçe Compound Kontrolü
-            if (base instanceof NBTTagCompound) {
-                if (checkRecursively((NBTTagCompound) base, depth + 1, maxDepth, maxList, maxStr, bannedKeys)) return true;
+                // Liste elemanlarını geziyoruz
+                for (int i = 0; i < list.size(); i++) {
+                    NBTBase child = list.get(i);
+                    // Alt eleman için rekürsif çağrı
+                    if (checkRecursively(child, visited, depth + 1, maxDepth)) {
+                        return true;
+                    }
+                }
             }
-        }
-        return false;
-    }
+            // Diğer tipler (Int, String, Byte vs.) primitif sarmalayıcı olduğu için
+            // içlerinde başka NBT barındırmazlar, dolayısıyla recursion burada biter.
 
-    // SpigotGuard'dan Esinlenilen Özel Kontroller
-    private static boolean checkSpecificItems(NBTTagCompound tag) {
-        // A. Banner & Shield Desen Limiti (Client Freeze)
-        if (tag.hasKey("BlockEntityTag")) {
-            NBTTagCompound blockTag = tag.getCompound("BlockEntityTag");
-            if (blockTag.hasKey("Patterns")) {
-                NBTTagList patterns = blockTag.getList("Patterns", 10); // 10 = Compound ID
-                if (patterns.size() > 20) return true; // 20'den fazla desen yasak
-            }
-        }
-
-        // B. Havai Fişek (Firework) Crash Limiti
-        if (tag.hasKey("Fireworks")) {
-            NBTTagCompound fireworks = tag.getCompound("Fireworks");
-
-            // Patlama Efekti Limiti
-            if (fireworks.hasKey("Explosions")) {
-                NBTTagList explosions = fireworks.getList("Explosions", 10);
-                if (explosions.size() > 10) return true; // 10'dan fazla patlama yasak
-            }
-
-            // Uçuş Süresi Limiti (Oyun Bozma)
-            if (fireworks.hasKey("Flight")) {
-                // Byte olarak tutulur
-                if (fireworks.getByte("Flight") > 5) return true;
-            }
+        } finally {
+            // 4. Backtracking (Geri İzleme)
+            // Bu düğümden çıkıyoruz, artık "bu yolda" değiliz.
+            // Bu sayede A->B ve A->C gibi meşru yapıları engellemeyiz.
+            visited.remove(current);
         }
 
-        // C. Kitap Başlık/Yazar Uzunluğu (Ekstra Güvenlik)
-        if (tag.hasKey("title") && tag.getString("title").length() > 32) return true;
-        if (tag.hasKey("author") && tag.getString("author").length() > 16) return true;
-
-        return false;
+        return false; // Temiz
     }
 }

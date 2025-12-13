@@ -1,6 +1,7 @@
 package com.mertout.lightguard.netty;
 
 import com.mertout.lightguard.LightGuard;
+import com.mertout.lightguard.checks.impl.PayloadCheck;
 import com.mertout.lightguard.data.PlayerData;
 import io.netty.channel.*;
 import org.bukkit.craftbukkit.v1_16_R3.entity.CraftPlayer;
@@ -32,10 +33,16 @@ public class PacketInjector implements Listener {
     @EventHandler
     public void onQuit(PlayerQuitEvent event) {
         remove(event.getPlayer());
+
+        // Payload kanal verilerini temizle
+        // (PayloadCheck.onQuit statik yapıldıysa böyle, değilse plugin.getPayloadCheck().onQuit(...) )
+        PayloadCheck.onQuit(event.getPlayer());
+
         plugin.getPlayerDataManager().removeData(event.getPlayer().getUniqueId());
     }
 
     private void inject(Player player) {
+        // 1. DECODER SONRASI HANDLER (Mevcut Mantık)
         ChannelDuplexHandler channelHandler = new ChannelDuplexHandler() {
             @Override
             public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
@@ -44,10 +51,15 @@ public class PacketInjector implements Listener {
                 // SENTINEL MODE: Try-Catch All
                 try {
                     long start = System.nanoTime();
-                    plugin.getPacketLoggerManager().getWatchdog().startProcessing();
+
+                    // Null Check
+                    if (plugin.getPacketLoggerManager() != null && plugin.getPacketLoggerManager().getWatchdog() != null) {
+                        plugin.getPacketLoggerManager().getWatchdog().startProcessing();
+                    }
 
                     PlayerData data = plugin.getPlayerDataManager().getData(p.getUniqueId());
                     if (data != null) {
+                        // CheckManager kontrolü (Flood, NBT vb.)
                         if (!data.getCheckManager().handlePacket(msg)) {
                             // Check başarısız, paketi iptal et
                             return;
@@ -57,29 +69,61 @@ public class PacketInjector implements Listener {
                     super.channelRead(ctx, msg);
 
                     long duration = System.nanoTime() - start;
-                    plugin.getPacketLoggerManager().getWatchdog().endProcessing();
-                    plugin.getPacketLoggerManager().processPacket(p, msg, duration);
+
+                    if (plugin.getPacketLoggerManager() != null) {
+                        if (plugin.getPacketLoggerManager().getWatchdog() != null) {
+                            plugin.getPacketLoggerManager().getWatchdog().endProcessing();
+                        }
+                        plugin.getPacketLoggerManager().processPacket(p, msg, duration);
+                    }
 
                 } catch (Throwable t) {
+                    // FAIL-CLOSED GÜNCELLEMESİ (Güvenli Mod)
                     if (plugin.getConfig().getBoolean("settings.sentinel.enabled", true)) {
-                        plugin.getLogger().severe("[Sentinel] Error for " + p.getName() + ": " + t.getMessage());
+
+                        plugin.getLogger().severe("[Sentinel] Critical Error for " + p.getName() + ": " + t.getMessage());
+                        t.printStackTrace();
+
                         if (!plugin.getConfig().getBoolean("settings.sentinel.silent-failures", true)) {
-                            p.kickPlayer("§cSecurity Error (Sentinel)");
+                            plugin.getServer().getScheduler().runTask(plugin, () ->
+                                    p.kickPlayer("§cSecurity Error (LightGuard Sentinel)")
+                            );
                         }
-                        super.channelRead(ctx, msg);
+
+                        // Hata varsa paketi düşür (Drop)
+                        return;
                     } else {
                         throw t;
                     }
                 }
             }
-            // NOT: write metodu (Outbound) tamamen kaldırıldı.
         };
 
         try {
             ChannelPipeline pipeline = ((CraftPlayer) player).getHandle().playerConnection.networkManager.channel.pipeline();
+
+            // 2. RAW INSPECTOR'I EKLE (Decoder Öncesi)
+            String targetHandler = "splitter";
+
+            if (pipeline.get("splitter") == null) {
+                // HATA DÜZELTİLDİ: pipeline.first() yerine pipeline.firstContext()
+                if (pipeline.firstContext() != null) {
+                    targetHandler = pipeline.firstContext().name();
+                }
+            }
+
+            // Raw Inspector zaten yoksa ve hedef handler varsa ekle
+            if (pipeline.get("lightguard_raw") == null && pipeline.get(targetHandler) != null) {
+                RawPacketInspector inspector = new RawPacketInspector(plugin, player.getName());
+                // Splitter'dan (veya ilk handler'dan) hemen sonrasına ekle
+                pipeline.addAfter(targetHandler, "lightguard_raw", inspector);
+            }
+
+            // 3. MAIN HANDLER (Decoder Sonrası)
             if (pipeline.get("lightguard_handler") == null) {
                 pipeline.addBefore("packet_handler", "lightguard_handler", channelHandler);
             }
+
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -88,11 +132,27 @@ public class PacketInjector implements Listener {
     public void remove(Player player) {
         try {
             Channel channel = ((CraftPlayer) player).getHandle().playerConnection.networkManager.channel;
+
+            // Kanal zaten kapanmışsa veya yoksa işlem yapma
+            if (channel == null || !channel.isOpen()) return;
+
             channel.eventLoop().submit(() -> {
-                channel.pipeline().remove("lightguard_handler");
+                ChannelPipeline pipeline = channel.pipeline();
+
+                // 1. Main Handler'ı sil
+                if (pipeline.get("lightguard_handler") != null) {
+                    pipeline.remove("lightguard_handler");
+                }
+
+                // 2. YENİ: Raw Inspector'ı sil (Bunu eklemeyi unutma!)
+                if (pipeline.get("lightguard_raw") != null) {
+                    pipeline.remove("lightguard_raw");
+                }
                 return null;
             });
-        } catch (Exception ignored) {}
+        } catch (Exception ignored) {
+            // Oyuncu çoktan düşmüş olabilir, hatayı yutuyoruz.
+        }
     }
 
     public void ejectAll() {
