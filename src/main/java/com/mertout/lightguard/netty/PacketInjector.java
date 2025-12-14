@@ -12,24 +12,26 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 
-import java.lang.reflect.Field;
+import java.lang.invoke.MethodHandles;
+import java.lang.invoke.VarHandle;
 
 public class PacketInjector implements Listener {
 
     private final LightGuard plugin;
-    private static Field keepAliveIdField;
+    private static final VarHandle KEEP_ALIVE_ID;
 
     static {
         try {
-            keepAliveIdField = PacketPlayOutKeepAlive.class.getDeclaredField("a");
-            keepAliveIdField.setAccessible(true);
-        } catch (Exception e) { e.printStackTrace(); }
+            MethodHandles.Lookup lookup = MethodHandles.privateLookupIn(PacketPlayOutKeepAlive.class, MethodHandles.lookup());
+            KEEP_ALIVE_ID = lookup.findVarHandle(PacketPlayOutKeepAlive.class, "a", long.class);
+        } catch (Exception e) {
+            throw new ExceptionInInitializerError(e);
+        }
     }
 
     public PacketInjector(LightGuard plugin) {
         this.plugin = plugin;
         plugin.getServer().getPluginManager().registerEvents(this, plugin);
-
         for (Player p : plugin.getServer().getOnlinePlayers()) {
             plugin.getPlayerDataManager().createData(p);
             inject(p);
@@ -58,37 +60,19 @@ public class PacketInjector implements Listener {
                     if (plugin.getPacketLoggerManager() != null && plugin.getPacketLoggerManager().getWatchdog() != null) {
                         plugin.getPacketLoggerManager().getWatchdog().startProcessing();
                     }
-
                     PlayerData data = plugin.getPlayerDataManager().getData(p.getUniqueId());
                     if (data != null) {
-                        if (!data.getCheckManager().handlePacket(msg)) {
-                            return;
-                        }
+                        if (!data.getCheckManager().handlePacket(msg)) return;
                     }
-
                     super.channelRead(ctx, msg);
-
                     long duration = System.nanoTime() - start;
                     if (plugin.getPacketLoggerManager() != null) {
-                        if (plugin.getPacketLoggerManager().getWatchdog() != null) {
-                            plugin.getPacketLoggerManager().getWatchdog().endProcessing();
-                        }
+                        plugin.getPacketLoggerManager().getWatchdog().endProcessing();
                         plugin.getPacketLoggerManager().processPacket(p, msg, duration);
                     }
                 } catch (Throwable t) {
-                    if (plugin.getConfig().getBoolean("settings.sentinel.enabled", true)) {
-                        plugin.getLogger().severe("[Sentinel] Critical Error for " + p.getName() + ": " + t.getMessage());
-                        if (plugin.getConfig().getBoolean("settings.debug", false)) t.printStackTrace();
-
-                        if (!plugin.getConfig().getBoolean("settings.sentinel.silent-failures", true)) {
-                            plugin.getServer().getScheduler().runTask(plugin, () ->
-                                    p.kickPlayer("§cSecurity Error (LightGuard Sentinel)")
-                            );
-                        }
-                        return;
-                    } else {
-                        throw t;
-                    }
+                    if (plugin.getConfig().getBoolean("settings.sentinel.enabled", true)) return;
+                    throw t;
                 }
             }
 
@@ -98,15 +82,14 @@ public class PacketInjector implements Listener {
                     PlayerData data = plugin.getPlayerDataManager().getData(player.getUniqueId());
                     if (data != null) {
                         try {
-                            long id = keepAliveIdField.getLong(msg);
-                            data.getPendingKeepAlives().add(id);
+                            long id = (long) KEEP_ALIVE_ID.get(msg);
+                            data.getPendingKeepAlives().put(id, System.currentTimeMillis());
                         } catch (Exception e) {}
                     }
                 }
                 super.write(ctx, msg, promise);
             }
         };
-
         try {
             ChannelPipeline pipeline = ((CraftPlayer) player).getHandle().playerConnection.networkManager.channel.pipeline();
             String[] targetHandlers = {"splitter", "decoder", "prepender", "packet_handler"};
@@ -114,14 +97,12 @@ public class PacketInjector implements Listener {
             for (String handlerName : targetHandlers) {
                 if (pipeline.get(handlerName) != null) { target = handlerName; break; }
             }
-
             if (pipeline.get("lightguard_raw") == null) {
                 RawPacketInspector inspector = new RawPacketInspector(plugin, player.getName());
                 if (pipeline.context("decoder") != null) pipeline.addBefore("decoder", "lightguard_raw", inspector);
                 else if (target != null) pipeline.addAfter(target, "lightguard_raw", inspector);
                 else pipeline.addFirst("lightguard_raw", inspector);
             }
-
             if (pipeline.get("lightguard_handler") == null) {
                 if (pipeline.get("packet_handler") != null) pipeline.addBefore("packet_handler", "lightguard_handler", channelHandler);
                 else pipeline.addLast("lightguard_handler", channelHandler);
@@ -129,21 +110,6 @@ public class PacketInjector implements Listener {
         } catch (Exception e) { e.printStackTrace(); }
     }
 
-    public void remove(Player player) {
-        try {
-            if (player == null || !player.isOnline()) return;
-            Channel channel = ((CraftPlayer) player).getHandle().playerConnection.networkManager.channel;
-            if (channel != null && channel.isOpen()) {
-                channel.eventLoop().execute(() -> {
-                    ChannelPipeline pipeline = channel.pipeline();
-                    if (pipeline.get("lightguard_handler") != null) pipeline.remove("lightguard_handler");
-                    if (pipeline.get("lightguard_raw") != null) pipeline.remove("lightguard_raw");
-                });
-            }
-        } catch (Exception e) {}
-    }
-
-    public void ejectAll() {
-        for (Player p : plugin.getServer().getOnlinePlayers()) { remove(p); }
-    }
+    public void remove(Player player) { /* Aynı */ try { if (player == null || !player.isOnline()) return; Channel channel = ((CraftPlayer) player).getHandle().playerConnection.networkManager.channel; if (channel != null && channel.isOpen()) { channel.eventLoop().execute(() -> { ChannelPipeline pipeline = channel.pipeline(); if (pipeline.get("lightguard_handler") != null) pipeline.remove("lightguard_handler"); if (pipeline.get("lightguard_raw") != null) pipeline.remove("lightguard_raw"); }); } } catch (Exception e) {} }
+    public void ejectAll() { for (Player p : plugin.getServer().getOnlinePlayers()) { remove(p); } }
 }

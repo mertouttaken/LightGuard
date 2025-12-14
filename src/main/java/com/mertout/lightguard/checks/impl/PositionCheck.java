@@ -33,13 +33,6 @@ public class PositionCheck extends Check {
                 double y = p.b(0);
                 double z = p.c(0);
 
-                int chunkX = (int) x >> 4;
-                int chunkZ = (int) z >> 4;
-                if (!data.getPlayer().getWorld().isChunkLoaded(chunkX, chunkZ)) {
-                    flag("Unloaded Chunk Position", "PacketPlayInFlying");
-                    return false;
-                }
-
                 if (!Double.isFinite(x) || !Double.isFinite(y) || !Double.isFinite(z)) {
                     flag("NaN/Infinity Coordinate", "PacketPlayInFlying");
                     return false;
@@ -65,7 +58,7 @@ public class PositionCheck extends Check {
                         }
                     }
 
-                    double maxOffset = plugin.getConfig().getDouble("checks.position.max-offset", 20.0);
+                    double maxOffset = plugin.getConfig().getDouble("checks.position.max-offset", 2000.0);
                     if (speedSquared > maxOffset * maxOffset) {
                         flag("Moved too fast / Teleport Hack (" + String.format("%.2f", Math.sqrt(speedSquared)) + ")", "PacketPlayInFlying");
                         return false;

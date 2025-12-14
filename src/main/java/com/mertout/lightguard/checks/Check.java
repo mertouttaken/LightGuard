@@ -3,6 +3,7 @@ package com.mertout.lightguard.checks;
 import com.mertout.lightguard.LightGuard;
 import com.mertout.lightguard.data.PlayerData;
 import org.bukkit.Bukkit;
+import org.bukkit.Location;
 import org.bukkit.craftbukkit.v1_16_R3.entity.CraftPlayer;
 
 import java.util.List;
@@ -24,43 +25,42 @@ public abstract class Check {
     public abstract boolean check(Object packet);
 
     public String getName() { return name; }
-
     public boolean isEnabled() { return enabled; }
 
     protected void flag(String info, String packetName) {
-        // Sentinel
         if(plugin.getConfig().getBoolean("settings.sentinel.enabled") &&
                 plugin.getConfig().getBoolean("settings.sentinel.silent-failures")) {
-            plugin.getLogger().warning(data.getPlayer().getName() + " failed " + name + " (" + packetName + "): " + info);
             return;
         }
 
-        // Kick
+        int ping = getPing();
+        double tps = plugin.getTPS();
+        Location loc = data.getPlayer().getLocation();
+        String locationStr = String.format("%.1f, %.1f, %.1f", loc.getX(), loc.getY(), loc.getZ());
+
+        plugin.getLogger().warning(String.format(
+                "§c[LightGuard] %s flagged %s (%s) | Info: %s | Ping: %dms | TPS: %.2f | Loc: %s",
+                data.getPlayer().getName(), name, packetName, info, ping, tps, locationStr
+        ));
+
         Bukkit.getScheduler().runTask(plugin, () -> {
-            String kickMessage = buildKickMessage(packetName);
+            String kickMessage = buildKickMessage(packetName, ping);
             data.getPlayer().kickPlayer(kickMessage);
         });
-
-        plugin.getLogger().warning(data.getPlayer().getName() + " flagged " + name + " [" + packetName + "] (" + info + ")");
     }
 
-    private String buildKickMessage(String packetName) {
+    private int getPing() {
+        try { return ((CraftPlayer) data.getPlayer()).getHandle().ping; } catch (Exception e) { return -1; }
+    }
+
+    private String buildKickMessage(String packetName, int ping) {
         List<String> layout = plugin.getConfig().getStringList("settings.kick-layout");
-
-        int ping = 0;
-        try {
-            ping = ((CraftPlayer) data.getPlayer()).getHandle().ping;
-        } catch (Exception e) {
-            ping = -1;
-        }
-        int finalPing = ping;
-
         return layout.stream()
                 .map(line -> line
                         .replace("%player%", data.getPlayer().getName())
                         .replace("%check%", name)
                         .replace("%packet%", packetName)
-                        .replace("%ping%", String.valueOf(finalPing))
+                        .replace("%ping%", String.valueOf(ping))
                         .replace("&", "§"))
                 .collect(Collectors.joining("\n"));
     }

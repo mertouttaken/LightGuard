@@ -6,12 +6,22 @@ import net.minecraft.server.v1_16_R3.PacketPlayInUseEntity;
 import org.bukkit.craftbukkit.v1_16_R3.entity.CraftPlayer;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.EntityType;
-import org.bukkit.entity.Player;
-import java.lang.reflect.Field;
+import java.lang.invoke.MethodHandles;
+import java.lang.invoke.VarHandle;
+import java.util.concurrent.atomic.AtomicLong;
 
 public class EntityCheck extends Check {
 
-    private long lastArmorStandInteract = 0;
+    private final AtomicLong lastArmorStandInteract = new AtomicLong(0);
+
+    private static final VarHandle ENTITY_ID;
+    static {
+        try {
+            MethodHandles.Lookup lookup = MethodHandles.privateLookupIn(PacketPlayInUseEntity.class, MethodHandles.lookup());
+            ENTITY_ID = lookup.findVarHandle(PacketPlayInUseEntity.class, "a", int.class);
+        } catch (Exception e) { throw new ExceptionInInitializerError(e); }
+    }
+
     private final boolean preventInvalidEntity;
     private final boolean preventArmorStandSpam;
 
@@ -27,7 +37,7 @@ public class EntityCheck extends Check {
 
         if (packet instanceof PacketPlayInUseEntity) {
             PacketPlayInUseEntity useEntity = (PacketPlayInUseEntity) packet;
-            int entityId = getEntityId(useEntity);
+            int entityId = (int) ENTITY_ID.get(useEntity);
 
             if (preventInvalidEntity) {
                 net.minecraft.server.v1_16_R3.Entity nmsEntity = ((CraftPlayer) data.getPlayer()).getHandle().world.getEntity(entityId);
@@ -37,20 +47,12 @@ public class EntityCheck extends Check {
                     Entity bukkitEntity = nmsEntity.getBukkitEntity();
                     if (bukkitEntity.getType() == EntityType.ARMOR_STAND) {
                         long now = System.currentTimeMillis();
-                        if (now - lastArmorStandInteract < 200) return false;
-                        lastArmorStandInteract = now;
+                        if (now - lastArmorStandInteract.get() < 200) return false;
+                        lastArmorStandInteract.set(now);
                     }
                 }
             }
         }
         return true;
-    }
-
-    private int getEntityId(PacketPlayInUseEntity packet) {
-        try {
-            Field f = packet.getClass().getDeclaredField("a");
-            f.setAccessible(true);
-            return f.getInt(packet);
-        } catch (Exception e) { return 0; }
     }
 }

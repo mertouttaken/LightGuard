@@ -4,9 +4,19 @@ import com.mertout.lightguard.checks.Check;
 import com.mertout.lightguard.data.PlayerData;
 import net.minecraft.server.v1_16_R3.PacketPlayInUseEntity;
 import net.minecraft.server.v1_16_R3.Vec3D;
+import java.lang.invoke.MethodHandles;
+import java.lang.invoke.VarHandle;
 import java.lang.reflect.Field;
 
 public class BadPacketCheck extends Check {
+
+    private static final VarHandle ENTITY_ID;
+    static {
+        try {
+            MethodHandles.Lookup lookup = MethodHandles.privateLookupIn(PacketPlayInUseEntity.class, MethodHandles.lookup());
+            ENTITY_ID = lookup.findVarHandle(PacketPlayInUseEntity.class, "a", int.class);
+        } catch (Exception e) { throw new ExceptionInInitializerError(e); }
+    }
 
     private final boolean preventSelfInteract;
 
@@ -18,22 +28,19 @@ public class BadPacketCheck extends Check {
     @Override
     public boolean check(Object packet) {
         if (!isEnabled()) return true;
-
         if (packet instanceof PacketPlayInUseEntity) {
             PacketPlayInUseEntity useEntity = (PacketPlayInUseEntity) packet;
+            int entityId = (int) ENTITY_ID.get(useEntity);
 
-            int entityId = getEntityId(useEntity);
-            if (entityId == data.getPlayer().getEntityId()) {
-                if (preventSelfInteract) {
-                    flag("Self Interaction", "PacketPlayInUseEntity");
-                    return false;
-                }
+            if (entityId == data.getPlayer().getEntityId() && preventSelfInteract) {
+                flag("Self Interaction", "PacketPlayInUseEntity");
+                return false;
             }
 
             Vec3D target = getTargetVector(useEntity);
             if (target != null) {
                 if (!Double.isFinite(target.x) || !Double.isFinite(target.y) || !Double.isFinite(target.z)) {
-                    flag("Invalid Interaction Vector (NaN/Infinity)", "PacketPlayInUseEntity");
+                    flag("Invalid Interaction Vector", "PacketPlayInUseEntity");
                     return false;
                 }
                 if (Math.abs(target.x) > 30 || Math.abs(target.y) > 30 || Math.abs(target.z) > 30) {
@@ -43,14 +50,6 @@ public class BadPacketCheck extends Check {
             }
         }
         return true;
-    }
-
-    private int getEntityId(PacketPlayInUseEntity packet) {
-        try {
-            Field f = packet.getClass().getDeclaredField("a");
-            f.setAccessible(true);
-            return f.getInt(packet);
-        } catch (Exception e) { return -1; }
     }
 
     private Vec3D getTargetVector(PacketPlayInUseEntity packet) {

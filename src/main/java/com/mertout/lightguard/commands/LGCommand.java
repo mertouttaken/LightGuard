@@ -26,6 +26,18 @@ public class LGCommand implements CommandExecutor {
             LGProfileCommand.toggle(sender);
             return true;
         }
+        if (args[0].equalsIgnoreCase("benchmark")) {
+            sender.sendMessage("§a[LightGuard] Benchmark statistics are being printed to the console...");
+            plugin.getPerformanceMonitor().printStats();
+            return true;
+        }
+
+        if (args[0].equalsIgnoreCase("resetbench") || args[0].equalsIgnoreCase("resetbenchmark")) {
+            plugin.getPerformanceMonitor().reset();
+            sender.sendMessage("§a[LightGuard] Benchmark data has been reset..");
+            return true;
+        }
+
         sender.sendMessage("§aLightGuard Active.");
         return true;
     }

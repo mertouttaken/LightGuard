@@ -5,7 +5,6 @@ import com.mertout.lightguard.data.PlayerData;
 import com.mertout.lightguard.checks.impl.*;
 import com.mertout.lightguard.utils.GeyserUtil;
 import net.minecraft.server.v1_16_R3.*;
-import org.bukkit.Bukkit;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -30,15 +29,18 @@ public class CheckManager {
     }
 
     private void loadChecks() {
-        // 1. Global Packets
+        // 1. Global Checks
         globalChecks.add(new FloodCheck(data));
         globalChecks.add(new PacketSizeCheck(data));
+
+        // 2. Packet Specific Checks
+        register(PacketPlayInKeepAlive.class, new KeepAliveCheck(data));
 
         register(PacketPlayInChat.class, new CommandCheck(data), new ChatSecurityCheck(data));
         register(PacketPlayInTabComplete.class, new TabCheck(data));
         register(PacketPlayInWindowClick.class, new ItemExploitCheck(data), new WindowCheck(data), new GameStateCheck(data));
         register(PacketPlayInSetCreativeSlot.class, new ItemExploitCheck(data), new MapExploitCheck(data));
-        register(PacketPlayInFlying.class, new PositionCheck(data)); // Flying, Position, Look
+        register(PacketPlayInFlying.class, new PositionCheck(data)); // Flying, Position, Look, PositionLook
         register(PacketPlayInUseItem.class, new BlockPlaceCheck(data));
         register(PacketPlayInCustomPayload.class, new PayloadCheck(data));
         register(PacketPlayInBEdit.class, new BookExploitCheck(data));
@@ -50,7 +52,6 @@ public class CheckManager {
         register(PacketPlayInAutoRecipe.class, new RecipeCheck(data));
         register(PacketPlayInRecipeDisplayed.class, new RecipeCheck(data));
         register(PacketPlayInItemName.class, new AnvilCheck(data));
-        register(PacketPlayInKeepAlive.class, new KeepAliveCheck(data));
     }
 
     private void register(Class<?> packetClass, Check... checks) {
@@ -61,7 +62,6 @@ public class CheckManager {
         boolean sentinelEnabled = plugin.getConfig().getBoolean("settings.sentinel.enabled", true);
         List<String> criticalChecks = plugin.getConfig().getStringList("settings.sentinel.critical-checks");
 
-        // 1. Offline/Dead Packet Fix
         if (plugin.getConfig().getBoolean("mechanics.block-dead-packets")) {
             if (data.getPlayer().isDead() || !data.getPlayer().isOnline()) {
                 String name = packet.getClass().getSimpleName();
@@ -91,24 +91,30 @@ public class CheckManager {
         boolean geyserSupport = plugin.getConfig().getBoolean("settings.sentinel.geyser-support", true);
 
         for (Check check : checks) {
-            // Geyser Bypass
             if (isBedrock && geyserSupport) {
                 String checkClassName = check.getClass().getSimpleName();
-                if (checkClassName.equals("VehicleCheck") || checkClassName.equals("PositionCheck")) {
+                if (checkClassName.equals("VehicleCheck") ||
+                        checkClassName.equals("PositionCheck") ||
+                        checkClassName.equals("BlockPlaceCheck")) {
                     continue;
                 }
             }
 
+            long start = System.nanoTime();
+
             try {
                 if (!check.check(packet)) return false;
             } catch (Throwable t) {
-                // Sentinel Error Handling
                 String checkName = check.getName();
                 plugin.getLogger().warning("[Sentinel] Error in '" + checkName + "': " + t.getMessage());
                 if (plugin.getConfig().getBoolean("settings.debug", false)) t.printStackTrace();
 
                 if (sentinel && critical.contains(checkName)) {
-                    return false; // Fail-closed
+                    return false;
+                }
+            } finally {
+                if (plugin.getPerformanceMonitor() != null) {
+                    plugin.getPerformanceMonitor().recordCheck(check.getName(), System.nanoTime() - start);
                 }
             }
         }
@@ -118,7 +124,6 @@ public class CheckManager {
     public void reloadChecks() {
         packetMap.clear();
         globalChecks.clear();
-
         loadChecks();
     }
 }

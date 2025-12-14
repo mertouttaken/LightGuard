@@ -3,9 +3,19 @@ package com.mertout.lightguard.checks.impl;
 import com.mertout.lightguard.checks.Check;
 import com.mertout.lightguard.data.PlayerData;
 import net.minecraft.server.v1_16_R3.PacketPlayInChat;
+import java.lang.invoke.MethodHandles;
+import java.lang.invoke.VarHandle;
 import java.util.List;
 
 public class CommandCheck extends Check {
+
+    private static final VarHandle MSG_FIELD;
+    static {
+        try {
+            MethodHandles.Lookup lookup = MethodHandles.privateLookupIn(PacketPlayInChat.class, MethodHandles.lookup());
+            MSG_FIELD = lookup.findVarHandle(PacketPlayInChat.class, "a", String.class);
+        } catch (Exception e) { throw new ExceptionInInitializerError(e); }
+    }
 
     private final boolean blockSyntax;
     private final List<String> blacklist;
@@ -21,50 +31,34 @@ public class CommandCheck extends Check {
         if (!isEnabled()) return true;
 
         if (packet instanceof PacketPlayInChat) {
-            String msg = getMessage((PacketPlayInChat) packet);
+            String msg = (String) MSG_FIELD.get(packet);
             if (msg == null) return true;
 
             if (msg.length() > 256) {
                 flag("Oversized Chat Message", "Chat");
                 return false;
             }
-            if (msg.codePointCount(0, msg.length()) > 256) {
-                flag("Oversized Unicode Message", "Chat");
-                return false;
-            }
 
             if (msg.startsWith("/")) {
                 String cmd = msg.split(" ")[0].toLowerCase();
 
-                String cleanCmd = cmd;
-                while (cleanCmd.contains(":")) {
-                    cleanCmd = cleanCmd.substring(cleanCmd.indexOf(":") + 1);
-                }
-                String checkedCleanCmd = "/" + cleanCmd;
+                String cleanCmd = cmd.replaceAll("^(/+[^:]+:)+", "/");
+
+                cleanCmd = cleanCmd.replaceAll("^//+", "/");
 
                 for (String b : blacklist) {
-                    if (cmd.equals(b) || cmd.endsWith(":" + b.replace("/", "")) ||
-                            checkedCleanCmd.equals(b)) {
-
+                    if (cmd.equals(b) || cleanCmd.equals(b)) {
                         flag("Blacklisted Command", "Chat");
                         return false;
                     }
                 }
 
-                if (blockSyntax && (msg.contains("::") || msg.startsWith("//"))) {
+                if (blockSyntax && (msg.contains("::") || (msg.startsWith("//") && !msg.startsWith("//calc")))) {
                     flag("Invalid Command Syntax", "Chat");
                     return false;
                 }
             }
         }
         return true;
-    }
-
-    private String getMessage(PacketPlayInChat p) {
-        try {
-            java.lang.reflect.Field f = p.getClass().getDeclaredField("a");
-            f.setAccessible(true);
-            return (String) f.get(p);
-        } catch (Exception e) { return null; }
     }
 }

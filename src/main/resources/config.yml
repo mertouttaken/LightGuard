@@ -246,7 +246,7 @@ checks:
 
   position:
     enabled: true
-    max-offset: 20.0 # Stricter movement area
+    max-offset: 2000.0 # Stricter movement area
     elytra-speed-limit: 4.0
     out-of-world-limit: 30000000.0
     check-teleport-delay: true
