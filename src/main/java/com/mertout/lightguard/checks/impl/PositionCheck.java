@@ -3,15 +3,24 @@ package com.mertout.lightguard.checks.impl;
 import com.mertout.lightguard.checks.Check;
 import com.mertout.lightguard.data.PlayerData;
 import net.minecraft.server.v1_16_R3.PacketPlayInFlying;
+import java.util.concurrent.atomic.AtomicReference;
 
 public class PositionCheck extends Check {
 
-    private double lastX = -1;
-    private double lastY = -1;
-    private double lastZ = -1;
+    private static class Position {
+        final double x, y, z;
+        Position(double x, double y, double z) { this.x = x; this.y = y; this.z = z; }
+    }
+
+    private final AtomicReference<Position> lastPos = new AtomicReference<>(new Position(-1, -1, -1));
 
     public PositionCheck(PlayerData data) {
         super(data, "Position", "position");
+    }
+
+    @Override
+    public boolean isBedrockCompatible() {
+        return false;
     }
 
     @Override
@@ -44,10 +53,11 @@ public class PositionCheck extends Check {
                     return false;
                 }
 
-                if (lastX != -1) {
-                    double deltaX = x - lastX;
-                    double deltaY = y - lastY;
-                    double deltaZ = z - lastZ;
+                Position last = lastPos.get();
+                if (last.x != -1) {
+                    double deltaX = x - last.x;
+                    double deltaY = y - last.y;
+                    double deltaZ = z - last.z;
                     double speedSquared = deltaX * deltaX + deltaY * deltaY + deltaZ * deltaZ;
 
                     if (data.getPlayer().isGliding()) {
@@ -58,9 +68,9 @@ public class PositionCheck extends Check {
                         }
                     }
 
-                    double maxOffset = plugin.getConfig().getDouble("checks.position.max-offset", 2000.0);
+                    double maxOffset = plugin.getConfig().getDouble("checks.position.max-offset", 20.0);
                     if (speedSquared > maxOffset * maxOffset) {
-                        flag("Moved too fast / Teleport Hack (" + String.format("%.2f", Math.sqrt(speedSquared)) + ")", "PacketPlayInFlying");
+                        flag("Moved too fast", "PacketPlayInFlying");
                         return false;
                     }
                 }
@@ -71,6 +81,6 @@ public class PositionCheck extends Check {
     }
 
     private void updateLastPos(double x, double y, double z) {
-        this.lastX = x; this.lastY = y; this.lastZ = z;
+        lastPos.set(new Position(x, y, z));
     }
 }

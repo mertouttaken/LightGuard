@@ -6,6 +6,8 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 
 public class PlayerData {
 
@@ -18,6 +20,9 @@ public class PlayerData {
     private volatile int currentPPS = 0;
     private volatile long lastVehicleJump;
 
+    private final AtomicLong lastChannelRegister = new AtomicLong(System.currentTimeMillis());
+    private final AtomicInteger recentChannelRegisters = new AtomicInteger(0);
+
     private final Map<Long, Long> pendingKeepAlives = new ConcurrentHashMap<>();
     private final Set<String> registeredChannels = ConcurrentHashMap.newKeySet();
 
@@ -26,7 +31,6 @@ public class PlayerData {
         this.uuid = player.getUniqueId();
         this.checkManager = new CheckManager(this);
         this.lastVehicleJump = 0;
-
         this.lastTeleportTime = System.currentTimeMillis() + 1000;
     }
 
@@ -40,6 +44,9 @@ public class PlayerData {
         pendingKeepAlives.entrySet().removeIf(entry -> (now - entry.getValue()) > 60000);
     }
 
+    public AtomicLong getLastChannelRegister() { return lastChannelRegister; }
+    public AtomicInteger getRecentChannelRegisters() { return recentChannelRegisters; }
+
     public Set<String> getRegisteredChannels() { return registeredChannels; }
     public Map<Long, Long> getPendingKeepAlives() { return pendingKeepAlives; }
 
@@ -47,10 +54,7 @@ public class PlayerData {
     public void setPPS(int pps) { this.currentPPS = pps; }
 
     public void setLastTeleportTime(long time) { this.lastTeleportTime = time; }
-
-    public boolean isTeleporting() {
-        return System.currentTimeMillis() - lastTeleportTime < 3000;
-    }
+    public boolean isTeleporting() { return System.currentTimeMillis() - lastTeleportTime < 3000; }
 
     public long getLastVehicleJump() { return lastVehicleJump; }
     public void setLastVehicleJump(long lastVehicleJump) { this.lastVehicleJump = lastVehicleJump; }

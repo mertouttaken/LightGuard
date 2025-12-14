@@ -15,6 +15,11 @@ public class VehicleCheck extends Check {
     }
 
     @Override
+    public boolean isBedrockCompatible() {
+        return false;
+    }
+
+    @Override
     public boolean check(Object packet) {
         if (!isEnabled()) return true;
 

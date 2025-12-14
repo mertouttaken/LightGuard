@@ -9,9 +9,7 @@ import java.util.*;
 
 public class PayloadCheck extends Check {
 
-
     private static final int MAX_CHANNELS_PER_PLAYER = 124;
-
     private final List<String> blockedChannels;
     private final int maxPayloadSize;
     private final boolean brandCheckEnabled;
@@ -44,27 +42,50 @@ public class PayloadCheck extends Check {
             }
 
             if (channel.equals("minecraft:register") || channel.equals("REGISTER")) {
-                ByteBuf dataCopy = p.data.copy();
-                try {
-                    String content = dataCopy.toString(StandardCharsets.UTF_8);
-                    String[] reqChannels = content.split("\0");
-                    if (reqChannels.length > 20) {
-                        flag("Channel Register Flood", packetName);
-                        return false;
-                    }
+                ByteBuf data = p.data;
+                int readableBytes = data.readableBytes();
+                int channelCount = 0;
 
-                    Set<String> channels = data.getRegisteredChannels();
-                    for (String ch : reqChannels) {
-                        if (ch.isEmpty()) continue;
-                        if (!channels.contains(ch)) {
-                            if (channels.size() >= MAX_CHANNELS_PER_PLAYER) {
-                                flag("Max Channel Limit Reached", packetName);
-                                return false;
+                for (int i = 0; i < readableBytes; i++) {
+                    if (data.getByte(data.readerIndex() + i) == 0) channelCount++;
+                }
+                if (channelCount > 20) {
+                    flag("Channel Register Flood", packetName);
+                    return false;
+                }
+
+                long now = System.currentTimeMillis();
+                if (now - this.data.getLastChannelRegister().get() > 60000) {
+                    this.data.getRecentChannelRegisters().set(0);
+                    this.data.getLastChannelRegister().set(now);
+                }
+                if (this.data.getRecentChannelRegisters().addAndGet(channelCount + 1) > 50) {
+                    flag("Channel Register Flood (Rate Limit)", packetName);
+                    return false;
+                }
+
+                Set<String> channels = this.data.getRegisteredChannels();
+                if (channels.size() + channelCount >= MAX_CHANNELS_PER_PLAYER) {
+                    flag("Max Channel Limit Reached", packetName);
+                    return false;
+                }
+
+                if (channelCount > 0) {
+                    int start = data.readerIndex();
+                    int pos = start;
+                    for (int i = 0; i <= readableBytes; i++) {
+                        if (i == readableBytes || data.getByte(start + i) == 0) {
+                            if (i > pos) {
+                                int length = i - pos;
+                                String ch = data.toString(pos, length, StandardCharsets.UTF_8);
+                                if (!ch.isEmpty() && !channels.contains(ch)) {
+                                    channels.add(ch);
+                                }
                             }
-                            channels.add(ch);
+                            pos = i + 1;
                         }
                     }
-                } catch (Exception e) { return false; } finally { dataCopy.release(); }
+                }
             }
 
             try {
@@ -76,15 +97,18 @@ public class PayloadCheck extends Check {
 
             if (channel.equals("minecraft:brand") || channel.equals("MC|Brand")) {
                 if (brandCheckEnabled) {
-                    String brand = readString(p.data.copy());
-                    if (brand.length() > maxBrandLength) {
-                        flag("Oversized Client Brand", packetName);
-                        return false;
-                    }
-                    if (blockInvalidBrandChars && !brand.matches("[a-zA-Z0-9_ .-]+")) {
-                        flag("Invalid Brand Characters", packetName);
-                        return false;
-                    }
+                    ByteBuf copy = p.data.copy();
+                    try {
+                        String brand = readString(copy);
+                        if (brand.length() > maxBrandLength) {
+                            flag("Oversized Client Brand", packetName);
+                            return false;
+                        }
+                        if (blockInvalidBrandChars && !brand.matches("[a-zA-Z0-9_ .-]+")) {
+                            flag("Invalid Brand Characters", packetName);
+                            return false;
+                        }
+                    } finally { copy.release(); }
                 }
             }
         }
@@ -98,7 +122,7 @@ public class PayloadCheck extends Check {
             byte[] bytes = new byte[len];
             buf.readBytes(bytes);
             return new String(bytes, StandardCharsets.UTF_8);
-        } catch (Exception e) { return ""; } finally { buf.release(); }
+        } catch (Exception e) { return ""; }
     }
 
     private int readVarInt(ByteBuf buf) {

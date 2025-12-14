@@ -35,7 +35,6 @@ public class FloodCheck extends Check {
     private final AtomicLong totalBytes = new AtomicLong(0);
     private final DoubleAdder currentWeight = new DoubleAdder();
     private final Map<String, PacketTracker> packetTrackers = new ConcurrentHashMap<>();
-    private long lastCleanupTime = System.currentTimeMillis();
 
     public FloodCheck(PlayerData data) {
         super(data, "Flood", "flood");
@@ -69,17 +68,16 @@ public class FloodCheck extends Check {
         return PACKET_NAME_CACHE.computeIfAbsent(packet.getClass(), Class::getSimpleName);
     }
 
+    public void cleanup(long now) {
+        packetTrackers.entrySet().removeIf(entry -> (now - entry.getValue().lastTime.get()) > 60000);
+    }
+
     @Override
     public boolean check(Object packet) {
         if (!isEnabled()) return true;
 
         long now = System.currentTimeMillis();
         String packetName = getPacketName(packet);
-
-        if (now - lastCleanupTime > 60000) {
-            packetTrackers.entrySet().removeIf(entry -> (now - entry.getValue().lastTime.get()) > 60000);
-            lastCleanupTime = now;
-        }
 
         double multiplier = 1.0;
         double tps = plugin.getTPS();

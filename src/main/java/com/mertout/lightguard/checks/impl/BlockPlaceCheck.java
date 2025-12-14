@@ -13,7 +13,6 @@ import java.util.concurrent.atomic.AtomicLong;
 
 public class BlockPlaceCheck extends Check {
 
-    // ➤ DEĞİŞİKLİK: Atomic Değişkenler
     private final AtomicLong lastPlaceTime = new AtomicLong();
     private final AtomicInteger placePackets = new AtomicInteger();
     private final AtomicLong lastPrinterCheck = new AtomicLong();
@@ -41,6 +40,11 @@ public class BlockPlaceCheck extends Check {
     }
 
     @Override
+    public boolean isBedrockCompatible() {
+        return false;
+    }
+
+    @Override
     public boolean check(Object packet) {
         if (!isEnabled()) return true;
 
@@ -49,7 +53,6 @@ public class BlockPlaceCheck extends Check {
             String packetName = "PacketPlayInUseItem";
             long now = System.currentTimeMillis();
 
-            // ➤ Atomic Kullanımı
             if (now - lastPlaceTime.get() > 1000) {
                 placePackets.set(0);
                 lastPlaceTime.set(now);
@@ -94,9 +97,7 @@ public class BlockPlaceCheck extends Check {
 
             BlockPosition pos = position.getBlockPosition();
             EnumHand hand = p.b();
-            org.bukkit.inventory.ItemStack item = (hand == EnumHand.MAIN_HAND) ?
-                    data.getPlayer().getInventory().getItemInMainHand() :
-                    data.getPlayer().getInventory().getItemInOffHand();
+            org.bukkit.inventory.ItemStack item = (hand == EnumHand.MAIN_HAND) ? data.getPlayer().getInventory().getItemInMainHand() : data.getPlayer().getInventory().getItemInOffHand();
 
             if (item != null && item.getType() != Material.AIR) {
                 Material type = item.getType();
@@ -110,17 +111,17 @@ public class BlockPlaceCheck extends Check {
                 }
                 if (preventIllegalBlocks && illegalBlocks.contains(type.name())) {
                     if (kickOnIllegal) {
-                        flag("Illegal Block Placement: " + type.name(), packetName);
+                        flag("Illegal Block: " + type.name(), packetName);
                     } else {
                         Bukkit.getScheduler().runTask(plugin, () -> {
-                            data.getPlayer().sendMessage("§c§lLightGuard: §7Bu bloğu (" + type.name() + ") koymanız yasaklanmıştır.");
+                            data.getPlayer().sendMessage("§cBu bloğu (" + type.name() + ") koymanız yasaklanmıştır.");
                         });
                     }
                     return false;
                 }
                 net.minecraft.server.v1_16_R3.ItemStack nms = CraftItemStack.asNMSCopy(item);
                 if (nms.hasTag() && NBTChecker.isNBTDangerous(nms.getTag(), maxItemDepth)) {
-                    flag("Dangerous NBT Data", packetName);
+                    flag("Dangerous NBT", packetName);
                     return false;
                 }
             }

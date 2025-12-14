@@ -48,10 +48,13 @@ public class LightGuard extends JavaPlugin {
                 this.currentTps = 20.0;
             }
         }, 40L, 40L);
-
         getServer().getScheduler().runTaskTimerAsynchronously(this, () -> {
+            long now = System.currentTimeMillis();
             for (com.mertout.lightguard.data.PlayerData data : getPlayerDataManager().getAllData()) {
                 data.cleanOldKeepAlives();
+                if (data.getCheckManager() != null) {
+                    data.getCheckManager().cleanupChecks(now);
+                }
             }
         }, 1200L, 1200L);
 

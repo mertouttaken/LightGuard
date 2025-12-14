@@ -6,15 +6,17 @@ import net.minecraft.server.v1_16_R3.PacketPlayInUseEntity;
 import net.minecraft.server.v1_16_R3.Vec3D;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.VarHandle;
-import java.lang.reflect.Field;
 
 public class BadPacketCheck extends Check {
 
     private static final VarHandle ENTITY_ID;
+    private static final VarHandle TARGET_VECTOR;
+
     static {
         try {
             MethodHandles.Lookup lookup = MethodHandles.privateLookupIn(PacketPlayInUseEntity.class, MethodHandles.lookup());
             ENTITY_ID = lookup.findVarHandle(PacketPlayInUseEntity.class, "a", int.class);
+            TARGET_VECTOR = lookup.findVarHandle(PacketPlayInUseEntity.class, "c", Vec3D.class);
         } catch (Exception e) { throw new ExceptionInInitializerError(e); }
     }
 
@@ -28,6 +30,7 @@ public class BadPacketCheck extends Check {
     @Override
     public boolean check(Object packet) {
         if (!isEnabled()) return true;
+
         if (packet instanceof PacketPlayInUseEntity) {
             PacketPlayInUseEntity useEntity = (PacketPlayInUseEntity) packet;
             int entityId = (int) ENTITY_ID.get(useEntity);
@@ -37,7 +40,7 @@ public class BadPacketCheck extends Check {
                 return false;
             }
 
-            Vec3D target = getTargetVector(useEntity);
+            Vec3D target = (Vec3D) TARGET_VECTOR.get(useEntity);
             if (target != null) {
                 if (!Double.isFinite(target.x) || !Double.isFinite(target.y) || !Double.isFinite(target.z)) {
                     flag("Invalid Interaction Vector", "PacketPlayInUseEntity");
@@ -50,17 +53,5 @@ public class BadPacketCheck extends Check {
             }
         }
         return true;
-    }
-
-    private Vec3D getTargetVector(PacketPlayInUseEntity packet) {
-        try {
-            for (Field f : packet.getClass().getDeclaredFields()) {
-                if (f.getType() == Vec3D.class) {
-                    f.setAccessible(true);
-                    return (Vec3D) f.get(packet);
-                }
-            }
-        } catch (Exception e) {}
-        return null;
     }
 }

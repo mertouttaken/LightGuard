@@ -13,6 +13,8 @@ import org.bukkit.inventory.InventoryView;
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
 import java.lang.reflect.Field;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 
 public class WindowCheck extends Check {
 
@@ -32,8 +34,9 @@ public class WindowCheck extends Check {
 
     private final boolean preventLecternSpam;
     private final boolean preventSwapInGui;
-    private long lastQuickMoveTime;
-    private int quickMoveCount;
+
+    private final AtomicLong lastQuickMoveTime = new AtomicLong();
+    private final AtomicInteger quickMoveCount = new AtomicInteger();
 
     public WindowCheck(PlayerData data) {
         super(data, "Window", "window");
@@ -80,10 +83,13 @@ public class WindowCheck extends Check {
 
                 if (clickType == InventoryClickType.QUICK_MOVE) {
                     long now = System.currentTimeMillis();
-                    if (now - lastQuickMoveTime > 1000) { quickMoveCount = 0; lastQuickMoveTime = now; }
-                    quickMoveCount++;
+                    if (now - lastQuickMoveTime.get() > 1000) {
+                        quickMoveCount.set(0);
+                        lastQuickMoveTime.set(now);
+                    }
                     int limit = (type == InventoryType.FURNACE || type == InventoryType.BLAST_FURNACE || type == InventoryType.SMOKER || type == InventoryType.MERCHANT) ? 8 : 15;
-                    if (quickMoveCount > limit) {
+
+                    if (quickMoveCount.incrementAndGet() > limit) {
                         flag("QuickMove Spam", packetName);
                         resync();
                         return false;

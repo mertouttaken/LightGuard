@@ -27,6 +27,10 @@ public abstract class Check {
     public String getName() { return name; }
     public boolean isEnabled() { return enabled; }
 
+    public boolean isBedrockCompatible() {
+        return true;
+    }
+
     protected void flag(String info, String packetName) {
         if(plugin.getConfig().getBoolean("settings.sentinel.enabled") &&
                 plugin.getConfig().getBoolean("settings.sentinel.silent-failures")) {
