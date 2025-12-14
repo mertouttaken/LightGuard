@@ -49,6 +49,9 @@ public class PayloadCheck extends Check {
                 for (int i = 0; i < readableBytes; i++) {
                     if (data.getByte(data.readerIndex() + i) == 0) channelCount++;
                 }
+
+                if (readableBytes > 0) channelCount++;
+
                 if (channelCount > 20) {
                     flag("Channel Register Flood", packetName);
                     return false;
@@ -59,7 +62,7 @@ public class PayloadCheck extends Check {
                     this.data.getRecentChannelRegisters().set(0);
                     this.data.getLastChannelRegister().set(now);
                 }
-                if (this.data.getRecentChannelRegisters().addAndGet(channelCount + 1) > 50) {
+                if (this.data.getRecentChannelRegisters().addAndGet(channelCount) > 100) {
                     flag("Channel Register Flood (Rate Limit)", packetName);
                     return false;
                 }
@@ -70,22 +73,6 @@ public class PayloadCheck extends Check {
                     return false;
                 }
 
-                if (channelCount > 0) {
-                    int start = data.readerIndex();
-                    int pos = start;
-                    for (int i = 0; i <= readableBytes; i++) {
-                        if (i == readableBytes || data.getByte(start + i) == 0) {
-                            if (i > pos) {
-                                int length = i - pos;
-                                String ch = data.toString(pos, length, StandardCharsets.UTF_8);
-                                if (!ch.isEmpty() && !channels.contains(ch)) {
-                                    channels.add(ch);
-                                }
-                            }
-                            pos = i + 1;
-                        }
-                    }
-                }
             }
 
             try {

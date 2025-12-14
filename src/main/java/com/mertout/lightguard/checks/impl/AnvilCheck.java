@@ -38,21 +38,38 @@ public class AnvilCheck extends Check {
                 String newName = (String) NAME_FIELD.get(packet);
                 if (newName == null) return true;
 
-                if (newName.length() > 60) {
-                    flag("Oversized Anvil Rename (" + newName.length() + ")", "PacketPlayInItemName");
+                int len = newName.length();
+                if (len > 60) {
+                    flag("Oversized Anvil Rename (" + len + ")", "PacketPlayInItemName");
                     return false;
                 }
 
-                if (!data.getPlayer().hasPermission("lightguard.bypass.anvil")) {
-                    if (newName.contains("§") || newName.contains("&")) {
-                        flag("Illegal Color Codes in Anvil", "PacketPlayInItemName");
-                        return false;
+                boolean hasColor = false;
+                boolean hasInvalid = false;
+
+                for (int i = 0; i < len; i++) {
+                    char c = newName.charAt(i);
+
+                    if (c == '§' || c == '&') {
+                        hasColor = true;
+                    }
+
+                    if (c < 0x20 && c != 0) {
+                        hasInvalid = true;
+                        break;
                     }
                 }
 
-                if (newName.chars().anyMatch(c -> c < 0x20 && c != 0)) {
+                if (hasInvalid) {
                     flag("Invalid Characters in Anvil", "PacketPlayInItemName");
                     return false;
+                }
+
+                if (hasColor) {
+                    if (!data.getPlayer().hasPermission("lightguard.bypass.anvil")) {
+                        flag("Illegal Color Codes in Anvil", "PacketPlayInItemName");
+                        return false;
+                    }
                 }
 
             } catch (Exception e) {}

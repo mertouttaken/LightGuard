@@ -16,7 +16,19 @@ public class BadPacketCheck extends Check {
         try {
             MethodHandles.Lookup lookup = MethodHandles.privateLookupIn(PacketPlayInUseEntity.class, MethodHandles.lookup());
             ENTITY_ID = lookup.findVarHandle(PacketPlayInUseEntity.class, "a", int.class);
-            TARGET_VECTOR = lookup.findVarHandle(PacketPlayInUseEntity.class, "c", Vec3D.class);
+
+            VarHandle targetHandle = null;
+            try {
+                targetHandle = lookup.findVarHandle(PacketPlayInUseEntity.class, "c", Vec3D.class);
+            } catch (Exception e) {
+                try {
+                    targetHandle = lookup.findVarHandle(PacketPlayInUseEntity.class, "d", Vec3D.class);
+                } catch (Exception ex) {
+                    throw new ExceptionInInitializerError("BadPacketCheck: Vec3D field not found!");
+                }
+            }
+            TARGET_VECTOR = targetHandle;
+
         } catch (Exception e) { throw new ExceptionInInitializerError(e); }
     }
 

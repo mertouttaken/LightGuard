@@ -29,6 +29,7 @@ public class ChatSecurityCheck extends Check {
     @Override
     public boolean check(Object packet) {
         if (!isEnabled()) return true;
+
         if (packet instanceof PacketPlayInChat) {
             String message = (String) MSG_FIELD.get(packet);
             if (message == null || message.isEmpty()) return true;
@@ -37,15 +38,26 @@ public class ChatSecurityCheck extends Check {
                 flag("Illegal Control Characters", "PacketPlayInChat");
                 return false;
             }
+
             if (blockZalgo && ZALGO_PATTERN.matcher(message).find()) {
-                flag("Zalgo Text", "PacketPlayInChat");
+                flag("Zalgo/Glitch Text Detected", "PacketPlayInChat");
                 return false;
             }
-            if (message.length() > 256) {
-                flag("Message too long", "PacketPlayInChat");
+
+            if (containsBlockedUnicode(message)) {
+                flag("Illegal Unicode Character", "PacketPlayInChat");
                 return false;
             }
         }
         return true;
+    }
+
+    private boolean containsBlockedUnicode(String message) {
+        int len = message.length();
+        for (int i = 0; i < len; i++) {
+            char c = message.charAt(i);
+            if ((c >= 0x202A && c <= 0x202E) || (c >= 0x200B && c <= 0x200D) || c >= 0xFFF0) return true;
+        }
+        return false;
     }
 }

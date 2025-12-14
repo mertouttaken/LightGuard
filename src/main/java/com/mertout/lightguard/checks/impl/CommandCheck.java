@@ -42,9 +42,7 @@ public class CommandCheck extends Check {
             if (msg.startsWith("/")) {
                 String cmd = msg.split(" ")[0].toLowerCase();
 
-                String cleanCmd = cmd.replaceAll("^(/+[^:]+:)+", "/");
-
-                cleanCmd = cleanCmd.replaceAll("^//+", "/");
+                String cleanCmd = cmd.replaceAll("^(/+[^:]+:)+", "/").replaceAll("^//+", "/");
 
                 for (String b : blacklist) {
                     if (cmd.equals(b) || cleanCmd.equals(b)) {

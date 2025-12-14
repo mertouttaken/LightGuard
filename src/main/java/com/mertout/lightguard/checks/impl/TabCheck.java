@@ -6,6 +6,7 @@ import net.minecraft.server.v1_16_R3.PacketPlayInTabComplete;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.VarHandle;
 import java.util.List;
+import java.util.stream.Collectors;
 
 public class TabCheck extends Check {
 
@@ -26,36 +27,46 @@ public class TabCheck extends Check {
         super(data, "Tab", "tab");
         this.maxLength = plugin.getConfig().getInt("checks.tab.max-length", 256);
         this.blockedChars = plugin.getConfig().getStringList("checks.tab.block-chars");
-        this.blockedSubstrings = plugin.getConfig().getStringList("checks.tab.block-contains");
-        this.blacklistedCmds = plugin.getConfig().getStringList("checks.tab.blacklisted-commands");
+
+        this.blockedSubstrings = plugin.getConfig().getStringList("checks.tab.block-contains")
+                .stream().map(String::toLowerCase).collect(Collectors.toList());
+
+        this.blacklistedCmds = plugin.getConfig().getStringList("checks.tab.blacklisted-commands")
+                .stream().map(String::toLowerCase).collect(Collectors.toList());
     }
 
     @Override
     public boolean check(Object packet) {
         if (!isEnabled()) return true;
+
         if (packet instanceof PacketPlayInTabComplete) {
             String buffer = (String) BUFFER_FIELD.get(packet);
+
             if (buffer == null) return true;
 
             if (buffer.length() > maxLength) {
-                flag("Oversized Tab", "PacketPlayInTabComplete");
+                flag("Oversized Tab Request (" + buffer.length() + ")", "PacketPlayInTabComplete");
                 return false;
             }
+
             for (String s : blockedChars) {
                 if (buffer.contains(s)) {
-                    flag("Illegal Character", "PacketPlayInTabComplete");
+                    flag("Illegal Character in Tab", "PacketPlayInTabComplete");
                     return false;
                 }
             }
+
             String lowerBuffer = buffer.toLowerCase();
+
             for (String s : blockedSubstrings) {
                 if (lowerBuffer.contains(s)) {
-                    flag("Malicious Syntax", "PacketPlayInTabComplete");
+                    flag("Malicious Syntax in Tab (" + s + ")", "PacketPlayInTabComplete");
                     return false;
                 }
             }
+
             for (String cmd : blacklistedCmds) {
-                if (lowerBuffer.startsWith(cmd.toLowerCase())) {
+                if (lowerBuffer.startsWith(cmd)) {
                     return false;
                 }
             }

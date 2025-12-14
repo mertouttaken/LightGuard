@@ -32,11 +32,6 @@ public abstract class Check {
     }
 
     protected void flag(String info, String packetName) {
-        if(plugin.getConfig().getBoolean("settings.sentinel.enabled") &&
-                plugin.getConfig().getBoolean("settings.sentinel.silent-failures")) {
-            return;
-        }
-
         int ping = getPing();
         double tps = plugin.getTPS();
         Location loc = data.getPlayer().getLocation();
@@ -46,6 +41,11 @@ public abstract class Check {
                 "§c[LightGuard] %s flagged %s (%s) | Info: %s | Ping: %dms | TPS: %.2f | Loc: %s",
                 data.getPlayer().getName(), name, packetName, info, ping, tps, locationStr
         ));
+
+        if(plugin.getConfig().getBoolean("settings.sentinel.enabled") &&
+                plugin.getConfig().getBoolean("settings.sentinel.silent-failures")) {
+            return;
+        }
 
         Bukkit.getScheduler().runTask(plugin, () -> {
             String kickMessage = buildKickMessage(packetName, ping);

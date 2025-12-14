@@ -4,10 +4,11 @@ import com.mertout.lightguard.checks.Check;
 import com.mertout.lightguard.data.PlayerData;
 import com.mertout.lightguard.utils.NBTChecker;
 import net.minecraft.server.v1_16_R3.*;
-import org.bukkit.craftbukkit.v1_16_R3.inventory.CraftItemStack;
-import org.bukkit.Material;
 import org.bukkit.Bukkit;
+import org.bukkit.craftbukkit.v1_16_R3.entity.CraftPlayer;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -24,8 +25,9 @@ public class BlockPlaceCheck extends Check {
     private final boolean checkCoordinates;
     private final boolean preventIllegalBlocks;
     private final boolean kickOnIllegal;
-    private final List<String> illegalBlocks;
     private final int maxItemDepth;
+
+    private final Set<Item> illegalNMSItems = new HashSet<>();
 
     public BlockPlaceCheck(PlayerData data) {
         super(data, "BlockPlace", "block-place");
@@ -35,8 +37,19 @@ public class BlockPlaceCheck extends Check {
         this.checkCoordinates = plugin.getConfig().getBoolean("checks.block-place.check-coordinates", true);
         this.preventIllegalBlocks = plugin.getConfig().getBoolean("checks.block-place.prevent-illegal-blocks");
         this.kickOnIllegal = plugin.getConfig().getBoolean("checks.block-place.kick-on-illegal-block", false);
-        this.illegalBlocks = plugin.getConfig().getStringList("checks.block-place.illegal-blocks");
         this.maxItemDepth = plugin.getConfig().getInt("checks.item.max-depth", 15);
+
+        List<String> configList = plugin.getConfig().getStringList("checks.block-place.illegal-blocks");
+        for (String key : configList) {
+            try {
+                MinecraftKey mcKey = new MinecraftKey(key.toLowerCase());
+                Item item = IRegistry.ITEM.get(mcKey);
+                if (item != null && item != Items.AIR) {
+                    illegalNMSItems.add(item);
+                }
+            } catch (Exception e) {
+            }
+        }
     }
 
     @Override
@@ -78,49 +91,33 @@ public class BlockPlaceCheck extends Check {
             if (checkCoordinates) {
                 Vec3D vec = position.getPos();
                 if (!Double.isFinite(vec.x) || !Double.isFinite(vec.y) || !Double.isFinite(vec.z)) {
-                    flag("Invalid Cursor Vector (NaN/Infinity)", packetName);
-                    return false;
+                    flag("Invalid Cursor", packetName); return false;
                 }
                 BlockPosition pos = position.getBlockPosition();
-                double dX = vec.x - pos.getX();
-                double dY = vec.y - pos.getY();
-                double dZ = vec.z - pos.getZ();
-                if (Math.abs(dX) > 3.0 || Math.abs(dY) > 3.0 || Math.abs(dZ) > 3.0) {
-                    flag("Invalid Cursor Offset", packetName);
-                    return false;
-                }
-                if (Math.abs(pos.getX()) > 30000000 || Math.abs(pos.getZ()) > 30000000 || pos.getY() < -100 || pos.getY() > 500) {
-                    flag("Invalid Coordinates (OOB)", packetName);
-                    return false;
+                if (Math.abs(pos.getX()) > 30000000 || Math.abs(pos.getZ()) > 30000000) {
+                    flag("Invalid Coordinates", packetName); return false;
                 }
             }
 
-            BlockPosition pos = position.getBlockPosition();
             EnumHand hand = p.b();
-            org.bukkit.inventory.ItemStack item = (hand == EnumHand.MAIN_HAND) ? data.getPlayer().getInventory().getItemInMainHand() : data.getPlayer().getInventory().getItemInOffHand();
+            EntityPlayer nmsPlayer = ((CraftPlayer) data.getPlayer()).getHandle();
+            ItemStack nmsItem = (hand == EnumHand.MAIN_HAND) ? nmsPlayer.inventory.getItemInHand() : nmsPlayer.inventory.extraSlots.get(0);
 
-            if (item != null && item.getType() != Material.AIR) {
-                Material type = item.getType();
-                if (type == Material.DISPENSER || type == Material.DROPPER) {
-                    int y = pos.getY();
-                    EnumDirection face = position.getDirection();
-                    if ((y <= 0 && face == EnumDirection.DOWN) || (y >= 255 && face == EnumDirection.UP) || y < 1 || y > 254) {
-                        flag("Invalid Dispenser Position", packetName);
+            if (nmsItem != null && !nmsItem.isEmpty()) {
+                if (preventIllegalBlocks) {
+                    if (illegalNMSItems.contains(nmsItem.getItem())) {
+                        if (kickOnIllegal) {
+                            flag("Illegal Block", packetName);
+                        } else {
+                            Bukkit.getScheduler().runTask(plugin, () -> {
+                                data.getPlayer().sendMessage("§c§lLightGuard: §7Bu bloğu koymanız yasaklanmıştır.");
+                            });
+                        }
                         return false;
                     }
                 }
-                if (preventIllegalBlocks && illegalBlocks.contains(type.name())) {
-                    if (kickOnIllegal) {
-                        flag("Illegal Block: " + type.name(), packetName);
-                    } else {
-                        Bukkit.getScheduler().runTask(plugin, () -> {
-                            data.getPlayer().sendMessage("§cBu bloğu (" + type.name() + ") koymanız yasaklanmıştır.");
-                        });
-                    }
-                    return false;
-                }
-                net.minecraft.server.v1_16_R3.ItemStack nms = CraftItemStack.asNMSCopy(item);
-                if (nms.hasTag() && NBTChecker.isNBTDangerous(nms.getTag(), maxItemDepth)) {
+
+                if (nmsItem.hasTag() && NBTChecker.isNBTDangerous(nmsItem.getTag(), maxItemDepth)) {
                     flag("Dangerous NBT", packetName);
                     return false;
                 }
