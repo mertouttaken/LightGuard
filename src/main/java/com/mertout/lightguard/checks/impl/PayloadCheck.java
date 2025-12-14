@@ -6,11 +6,10 @@ import net.minecraft.server.v1_16_R3.PacketPlayInCustomPayload;
 import io.netty.buffer.ByteBuf;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
 
 public class PayloadCheck extends Check {
 
-    private static final Map<UUID, Set<String>> playerChannels = new ConcurrentHashMap<>();
+
     private static final int MAX_CHANNELS_PER_PLAYER = 124;
 
     private final List<String> blockedChannels;
@@ -53,8 +52,8 @@ public class PayloadCheck extends Check {
                         flag("Channel Register Flood", packetName);
                         return false;
                     }
-                    UUID uuid = data.getPlayer().getUniqueId();
-                    Set<String> channels = playerChannels.computeIfAbsent(uuid, k -> new HashSet<>());
+
+                    Set<String> channels = data.getRegisteredChannels();
                     for (String ch : reqChannels) {
                         if (ch.isEmpty()) continue;
                         if (!channels.contains(ch)) {
@@ -112,9 +111,5 @@ public class PayloadCheck extends Check {
             if (numRead > 5) throw new RuntimeException("VarInt is too big");
         } while ((read & 0x80) != 0);
         return result;
-    }
-
-    public static void onQuit(org.bukkit.entity.Player player) {
-        playerChannels.remove(player.getUniqueId());
     }
 }

@@ -1,6 +1,8 @@
 package com.mertout.lightguard.utils;
 
+import com.mertout.lightguard.LightGuard;
 import net.minecraft.server.v1_16_R3.*;
+import org.bukkit.configuration.file.FileConfiguration;
 
 import java.util.Collections;
 import java.util.IdentityHashMap;
@@ -8,8 +10,14 @@ import java.util.Set;
 
 public class NBTChecker {
 
-    private static final int MAX_LIST_SIZE = 500;
-    private static final int MAX_ARRAY_SIZE = 1024;
+    private static int maxListSize = 500;
+    private static int maxArraySize = 1024;
+
+    public static void reload() {
+        FileConfiguration config = LightGuard.getInstance().getConfig();
+        maxListSize = config.getInt("checks.nbt.max-list-size-nbt", 500);
+        maxArraySize = config.getInt("checks.nbt.max-array-size", 1024);
+    }
 
     public static boolean isNBTDangerous(NBTTagCompound rootTag, int maxDepth) {
         if (rootTag == null) return false;
@@ -30,7 +38,7 @@ public class NBTChecker {
         try {
             if (current instanceof NBTTagList) {
                 NBTTagList list = (NBTTagList) current;
-                if (list.size() > MAX_LIST_SIZE) return true;
+                if (list.size() > maxListSize) return true;
 
                 for (int i = 0; i < list.size(); i++) {
                     NBTBase child = list.get(i);
@@ -43,9 +51,9 @@ public class NBTChecker {
                     if (checkRecursively(child, visited, depth + 1, maxDepth)) return true;
                 }
             } else if (current instanceof NBTTagIntArray) {
-                if (((NBTTagIntArray) current).getInts().length > MAX_ARRAY_SIZE) return true;
+                if (((NBTTagIntArray) current).getInts().length > maxArraySize) return true;
             } else if (current instanceof NBTTagByteArray) {
-                if (((NBTTagByteArray) current).getBytes().length > MAX_ARRAY_SIZE) return true;
+                if (((NBTTagByteArray) current).getBytes().length > maxArraySize) return true;
             }
         } finally {
             visited.remove(current);

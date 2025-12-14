@@ -55,8 +55,8 @@ public class WindowCheck extends Check {
                 InventoryClickType clickType = (InventoryClickType) CLICK_TYPE_GETTER.invoke(click);
                 Container activeContainer = ((CraftPlayer) data.getPlayer()).getHandle().activeContainer;
 
-                if (windowId != activeContainer.windowId && windowId != 0) {
-                    flag("Invalid Window ID", packetName);
+                if (windowId != 0 && windowId != activeContainer.windowId) {
+                    flag("Inventory Desync (Client: " + windowId + " Server: " + activeContainer.windowId + ")", packetName);
                     resync();
                     return false;
                 }

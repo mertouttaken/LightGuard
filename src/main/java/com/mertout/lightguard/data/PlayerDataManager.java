@@ -1,6 +1,7 @@
 package com.mertout.lightguard.data;
 
 import org.bukkit.entity.Player;
+import java.util.Collection;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -10,6 +11,10 @@ public class PlayerDataManager {
 
     public PlayerData getData(UUID uuid) {
         return dataMap.get(uuid);
+    }
+
+    public Collection<PlayerData> getAllData() {
+        return dataMap.values();
     }
 
     public void createData(Player player) {

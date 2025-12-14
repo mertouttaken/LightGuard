@@ -4,17 +4,20 @@ import com.mertout.lightguard.checks.Check;
 import com.mertout.lightguard.data.PlayerData;
 import net.minecraft.server.v1_16_R3.PacketPlayInItemName;
 import org.bukkit.event.inventory.InventoryType;
-import java.lang.reflect.Field;
+import java.lang.invoke.MethodHandles;
+import java.lang.invoke.VarHandle;
 
 public class AnvilCheck extends Check {
 
-    private static Field nameField;
+    private static final VarHandle NAME_FIELD;
 
     static {
         try {
-            nameField = PacketPlayInItemName.class.getDeclaredField("a");
-            nameField.setAccessible(true);
-        } catch (Exception e) { e.printStackTrace(); }
+            MethodHandles.Lookup lookup = MethodHandles.privateLookupIn(PacketPlayInItemName.class, MethodHandles.lookup());
+            NAME_FIELD = lookup.findVarHandle(PacketPlayInItemName.class, "a", String.class);
+        } catch (Exception e) {
+            throw new ExceptionInInitializerError(e);
+        }
     }
 
     public AnvilCheck(PlayerData data) {
@@ -32,7 +35,7 @@ public class AnvilCheck extends Check {
                     return false;
                 }
 
-                String newName = (String) nameField.get(packet);
+                String newName = (String) NAME_FIELD.get(packet);
                 if (newName == null) return true;
 
                 if (newName.length() > 60) {

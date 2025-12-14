@@ -50,6 +50,7 @@ public class CheckManager {
         register(PacketPlayInAutoRecipe.class, new RecipeCheck(data));
         register(PacketPlayInRecipeDisplayed.class, new RecipeCheck(data));
         register(PacketPlayInItemName.class, new AnvilCheck(data));
+        register(PacketPlayInKeepAlive.class, new KeepAliveCheck(data));
     }
 
     private void register(Class<?> packetClass, Check... checks) {
@@ -112,5 +113,12 @@ public class CheckManager {
             }
         }
         return true;
+    }
+
+    public void reloadChecks() {
+        packetMap.clear();
+        globalChecks.clear();
+
+        loadChecks();
     }
 }

@@ -8,13 +8,16 @@ import org.bukkit.craftbukkit.v1_16_R3.inventory.CraftItemStack;
 import org.bukkit.Material;
 import org.bukkit.Bukkit;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 
 public class BlockPlaceCheck extends Check {
 
-    private long lastPlaceTime;
-    private int placePackets;
-    private long lastPrinterCheck;
-    private int printerPackets;
+    // ➤ DEĞİŞİKLİK: Atomic Değişkenler
+    private final AtomicLong lastPlaceTime = new AtomicLong();
+    private final AtomicInteger placePackets = new AtomicInteger();
+    private final AtomicLong lastPrinterCheck = new AtomicLong();
+    private final AtomicInteger printerPackets = new AtomicInteger();
 
     private final int maxPPS;
     private final boolean printerCheckEnabled;
@@ -27,7 +30,6 @@ public class BlockPlaceCheck extends Check {
 
     public BlockPlaceCheck(PlayerData data) {
         super(data, "BlockPlace", "block-place");
-
         this.maxPPS = plugin.getConfig().getInt("checks.block-place.max-pps", 15);
         this.printerCheckEnabled = plugin.getConfig().getBoolean("checks.block-place.printer-check");
         this.printerThreshold = plugin.getConfig().getInt("checks.block-place.printer-threshold", 10);
@@ -47,70 +49,57 @@ public class BlockPlaceCheck extends Check {
             String packetName = "PacketPlayInUseItem";
             long now = System.currentTimeMillis();
 
-            if (now - lastPlaceTime > 1000) {
-                placePackets = 0;
-                lastPlaceTime = now;
+            // ➤ Atomic Kullanımı
+            if (now - lastPlaceTime.get() > 1000) {
+                placePackets.set(0);
+                lastPlaceTime.set(now);
             }
-            placePackets++;
-            if (placePackets > maxPPS) {
+            if (placePackets.incrementAndGet() > maxPPS) {
                 flag("Block Place Flood", packetName);
                 return false;
             }
 
             if (printerCheckEnabled) {
-                if (now - lastPrinterCheck > 1000) {
-                    printerPackets = 0;
-                    lastPrinterCheck = now;
+                if (now - lastPrinterCheck.get() > 1000) {
+                    printerPackets.set(0);
+                    lastPrinterCheck.set(now);
                 }
-                printerPackets++;
-                if (printerPackets > printerThreshold) {
+                if (printerPackets.incrementAndGet() > printerThreshold) {
                     data.setPrinterMode(true);
                 }
             }
 
             MovingObjectPositionBlock position = p.c();
-
-            if (position == null || position.getDirection() == null) {
-                return false;
-            }
+            if (position == null || position.getDirection() == null) return false;
 
             if (checkCoordinates) {
-
                 Vec3D vec = position.getPos();
                 if (!Double.isFinite(vec.x) || !Double.isFinite(vec.y) || !Double.isFinite(vec.z)) {
                     flag("Invalid Cursor Vector (NaN/Infinity)", packetName);
                     return false;
                 }
-
                 BlockPosition pos = position.getBlockPosition();
-
                 double dX = vec.x - pos.getX();
                 double dY = vec.y - pos.getY();
                 double dZ = vec.z - pos.getZ();
-
                 if (Math.abs(dX) > 3.0 || Math.abs(dY) > 3.0 || Math.abs(dZ) > 3.0) {
                     flag("Invalid Cursor Offset", packetName);
                     return false;
                 }
-
-                if (Math.abs(pos.getX()) > 30000000 || Math.abs(pos.getZ()) > 30000000 ||
-                        pos.getY() < -100 || pos.getY() > 500) {
+                if (Math.abs(pos.getX()) > 30000000 || Math.abs(pos.getZ()) > 30000000 || pos.getY() < -100 || pos.getY() > 500) {
                     flag("Invalid Coordinates (OOB)", packetName);
                     return false;
                 }
             }
 
             BlockPosition pos = position.getBlockPosition();
-
             EnumHand hand = p.b();
-
             org.bukkit.inventory.ItemStack item = (hand == EnumHand.MAIN_HAND) ?
                     data.getPlayer().getInventory().getItemInMainHand() :
                     data.getPlayer().getInventory().getItemInOffHand();
 
             if (item != null && item.getType() != Material.AIR) {
                 Material type = item.getType();
-
                 if (type == Material.DISPENSER || type == Material.DROPPER) {
                     int y = pos.getY();
                     EnumDirection face = position.getDirection();
@@ -119,27 +108,20 @@ public class BlockPlaceCheck extends Check {
                         return false;
                     }
                 }
-
-                if (preventIllegalBlocks) {
-                    if (illegalBlocks.contains(type.name())) {
-                        if (kickOnIllegal) {
-                            flag("Illegal Block Placement: " + type.name(), packetName);
-                        } else {
-                            Bukkit.getScheduler().runTask(plugin, () -> {
-                                data.getPlayer().sendMessage("§c§lLightGuard: §7Bu bloğu (" + type.name() + ") koymanız yasaklanmıştır.");
-                            });
-                        }
-                        return false;
+                if (preventIllegalBlocks && illegalBlocks.contains(type.name())) {
+                    if (kickOnIllegal) {
+                        flag("Illegal Block Placement: " + type.name(), packetName);
+                    } else {
+                        Bukkit.getScheduler().runTask(plugin, () -> {
+                            data.getPlayer().sendMessage("§c§lLightGuard: §7Bu bloğu (" + type.name() + ") koymanız yasaklanmıştır.");
+                        });
                     }
+                    return false;
                 }
-
                 net.minecraft.server.v1_16_R3.ItemStack nms = CraftItemStack.asNMSCopy(item);
-
-                if (nms.hasTag()) {
-                    if (NBTChecker.isNBTDangerous(nms.getTag(), maxItemDepth)) {
-                        flag("Dangerous NBT Data", packetName);
-                        return false;
-                    }
+                if (nms.hasTag() && NBTChecker.isNBTDangerous(nms.getTag(), maxItemDepth)) {
+                    flag("Dangerous NBT Data", packetName);
+                    return false;
                 }
             }
         }

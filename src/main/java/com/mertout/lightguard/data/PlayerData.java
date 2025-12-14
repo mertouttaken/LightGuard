@@ -2,7 +2,9 @@ package com.mertout.lightguard.data;
 
 import com.mertout.lightguard.checks.CheckManager;
 import org.bukkit.entity.Player;
+import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 public class PlayerData {
 
@@ -15,12 +17,18 @@ public class PlayerData {
     private volatile int currentPPS = 0;
     private volatile long lastVehicleJump;
 
+    private final Set<String> registeredChannels = ConcurrentHashMap.newKeySet();
+    private final Set<Long> pendingKeepAlives = ConcurrentHashMap.newKeySet();
+
     public PlayerData(Player player) {
         this.player = player;
         this.uuid = player.getUniqueId();
         this.checkManager = new CheckManager(this);
         this.lastVehicleJump = 0;
     }
+
+    public Set<String> getRegisteredChannels() { return registeredChannels; }
+    public Set<Long> getPendingKeepAlives() { return pendingKeepAlives; }
 
     public int getPPS() { return currentPPS; }
     public void setPPS(int pps) { this.currentPPS = pps; }

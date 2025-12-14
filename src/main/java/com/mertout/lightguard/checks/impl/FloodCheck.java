@@ -16,6 +16,8 @@ import java.util.concurrent.atomic.DoubleAdder;
 
 public class FloodCheck extends Check {
 
+    private static final Map<Class<?>, String> PACKET_NAME_CACHE = new ConcurrentHashMap<>();
+
     private final int maxGlobalPPS;
     private final int burstLimit;
     private final int maxBytesPerSec;
@@ -28,37 +30,28 @@ public class FloodCheck extends Check {
     private final AtomicLong lastCheck = new AtomicLong(System.currentTimeMillis());
     private final AtomicLong lastBurstCheck = new AtomicLong(System.currentTimeMillis());
     private final AtomicLong lastByteCheck = new AtomicLong(System.currentTimeMillis());
-
     private final AtomicInteger globalPacketCount = new AtomicInteger(0);
     private final AtomicInteger burstCount = new AtomicInteger(0);
     private final AtomicLong totalBytes = new AtomicLong(0);
     private final DoubleAdder currentWeight = new DoubleAdder();
-
     private final Map<String, PacketTracker> packetTrackers = new ConcurrentHashMap<>();
     private long lastCleanupTime = System.currentTimeMillis();
 
     public FloodCheck(PlayerData data) {
         super(data, "Flood", "flood");
-
         this.maxGlobalPPS = plugin.getConfig().getInt("checks.flood.max-global-pps", 600);
         this.burstLimit = plugin.getConfig().getInt("checks.flood.burst-limit", 400);
         this.maxBytesPerSec = plugin.getConfig().getInt("checks.flood.max-bytes-per-sec", 40000);
         this.matrixEnabled = plugin.getConfig().getBoolean("checks.flood.matrix.enabled");
         this.maxMatrixWeight = plugin.getConfig().getDouble("checks.flood.matrix.max-weight-per-sec", 1000.0);
-
         loadWeights();
         loadLimits();
     }
 
     private void loadWeights() {
         ConfigurationSection sec = plugin.getConfig().getConfigurationSection("checks.flood.matrix.weights");
-        if (sec != null) {
-            for (String key : sec.getKeys(false)) {
-                weights.put(key, sec.getDouble(key));
-            }
-        }
+        if (sec != null) for (String key : sec.getKeys(false)) weights.put(key, sec.getDouble(key));
     }
-
     private void loadLimits() {
         ConfigurationSection sec = plugin.getConfig().getConfigurationSection("checks.flood.limits");
         if (sec != null) {
@@ -72,12 +65,16 @@ public class FloodCheck extends Check {
         }
     }
 
+    private String getPacketName(Object packet) {
+        return PACKET_NAME_CACHE.computeIfAbsent(packet.getClass(), Class::getSimpleName);
+    }
+
     @Override
     public boolean check(Object packet) {
         if (!isEnabled()) return true;
 
         long now = System.currentTimeMillis();
-        String packetName = packet.getClass().getSimpleName();
+        String packetName = getPacketName(packet);
 
         if (now - lastCleanupTime > 60000) {
             packetTrackers.entrySet().removeIf(entry -> (now - entry.getValue().lastTime.get()) > 60000);
@@ -86,11 +83,8 @@ public class FloodCheck extends Check {
 
         double multiplier = 1.0;
         double tps = plugin.getTPS();
+        if (tps < 18.0) multiplier = 1.5; else if (tps < 19.5) multiplier = 1.2;
 
-        if (tps < 18.0) multiplier = 1.5;
-        else if (tps < 19.5) multiplier = 1.2;
-
-        // Global PPS
         if (now - lastCheck.get() > 1000) {
             data.setPPS(globalPacketCount.get());
             globalPacketCount.set(0);
@@ -101,14 +95,12 @@ public class FloodCheck extends Check {
         int currentGlobal = globalPacketCount.incrementAndGet();
         if (currentGlobal > (maxGlobalPPS * multiplier)) return false;
 
-        // Matrix
         if (matrixEnabled) {
             double weight = weights.getOrDefault(packetName, weights.getOrDefault("default", 5.0));
             currentWeight.add(weight);
             if (currentWeight.sum() > (maxMatrixWeight * multiplier)) return false;
         }
 
-        // Burst
         if (now - lastBurstCheck.get() > 500) {
             burstCount.set(0);
             lastBurstCheck.set(now);
@@ -119,7 +111,6 @@ public class FloodCheck extends Check {
             return false;
         }
 
-        // Bandwidth
         if (now - lastByteCheck.get() > 1000) {
             totalBytes.set(0);
             lastByteCheck.set(now);
@@ -131,7 +122,6 @@ public class FloodCheck extends Check {
             return false;
         }
 
-        // Per-Packet Limits
         LimitConfig limitConfig = limits.get(packetName);
         if (limitConfig != null) {
             PacketTracker tracker = packetTrackers.computeIfAbsent(packetName, k -> new PacketTracker());

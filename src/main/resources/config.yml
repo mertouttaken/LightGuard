@@ -224,6 +224,8 @@ checks:
     max-items-per-packet: 500 # Restricted bulk packet sending.
     max-string-len: 200 # Lore/Name length cannot exceed 200 characters.
     max-list-size: 15 # An item can have max 15 lines of lore.
+    max-list-size-nbt: 500
+    max-array-size: 1024
     max-depth: 15
     max-attributes: 15
     max-attribute-value: 2048.0

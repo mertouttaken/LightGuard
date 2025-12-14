@@ -36,8 +36,16 @@ public class CommandCheck extends Check {
             if (msg.startsWith("/")) {
                 String cmd = msg.split(" ")[0].toLowerCase();
 
+                String cleanCmd = cmd;
+                while (cleanCmd.contains(":")) {
+                    cleanCmd = cleanCmd.substring(cleanCmd.indexOf(":") + 1);
+                }
+                String checkedCleanCmd = "/" + cleanCmd;
+
                 for (String b : blacklist) {
-                    if (cmd.equals(b) || cmd.endsWith(":" + b.replace("/", ""))) {
+                    if (cmd.equals(b) || cmd.endsWith(":" + b.replace("/", "")) ||
+                            checkedCleanCmd.equals(b)) {
+
                         flag("Blacklisted Command", "Chat");
                         return false;
                     }
