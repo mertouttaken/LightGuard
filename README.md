@@ -141,7 +141,7 @@ This project is a result of **human + AI collaboration**.
 | `/lg benchmark` | `lg.admin` | Prints performance statistics for each check to console. |
 | `/lg tps` | `lg.admin` | Displays accurate server TPS. |
 
-**Permissions:** - `lg.bypass`: Grants total immunity to all security checks.
+**Permissions:** - `lg.admin`: Grants total immunity to all security checks.
 
 ---
 
