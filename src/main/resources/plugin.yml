@@ -8,12 +8,9 @@ description: Advanced Packet-Based Anti-Crash & Exploit Protection System By AI
 commands:
   lg:
     permission: lg.admin
+    aliases: lightguard
     usage: /lg <args>
 
 permissions:
   lg.admin:
     default: op
-  lg.alerts:
-    default: op
-  lg.bypass:
-    default: false

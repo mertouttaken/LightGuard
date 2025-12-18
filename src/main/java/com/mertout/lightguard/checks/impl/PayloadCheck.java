@@ -41,6 +41,30 @@ public class PayloadCheck extends Check {
                 }
             }
 
+            if (channel.equalsIgnoreCase("MC|BEdit") || channel.equalsIgnoreCase("minecraft:bedit") ||
+                    channel.equalsIgnoreCase("MC|BSign") || channel.equalsIgnoreCase("minecraft:bsign")) {
+
+                ByteBuf dataBuffer = p.data;
+                if (dataBuffer.readableBytes() > 0) {
+                    ByteBuf copy = dataBuffer.copy();
+                    try {
+                        if (copy.readableBytes() > 0) {
+                            byte firstByte = copy.readByte();
+                            if (firstByte != 0x0A && firstByte != 0x00) {
+                                flag("Malformed NBT Root Tag (" + firstByte + ")", packetName);
+                                return false;
+                            }
+                        }
+                    } catch (Exception e) {
+                        flag("Malformed Payload Read Error", packetName);
+                        return false;
+                    } finally {
+                        copy.release();
+                    }
+                }
+            }
+
+
             if (channel.equals("minecraft:register") || channel.equals("REGISTER")) {
                 ByteBuf data = p.data;
                 int readableBytes = data.readableBytes();

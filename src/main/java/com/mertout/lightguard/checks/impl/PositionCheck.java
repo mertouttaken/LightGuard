@@ -68,7 +68,7 @@ public class PositionCheck extends Check {
                         }
                     }
 
-                    double maxOffset = plugin.getConfig().getDouble("checks.position.max-offset", 20.0);
+                    double maxOffset = plugin.getConfig().getDouble("checks.position.max-offset", 400.0);
                     if (speedSquared > maxOffset * maxOffset) {
                         flag("Moved too fast", "PacketPlayInFlying");
                         return false;

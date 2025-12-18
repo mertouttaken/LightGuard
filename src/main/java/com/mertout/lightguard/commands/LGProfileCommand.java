@@ -18,11 +18,11 @@ public class LGProfileCommand {
         if (task != null && !task.isCancelled()) {
             task.cancel();
             task = null;
-            sender.sendMessage("§c[LightGuard] Profiler durduruldu.");
+            sender.sendMessage("§c[LightGuard] Profiler Started.");
             return;
         }
 
-        sender.sendMessage("§a[LightGuard] Profiler başlatıldı!");
+        sender.sendMessage("§c[LightGuard] Profiler Stopped.");
 
         task = new BukkitRunnable() {
             @Override
@@ -35,10 +35,10 @@ public class LGProfileCommand {
                         .collect(Collectors.toList());
 
                 sender.sendMessage("\n§8§m---------§r §bLightGuard Live Profiler §8§m---------");
-                sender.sendMessage("§7(Sunucu TPS: §f" + String.format("%.2f", LightGuard.getInstance().getTPS()) + "§7)");
+                sender.sendMessage("§7(Server TPS: §f" + String.format("%.2f", LightGuard.getInstance().getTPS()) + "§7)");
 
                 if (topPlayers.isEmpty()) {
-                    sender.sendMessage("§7Veri yok veya oyuncu yok.");
+                    sender.sendMessage("§7No data or no player.");
                 }
 
                 for (PlayerData data : topPlayers) {

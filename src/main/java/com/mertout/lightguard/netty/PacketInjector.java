@@ -1,7 +1,6 @@
 package com.mertout.lightguard.netty;
 
 import com.mertout.lightguard.LightGuard;
-import com.mertout.lightguard.checks.impl.PayloadCheck;
 import com.mertout.lightguard.data.PlayerData;
 import io.netty.channel.*;
 import net.minecraft.server.v1_16_R3.PacketPlayOutKeepAlive;
@@ -74,6 +73,24 @@ public class PacketInjector implements Listener {
                     if (plugin.getConfig().getBoolean("settings.sentinel.enabled", true)) return;
                     throw t;
                 }
+            }
+
+            @Override
+            public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
+                Player p = player;
+                Throwable rootCause = cause;
+                while (rootCause.getCause() != null && rootCause.getCause() != rootCause) {
+                    rootCause = rootCause.getCause();
+                }
+
+                String message = rootCause.getMessage();
+                if (message != null && message.contains("Expected root tag to be a CompoundTag") && message.contains("was 69")) {
+                    plugin.getLogger().warning("§c[LightGuard-CRITICAL] Protocol Exploit (Bad NBT Tag 69) detected and blocked from " + p.getName() + ".");
+                    p.kickPlayer("§4[LightGuard] &cBad Package (NBT Exploit) Detected. Please reconnect.");
+                    return;
+                }
+
+                super.exceptionCaught(ctx, cause);
             }
 
             @Override

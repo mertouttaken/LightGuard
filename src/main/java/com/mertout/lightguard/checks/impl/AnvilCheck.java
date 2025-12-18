@@ -66,7 +66,7 @@ public class AnvilCheck extends Check {
                 }
 
                 if (hasColor) {
-                    if (!data.getPlayer().hasPermission("lightguard.bypass.anvil")) {
+                    if (!data.getPlayer().hasPermission("lg.admin")) {
                         flag("Illegal Color Codes in Anvil", "PacketPlayInItemName");
                         return false;
                     }

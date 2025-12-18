@@ -108,10 +108,6 @@ public class BlockPlaceCheck extends Check {
                     if (illegalNMSItems.contains(nmsItem.getItem())) {
                         if (kickOnIllegal) {
                             flag("Illegal Block", packetName);
-                        } else {
-                            Bukkit.getScheduler().runTask(plugin, () -> {
-                                data.getPlayer().sendMessage("§c§lLightGuard: §7Bu bloğu koymanız yasaklanmıştır.");
-                            });
                         }
                         return false;
                     }
