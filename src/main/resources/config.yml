@@ -22,6 +22,7 @@ settings:
       - "ItemExploit"     # Item Attribute (Critical)
       - "Payload"         # Crash client channels
       - "Flood"           # Packet flooding
+      - "PacketSize"
 
 checks:
   anvil:
@@ -38,7 +39,7 @@ checks:
 
   packet-size:
     enabled: true
-    max-string-length: 10000
+    max-string-length: 8192
     max-buffer-size: 16384
     per-packet-limit: 32000
     excluded-packets:
@@ -67,8 +68,8 @@ checks:
 
   map-exploit:
       enabled: true
-      max-pps: 5
-      max-nbt-size: 8192
+      max-pps: 3
+      max-nbt-size: 4096
 
   chat-unicode:
     enabled: true
@@ -81,12 +82,12 @@ checks:
 
   client-brand:
     enabled: true
-    max-length: 20 # Shortened brand name (e.g., "Lunar-Client" fits but spam won't)
+    max-length: 30 # Shortened brand name (e.g., "Lunar-Client" fits but spam won't)
     block-invalid-chars: true
 
   resource-pack:
     enabled: true
-    max-status-length: 100 # Status packet length
+    max-status-length: 50 # Status packet length
     block-invalid-status: true
 
   entity:
@@ -97,67 +98,66 @@ checks:
   flood:
     enabled: true
     # Maximum allowed data size per second (Bytes)
-    max-bytes-per-sec: 40000
+    max-bytes-per-sec: 25000
 
     # Instant packet burst limit
-    burst-limit: 400
+    burst-limit: 300
 
     # Global Packets Per Second Limit (PPS)
-    max-global-pps: 600
+    max-global-pps: 500
 
     # System that relaxes or tightens limits based on server status
     adaptive:
       enabled: true
-      low-tps-threshold: 18.0   # If TPS drops below 18
-      low-tps-multiplier: 0.7   # Tighten limits by 30% (Stricter protection)
-      high-tps-threshold: 19.8  # If TPS is above 19.8 (Server is healthy)
-      high-tps-multiplier: 1.2  # Relax limits by 20% (Prevents False Positives)
-      high-player-threshold: 50 # If over 50 players
+      low-tps-threshold: 19.0   # If TPS drops below 19
+      low-tps-multiplier: 0.5   # Tighten limits (Stricter protection)
+      high-tps-threshold: 19.9  # If TPS is above 19.9 (Server is healthy)
+      high-tps-multiplier: 1.0  # Relax limits(Prevents False Positives)
+      high-player-threshold: 100 # If over 100 players
       high-player-multiplier: 1.1 # Relax limits by 10%
 
     # Scoring system based on packet processing cost
     matrix:
       enabled: true
-      max-weight-per-sec: 1200.0
+      max-weight-per-sec: 1000.0
       weights:
-        PacketPlayInWindowClick: 50.0
-        PacketPlayInSetCreativeSlot: 45.0
+        PacketPlayInWindowClick: 80.0
+        PacketPlayInSetCreativeSlot: 100.0 
         PacketPlayInBlockDig: 35.0
-        PacketPlayInUseItem: 25.0
-        PacketPlayInBEdit: 40.0
-        PacketPlayInUseEntity: 15.0
+        PacketPlayInUseItem: 30.0
+        PacketPlayInBEdit: 100.0
+        PacketPlayInUseEntity: 20.0
         PacketPlayInArmAnimation: 5.0
-        PacketPlayInEntityAction: 8.0
-        PacketPlayInFlying: 2.0
-        PacketPlayInPosition: 2.0
-        PacketPlayInLook: 1.5
-        PacketPlayInPositionLook: 2.5
-        PacketPlayInKeepAlive: 12.0
-        PacketPlayInTransaction: 12.0
-        default: 5.0
+        PacketPlayInEntityAction: 10.0
+        PacketPlayInFlying: 1.0
+        PacketPlayInPosition: 1.0
+        PacketPlayInLook: 1.0
+        PacketPlayInKeepAlive: 5.0
+        PacketPlayInTransaction: 5.0
+        default: 10.0
 
     limits:
       # Movement
       PacketPlayInFlying: "25/1000"
       PacketPlayInPosition: "25/1000"
-      PacketPlayInLook: "30/1000"
+      PacketPlayInLook: "40/1000"
       PacketPlayInPositionLook: "25/1000"
 
       # Actions
-      PacketPlayInArmAnimation: "50/1000"
-      PacketPlayInBlockDig: "70/1000"
-      PacketPlayInUseItem: "35/1000"
+      PacketPlayInArmAnimation: "30/1000"
+      PacketPlayInBlockDig: "50/1000"
+      PacketPlayInUseItem: "25/1000"
       PacketPlayInUseEntity: "20/1000"
       PacketPlayInEntityAction: "25/1000"
 
       # Inventory (Dupe-sensitive)
-      PacketPlayInWindowClick: "30/500"
-      PacketPlayInSetCreativeSlot: "25/1000"
+      PacketPlayInWindowClick: "25/500"
+      PacketPlayInSetCreativeSlot: "15/1000"
       PacketPlayInPickItem: "12/1000"
       PacketPlayInCloseWindow: "15/1000"
 
       # Anticheat bypass detection
-      PacketPlayInKeepAlive: "12/1000"
+      PacketPlayInKeepAlive: "10/1000"
       PacketPlayInTransaction: "18/1000"
       PacketPlayInTeleportAccept: "12/1000"
 
@@ -165,32 +165,32 @@ checks:
       PacketPlayInAutoRecipe: "8/1000"
       PacketPlayInRecipeDisplayed: "8/1000"
       PacketPlayInRecipeSettings: "12/1000"
-      PacketPlayInBEdit: "5/2000"
+      PacketPlayInBEdit: "3/2000"
 
       # Trading & Merchants
-      PacketPlayInTrSel: "12/1000"
+      PacketPlayInTrSel: "10/1000"
 
       # System commands
-      PacketPlayInClientCommand: "8/1000"
+      PacketPlayInClientCommand: "5/1000"
       PacketPlayInSpectate: "8/1000"
       PacketPlayInAdvancements: "8/1000"
       PacketPlayInDifficultyLock: "5/2000"
       PacketPlayInDifficultyChange: "5/2000"
 
       # Communication
-      PacketPlayInCustomPayload: "20/1000"
+      PacketPlayInCustomPayload: "12/1000"
       PacketPlayInTabComplete: "15/1000"
-      PacketPlayInChat: "12/2000"
+      PacketPlayInChat: "10/2000"
 
       # Misc
       PacketPlayInVehicleMove: "25/1000"
       PacketPlayInSteerVehicle: "25/1000"
       PacketPlayInAbilities: "10/1000"
       PacketPlayInBeacon: "10/1000"
-      PacketPlayInEnchantItem: "15/1000"
+      PacketPlayInEnchantItem: "10/1000"
       PacketPlayInResourcePackStatus: "5/2000"
-      PacketPlayInUpdateSign: "8/1000"
-      PacketPlayInItemName: "10/1000"
+      PacketPlayInUpdateSign: "5/1000"
+      PacketPlayInItemName: "6/1000"
 
   block-place:
     enabled: true
@@ -200,8 +200,8 @@ checks:
 
     # Printer Detection
     printer-check: true
-    printer-threshold: 8 # Over 8 PPS is suspicious
-    printer-leave-delay: 5000 # 5s wait penalty when disabling printer
+    printer-threshold: 6 # Over 6 PPS is suspicious
+    printer-leave-delay: 8000 # 8s wait penalty when disabling printer
 
     velocity:
       a: "80/500" # Velocity check tightened
@@ -215,20 +215,21 @@ checks:
       - "STRUCTURE_VOID"
       - "STRUCTURE_BLOCK"
       - "JIGSAW"
+      - "END_PORTAL_FRAME"
       - "LIGHT"
 
   item:
     enabled: true
-    max-item-depth: 3 # Nested NBT (Shulker inside Shulker) forbidden.
-    max-nbt-size: 8000
-    max-items-per-packet: 500 # Restricted bulk packet sending.
-    max-string-len: 200 # Lore/Name length cannot exceed 200 characters.
-    max-list-size: 15 # An item can have max 15 lines of lore.
-    max-list-size-nbt: 500
-    max-array-size: 1024
-    max-depth: 15
-    max-attributes: 15
-    max-attribute-value: 2048.0
+    max-item-depth: 2 # Nested NBT (Shulker inside Shulker) forbidden.
+    max-nbt-size: 2048
+    max-items-per-packet: 100 # Restricted bulk packet sending.
+    max-string-len: 100 # Lore/Name length cannot exceed 100 characters.
+    max-list-size: 10 # An item can have max 10 lines of lore.
+    max-list-size-nbt: 100
+    max-array-size: 256
+    max-depth: 7
+    max-attributes: 7
+    max-attribute-value: 100.0
 
     illegal-keys:
       - "run_command"
@@ -237,6 +238,7 @@ checks:
       - "Score" # Scoreboard exploit
       - "Selector" # Selector exploit
       - "translation.test.invalid"
+      - "BlockEntityTag"
 
     nbt-occurrences:
       - "extra:15"      # Block JSON bombs
@@ -255,13 +257,13 @@ checks:
   book:
     enabled: true
     max-pages: 5 # No one should write a novel, 5 pages is enough.
-    max-bytes-per-page: 200
+    max-bytes-per-page: 150
     strip-ascii: true
 
   payload:
     enabled: true
-    max-size: 1500 # Large packets (except Maps etc.) are blocked.
-    max-frequency: "5/1000" # Payload spam ended.
+    max-size: 1024 # Large packets (except Maps etc.) are blocked.
+    max-frequency: "4/1000" # Payload spam ended.
     blocked-channels:
       - "MC|BEdit"
       - "MC|BSign"
@@ -273,6 +275,9 @@ checks:
       - "minecraft:bedit"
       - "minecraft:bsign"
       - "minecraft:bopen"
+      - "wdl:init" # WorldDownloader
+      - "world_downloader"
+      
   command:
     enabled: true
     block-syntax: true
@@ -280,7 +285,9 @@ checks:
       - "/calc"
       - "//calc"
       - "/eval"
+      - "//eval"
       - "/solve"
+      - "//solve"
       - "/hd readtext"
       - "/pex"
       - "/op"
@@ -291,10 +298,11 @@ checks:
       - "/me"
       - "/execute"
       - "/function"
-
+      - "/reload"
+      - "/rl"
   tab:
     enabled: true
-    max-length: 48 # Long command completions blocked.
+    max-length: 32 # Long command completions blocked.
     block-chars:
       - "["
       - "]"
@@ -307,6 +315,8 @@ checks:
       - "="
       - "\""
       - "'"
+      - "`"
+      - "$" # Log4j
     block-contains:
       - "targetoffset"
       - "for("
@@ -318,6 +328,11 @@ checks:
       - "summon"
       - "nbt"
       - "tag"
+      - "uuid"
+      - "score"
+      - "jndi" # Log4j
+      - "ldap" # Log4j
+      - "rmi" # Log4j
     blacklisted-commands:
       - "/ver"
       - "/version"
@@ -329,24 +344,28 @@ checks:
       - "/bukkit:ver"
       - "/bukkit:pl"
       - "/minecraft:me"
-
+      - "/icanhasbukkit"
+      
 packet-logger:
   enabled: false
-  heavy-packet-threshold: 1000000 # 1ms (nanoseconds)
+  heavy-packet-threshold: 5000000 # 5ms (nanoseconds)
   output: FILE
   players: []
   packet-mode: BLACKLIST # WHITELIST or BLACKLIST
   packets:
     - "PacketPlayInKeepAlive"
     - "PacketPlayInFlying"
+    - "PacketPlayInPosition"
+    - "PacketPlayInLook"
+    - "PacketPlayInPositionLook"
 
 mechanics:
   nether-portal-delay: true
-  nether-portal-cooldown-ms: 3000 # 3s cooldown after passing through portal
-  max-arrow-velocity: 15.0 # Bow speed significantly reduced
+  nether-portal-cooldown-ms: 4000 # 4s cooldown after passing through portal
+  max-arrow-velocity: 12.0 # Bow speed significantly reduced
   shears-cooldown: true
   break-close-inventory: true
-  interact-container-delay: 200 # Chest opening interval 200ms (No spam)
+  interact-container-delay: 300 # Chest opening interval 300ms (No spam)
   prevent-portal-break: true
   prevent-mule-dupe: true
   block-dead-packets: true
@@ -356,7 +375,7 @@ mechanics:
   disable-piglin-trading: false
   close-inventory-on-teleport: true
   limit-falling-blocks: true
-  max-falling-blocks-per-chunk: 15
+  max-falling-blocks-per-chunk: 10
   prevent-nether-roof: true
   limit-map-creation: true
   prevent-invalid-trade: true
