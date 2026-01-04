@@ -11,7 +11,7 @@ public class VehicleCheck extends Check {
 
     public VehicleCheck(PlayerData data) {
         super(data, "Vehicle", "vehicle");
-        this.preventInvalidMove = plugin.getConfig().getBoolean("checks.vehicle.prevent-invalid-move");
+        this.preventInvalidMove = plugin.getConfig().getBoolean("checks.vehicle.prevent-invalid-move", true);
     }
 
     @Override
@@ -22,6 +22,13 @@ public class VehicleCheck extends Check {
     @Override
     public boolean check(Object packet) {
         if (!isEnabled()) return true;
+
+        if (packet instanceof PacketPlayInSteerVehicle || packet instanceof PacketPlayInVehicleMove) {
+            if (preventInvalidMove && !data.getPlayer().isInsideVehicle()) {
+                flag("Vehicle Desync (No Vehicle)", packet.getClass().getSimpleName());
+                return false;
+            }
+        }
 
         if (packet instanceof PacketPlayInSteerVehicle) {
             PacketPlayInSteerVehicle steer = (PacketPlayInSteerVehicle) packet;
@@ -53,9 +60,6 @@ public class VehicleCheck extends Check {
             }
             if (Math.abs(x) > 30000000 || Math.abs(z) > 30000000) {
                 flag("Vehicle Out of World", packetName);
-                return false;
-            }
-            if (preventInvalidMove && data.getPlayer().getVehicle() == null) {
                 return false;
             }
         }

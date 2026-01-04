@@ -23,6 +23,9 @@ public class TabCheck extends Check {
     private final List<String> blockedSubstrings;
     private final List<String> blacklistedCmds;
 
+    private long lastTabTime = 0;
+    private int tabBurst = 0;
+
     public TabCheck(PlayerData data) {
         super(data, "Tab", "tab");
         this.maxLength = plugin.getConfig().getInt("checks.tab.max-length", 256);
@@ -40,6 +43,18 @@ public class TabCheck extends Check {
         if (!isEnabled()) return true;
 
         if (packet instanceof PacketPlayInTabComplete) {
+
+            long now = System.currentTimeMillis();
+            if (now - lastTabTime > 1000) {
+                tabBurst = 0;
+                lastTabTime = now;
+            }
+
+            tabBurst++;
+            if (tabBurst > 4) {
+                return false;
+            }
+
             String buffer = (String) BUFFER_FIELD.get(packet);
 
             if (buffer == null) return true;

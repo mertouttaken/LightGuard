@@ -3,21 +3,25 @@ package com.mertout.lightguard.checks.impl;
 import com.mertout.lightguard.checks.Check;
 import com.mertout.lightguard.data.PlayerData;
 import net.minecraft.server.v1_16_R3.PacketPlayInKeepAlive;
+
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.VarHandle;
 
 public class KeepAliveCheck extends Check {
 
-    private static final VarHandle PACKET_ID;
+    private static final VarHandle ID_FIELD;
+
     static {
         try {
             MethodHandles.Lookup lookup = MethodHandles.privateLookupIn(PacketPlayInKeepAlive.class, MethodHandles.lookup());
-            PACKET_ID = lookup.findVarHandle(PacketPlayInKeepAlive.class, "a", long.class);
-        } catch (Exception e) { throw new ExceptionInInitializerError(e); }
+            ID_FIELD = lookup.findVarHandle(PacketPlayInKeepAlive.class, "a", long.class);
+        } catch (Exception e) {
+            throw new ExceptionInInitializerError(e);
+        }
     }
 
     public KeepAliveCheck(PlayerData data) {
-        super(data, "KeepAlive", "bad-packets");
+        super(data, "KeepAlive", "keep-alive");
     }
 
     @Override
@@ -25,17 +29,28 @@ public class KeepAliveCheck extends Check {
         if (!isEnabled()) return true;
 
         if (packet instanceof PacketPlayInKeepAlive) {
-            long id = (long) PACKET_ID.get(packet);
+            try {
+                long id = (long) ID_FIELD.get(packet);
 
-            Long timestamp = data.getPendingKeepAlives().remove(id);
+                if (!data.getPendingKeepAlives().containsKey(id)) {
+                    flag("Invalid KeepAlive ID (Spoof)", "KeepAlive");
+                    return false;
+                }
 
-            if (timestamp == null) {
-                flag("Invalid KeepAlive ID (Spoofed)", "PacketPlayInKeepAlive");
-                return false;
-            }
+                long sentTime = data.getPendingKeepAlives().remove(id);
+                long ping = System.currentTimeMillis() - sentTime;
 
-            if (System.currentTimeMillis() - timestamp > 60000) {
-                flag("KeepAlive Timeout (Lag Switch?)", "PacketPlayInKeepAlive");
+                if (ping > 60000) {
+                    flag("Extreme Latency / Timeout", "KeepAlive");
+                }
+
+                if (data.getPendingKeepAlives().size() > 5) {
+                    flag("KeepAlive Hoarding (Ping Spoof)", "KeepAlive");
+                    data.cleanOldKeepAlives();
+                    return false;
+                }
+
+            } catch (Exception e) {
                 return false;
             }
         }

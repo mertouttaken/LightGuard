@@ -20,6 +20,8 @@ public class PlayerData {
     private volatile int currentPPS = 0;
     private long lastVehicleJump;
 
+    private volatile int teleportBurst = 0;
+
     private final AtomicLong lastChannelRegister = new AtomicLong(System.currentTimeMillis());
     private final AtomicInteger recentChannelRegisters = new AtomicInteger(0);
 
@@ -31,7 +33,7 @@ public class PlayerData {
         this.uuid = player.getUniqueId();
         this.checkManager = new CheckManager(this);
         this.lastVehicleJump = 0;
-        this.lastTeleportTime = System.currentTimeMillis() + 1000;
+        this.lastTeleportTime = System.currentTimeMillis();
     }
 
     public void clearSecurityData() {
@@ -53,8 +55,21 @@ public class PlayerData {
     public int getPPS() { return currentPPS; }
     public void setPPS(int pps) { this.currentPPS = pps; }
 
-    public void setLastTeleportTime(long time) { this.lastTeleportTime = time; }
-    public boolean isTeleporting() { return System.currentTimeMillis() - lastTeleportTime < 1000; }
+    public void setLastTeleportTime(long time) {
+        if (time - this.lastTeleportTime < 600L) {
+            teleportBurst++;
+        } else {
+            teleportBurst = 0;
+        }
+        this.lastTeleportTime = time;
+    }
+
+    public boolean isTeleporting() {
+        if (teleportBurst > 3) {
+            return false;
+        }
+        return System.currentTimeMillis() - lastTeleportTime < 250L;
+    }
 
     public long getLastVehicleJump() { return lastVehicleJump; }
     public void setLastVehicleJump(long lastVehicleJump) { this.lastVehicleJump = lastVehicleJump; }

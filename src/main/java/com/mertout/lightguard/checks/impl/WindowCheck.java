@@ -61,7 +61,9 @@ public class WindowCheck extends Check {
                 Container activeContainer = ((CraftPlayer) data.getPlayer()).getHandle().activeContainer;
 
                 if (activeContainer == null) {
-                    return true;
+                    flag("Null Container Access", packetName);
+                    resync();
+                    return false;
                 }
 
                 if (windowId != 0 && windowId != activeContainer.windowId) {
@@ -77,7 +79,7 @@ public class WindowCheck extends Check {
 
                 GameMode mode = data.getPlayer().getGameMode();
                 if (slot != -999 && slot != -1 && mode != GameMode.SPECTATOR && mode != GameMode.CREATIVE) {
-                    if (slot >= activeContainer.slots.size()) {
+                    if (activeContainer.slots == null || slot >= activeContainer.slots.size()) {
                         flag("Slot Index Out of Bounds", packetName);
                         resync();
                         return false;
@@ -118,14 +120,18 @@ public class WindowCheck extends Check {
                     return false;
                 }
 
-            } catch (Throwable t) { t.printStackTrace(); }
+            } catch (Throwable t) {
+                plugin.getLogger().warning("WindowCheck error: " + t.getMessage());
+                resync();
+                return false;
+            }
         }
         return true;
     }
 
     private void resync() {
         long now = System.currentTimeMillis();
-        if (now - lastResync > 1000) { // Saniyede max 1 resync
+        if (now - lastResync > 1000) {
             lastResync = now;
             Bukkit.getScheduler().runTask(plugin, () -> data.getPlayer().updateInventory());
         }
