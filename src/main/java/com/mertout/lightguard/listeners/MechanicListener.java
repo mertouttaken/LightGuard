@@ -228,14 +228,21 @@ public class MechanicListener implements Listener {
             player.closeInventory();
         }
     }
-    @EventHandler
-    public void onEntityTeleport(EntityTeleportEvent event) {
-        if (!plugin.getConfig().getBoolean("mechanics.prevent-end-teleport-exploits")) return;
+    @EventHandler(ignoreCancelled = true)
+    public void onEntityTeleport(org.bukkit.event.entity.EntityTeleportEvent event) {
+        if (!plugin.getConfig().getBoolean("mechanics.prevent-end-teleport-exploits", true)) return;
 
         Entity entity = event.getEntity();
-        if (entity instanceof Item || entity instanceof ArmorStand) {
-            if (entity.getWorld().getEnvironment() == World.Environment.THE_END) {
-                event.setCancelled(true);
+
+        if (entity instanceof org.bukkit.entity.Item || entity instanceof org.bukkit.entity.ArmorStand) {
+
+            if (event.getFrom() != null && event.getTo() != null) {
+                World.Environment fromEnv = event.getFrom().getWorld().getEnvironment();
+                World.Environment toEnv = event.getTo().getWorld().getEnvironment();
+
+                if (fromEnv != World.Environment.THE_END && toEnv == World.Environment.THE_END) {
+                    event.setCancelled(true);
+                }
             }
         }
     }

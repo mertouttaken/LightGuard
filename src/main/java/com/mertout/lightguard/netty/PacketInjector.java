@@ -75,7 +75,10 @@ public class PacketInjector implements Listener {
                         plugin.getPacketLoggerManager().processPacket(p, msg, duration);
                     }
                 } catch (Exception e) {
-                    if (plugin.getConfig().getBoolean("settings.sentinel.enabled", true)) return;
+                    if (plugin.getConfig().getBoolean("settings.sentinel.enabled", true)) {
+                        plugin.getLogger().warning("[Sentinel] Packet error from " + p.getName() + ": " + e.getMessage());
+                        return;
+                    }
                     throw e;
                 }
             }

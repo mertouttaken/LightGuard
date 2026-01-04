@@ -42,9 +42,11 @@ public class CommandCheck extends Check {
             if (msg.startsWith("/")) {
                 String cmd = msg.split(" ")[0].toLowerCase();
 
-                String cleanCmd = cmd
-                        .replaceAll("^/+(minecraft|bukkit|spigot):", "/")
-                        .replaceAll("^//+", "/");
+                String cleanCmd = cmd;
+                while (cleanCmd.matches("^/+(minecraft|bukkit|spigot):.+")) {
+                    cleanCmd = cleanCmd.replaceFirst("^/+(minecraft|bukkit|spigot):", "/");
+                }
+                cleanCmd = cleanCmd.replaceAll("^//+", "/");
 
                 for (String b : blacklist) {
                     if (cmd.equalsIgnoreCase(b) || cleanCmd.equalsIgnoreCase(b))
@@ -53,7 +55,11 @@ public class CommandCheck extends Check {
                         return false;
                     }
                 }
-
+                if(containsLog4Shell(cmd) || containsLog4Shell(cleanCmd))
+                {
+                    flag("Invalid Command Syntax", "Chat");
+                    return false;
+                }
                 if (blockSyntax && (msg.contains("::") || (msg.startsWith("//") && !msg.startsWith("//calc")))) {
                     flag("Invalid Command Syntax", "Chat");
                     return false;
@@ -61,5 +67,12 @@ public class CommandCheck extends Check {
             }
         }
         return true;
+    }
+    private boolean containsLog4Shell(String msg) {
+        String lower = msg.toLowerCase();
+        return lower.contains("${jndi:") ||
+                lower.contains("${ldap:") ||
+                lower.contains("${rmi:") ||
+                lower.contains("${dns:");
     }
 }

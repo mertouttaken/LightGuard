@@ -15,8 +15,8 @@ public class NBTChecker {
 
     public static void reload() {
         FileConfiguration config = LightGuard.getInstance().getConfig();
-        maxListSize = config.getInt("checks.nbt.max-list-size-nbt", 500);
-        maxArraySize = config.getInt("checks.nbt.max-array-size", 1024);
+        maxListSize = config.getInt("checks.item.max-list-size-nbt", 500);
+        maxArraySize = config.getInt("checks.item.max-array-size", 1024);
     }
 
     public static boolean isNBTDangerous(NBTTagCompound rootTag, int maxDepth) {

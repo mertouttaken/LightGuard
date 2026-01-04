@@ -36,11 +36,12 @@ public class CheckManager {
     private void loadChecks() {
         globalChecks.add(new FloodCheck(data));
         globalChecks.add(new PacketSizeCheck(data));
+        globalChecks.add(new EOFExploitCheck(data));
         register(PacketPlayInKeepAlive.class, new KeepAliveCheck(data));
         register(PacketPlayInChat.class, new CommandCheck(data), new ChatSecurityCheck(data));
         register(PacketPlayInTabComplete.class, new TabCheck(data));
-        register(PacketPlayInWindowClick.class, new ItemExploitCheck(data), new WindowCheck(data), new GameStateCheck(data), new EOFExploitCheck(data));
-        register(PacketPlayInSetCreativeSlot.class, new ItemExploitCheck(data), new MapExploitCheck(data), new EOFExploitCheck(data));
+        register(PacketPlayInWindowClick.class, new ItemExploitCheck(data), new WindowCheck(data), new GameStateCheck(data));
+        register(PacketPlayInSetCreativeSlot.class, new ItemExploitCheck(data), new MapExploitCheck(data));
         register(PacketPlayInFlying.class, new PositionCheck(data));
         register(PacketPlayInUseItem.class, new BlockPlaceCheck(data));
         register(PacketPlayInCustomPayload.class, new PayloadCheck(data));

@@ -101,7 +101,7 @@ checks:
   flood:
     enabled: true
     # Maximum allowed data size per second (Bytes)
-    max-bytes-per-sec: 25000
+    max-bytes-per-sec: 40000
 
     # Instant packet burst limit
     burst-limit: 300
@@ -135,8 +135,8 @@ checks:
         PacketPlayInFlying: 1.0
         PacketPlayInPosition: 1.0
         PacketPlayInLook: 1.0
-        PacketPlayInKeepAlive: 5.0
-        PacketPlayInTransaction: 5.0
+        PacketPlayInKeepAlive: 15.0
+        PacketPlayInTransaction: 15.0
         default: 10.0
 
     limits:
