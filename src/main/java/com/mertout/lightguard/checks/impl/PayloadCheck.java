@@ -46,8 +46,9 @@ public class PayloadCheck extends Check {
 
                 ByteBuf dataBuffer = p.data;
                 if (dataBuffer.readableBytes() > 0) {
-                    ByteBuf copy = dataBuffer.copy();
+                    ByteBuf copy = null;
                     try {
+                        copy = dataBuffer.copy();
                         if (copy.readableBytes() > 0) {
                             byte firstByte = copy.readByte();
                             if (firstByte != 0x0A && firstByte != 0x00) {
@@ -59,7 +60,7 @@ public class PayloadCheck extends Check {
                         flag("Malformed Payload Read Error", packetName);
                         return false;
                     } finally {
-                        copy.release();
+                        if (copy != null) copy.release();
                     }
                 }
             }

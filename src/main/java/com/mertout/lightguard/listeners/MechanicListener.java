@@ -2,9 +2,9 @@ package com.mertout.lightguard.listeners;
 
 import com.mertout.lightguard.LightGuard;
 import org.bukkit.Material;
-import org.bukkit.entity.ChestedHorse;
-import org.bukkit.entity.Entity;
-import org.bukkit.entity.Player;
+import org.bukkit.World;
+import org.bukkit.entity.*;
+import org.bukkit.entity.minecart.StorageMinecart;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
@@ -13,8 +13,8 @@ import org.bukkit.event.block.BlockFromToEvent;
 import org.bukkit.event.block.BlockRedstoneEvent;
 import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.event.entity.EntityDeathEvent;
-import org.bukkit.event.inventory.InventoryOpenEvent;
-import org.bukkit.event.inventory.InventoryType;
+import org.bukkit.event.entity.EntityTeleportEvent;
+import org.bukkit.event.inventory.*;
 import org.bukkit.event.player.*;
 import org.bukkit.event.world.ChunkUnloadEvent;
 import org.bukkit.inventory.Inventory;
@@ -58,7 +58,8 @@ public class MechanicListener implements Listener {
 
     @EventHandler
     public void onEntityInteract(org.bukkit.event.player.PlayerInteractEntityEvent event) {
-        if (event.getRightClicked().getType().name().contains("PIGLIN")) {
+        EntityType type = event.getRightClicked().getType();
+        if (type == EntityType.PIGLIN || type == EntityType.PIGLIN_BRUTE) {
             if (plugin.getConfig().getBoolean("mechanics.disable-piglin-trading")) {
                 event.setCancelled(true);
             }
@@ -227,10 +228,13 @@ public class MechanicListener implements Listener {
             player.closeInventory();
         }
     }
-    @EventHandler(ignoreCancelled = true)
-    public void onEntityTeleport(org.bukkit.event.entity.EntityTeleportEvent event) {
-        if (event.getEntity().getWorld().getEnvironment() == org.bukkit.World.Environment.THE_END) {
-            if (!(event.getEntity() instanceof Player)) {
+    @EventHandler
+    public void onEntityTeleport(EntityTeleportEvent event) {
+        if (!plugin.getConfig().getBoolean("mechanics.prevent-end-teleport-exploits")) return;
+
+        Entity entity = event.getEntity();
+        if (entity instanceof Item || entity instanceof ArmorStand) {
+            if (entity.getWorld().getEnvironment() == World.Environment.THE_END) {
                 event.setCancelled(true);
             }
         }
@@ -342,6 +346,40 @@ public class MechanicListener implements Listener {
         if (event.getEntity() instanceof org.bukkit.entity.ItemFrame) {
             if (!event.getEntity().isValid()) {
                 event.setCancelled(true);
+            }
+        }
+    }
+    @EventHandler(priority = EventPriority.LOWEST, ignoreCancelled = true)
+    public void onInventoryClick(InventoryClickEvent event) {
+        if (event.getInventory().getType() == InventoryType.ANVIL && event.getSlotType() == InventoryType.SlotType.RESULT) {
+            if (plugin.getConfig().getBoolean("mechanics.prevent-anvil-dupe", true)) {
+                if (event.getClick() == ClickType.SHIFT_LEFT || event.getClick() == ClickType.SHIFT_RIGHT) {
+                    event.setCancelled(true);
+                }
+            }
+        }
+        if (event.getInventory().getType() == InventoryType.FURNACE && event.getSlotType() == InventoryType.SlotType.RESULT) {
+            if (plugin.getConfig().getBoolean("mechanics.prevent-furnace-dupe", true)) {
+                if (event.getClick() == ClickType.NUMBER_KEY) {
+                    event.setCancelled(true);
+                }
+            }
+        }
+    }
+
+    @EventHandler(priority = EventPriority.LOWEST, ignoreCancelled = true)
+    public void onInventoryMoveItem(InventoryMoveItemEvent event) {
+        if (!plugin.getConfig().getBoolean("mechanics.prevent-hopper-dupe", true)) return;
+
+        if (event.getSource().getHolder() instanceof StorageMinecart || event.getDestination().getHolder() instanceof StorageMinecart) {
+            if (!event.getSource().getLocation().getChunk().isLoaded() || !event.getDestination().getLocation().getChunk().isLoaded()) {
+                event.setCancelled(true);
+                return;
+            }
+            if (event.getSource().getHolder() instanceof StorageMinecart) {
+                if (((StorageMinecart) event.getSource().getHolder()).isDead()) {
+                    event.setCancelled(true);
+                }
             }
         }
     }

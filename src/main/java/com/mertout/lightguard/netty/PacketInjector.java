@@ -45,8 +45,13 @@ public class PacketInjector implements Listener {
 
     @EventHandler
     public void onQuit(PlayerQuitEvent event) {
-        remove(event.getPlayer());
-        plugin.getPlayerDataManager().removeData(event.getPlayer().getUniqueId());
+        try {
+            removeSync(event.getPlayer());
+        } catch (Exception e) {
+            plugin.getLogger().warning("Failed to eject packet handler for " + event.getPlayer().getName());
+        } finally {
+            plugin.getPlayerDataManager().removeData(event.getPlayer().getUniqueId());
+        }
     }
 
     private void inject(Player player) {
@@ -69,9 +74,9 @@ public class PacketInjector implements Listener {
                         plugin.getPacketLoggerManager().getWatchdog().endProcessing();
                         plugin.getPacketLoggerManager().processPacket(p, msg, duration);
                     }
-                } catch (Throwable t) {
+                } catch (Exception e) {
                     if (plugin.getConfig().getBoolean("settings.sentinel.enabled", true)) return;
-                    throw t;
+                    throw e;
                 }
             }
 
@@ -86,7 +91,8 @@ public class PacketInjector implements Listener {
                 String message = rootCause.getMessage();
                 if (message != null && message.contains("Expected root tag to be a CompoundTag") && message.contains("was 69")) {
                     plugin.getLogger().warning("§c[LightGuard-CRITICAL] Protocol Exploit (Bad NBT Tag 69) detected and blocked from " + p.getName() + ".");
-                    p.kickPlayer("§4[LightGuard] &cBad Package (NBT Exploit) Detected. Please reconnect.");
+                    plugin.getServer().getScheduler().runTask(plugin, () ->
+                            p.kickPlayer("§4[LightGuard] &cBad Package (NBT Exploit) Detected. Please reconnect."));
                     return;
                 }
 
@@ -127,6 +133,22 @@ public class PacketInjector implements Listener {
         } catch (Exception e) { e.printStackTrace(); }
     }
 
-    public void remove(Player player) { /* Aynı */ try { if (player == null || !player.isOnline()) return; Channel channel = ((CraftPlayer) player).getHandle().playerConnection.networkManager.channel; if (channel != null && channel.isOpen()) { channel.eventLoop().execute(() -> { ChannelPipeline pipeline = channel.pipeline(); if (pipeline.get("lightguard_handler") != null) pipeline.remove("lightguard_handler"); if (pipeline.get("lightguard_raw") != null) pipeline.remove("lightguard_raw"); }); } } catch (Exception e) {} }
-    public void ejectAll() { for (Player p : plugin.getServer().getOnlinePlayers()) { remove(p); } }
+    private void removeSync(Player player) {
+        try {
+            Channel channel = ((CraftPlayer) player).getHandle().playerConnection.networkManager.channel;
+            if (channel != null && channel.isOpen()) {
+                ChannelPipeline pipeline = channel.pipeline();
+                if (pipeline.get("lightguard_handler") != null) pipeline.remove("lightguard_handler");
+                if (pipeline.get("lightguard_raw") != null) pipeline.remove("lightguard_raw");
+            }
+        } catch (Exception ignored) {}
+    }
+
+    public void remove(Player player) {
+        removeSync(player);
+    }
+
+    public void ejectAll() {
+        for (Player p : plugin.getServer().getOnlinePlayers()) { remove(p); }
+    }
 }

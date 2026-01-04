@@ -42,10 +42,13 @@ public class CommandCheck extends Check {
             if (msg.startsWith("/")) {
                 String cmd = msg.split(" ")[0].toLowerCase();
 
-                String cleanCmd = cmd.replaceAll("^(/+[^:]+:)+", "/").replaceAll("^//+", "/");
+                String cleanCmd = cmd
+                        .replaceAll("^/+(minecraft|bukkit|spigot):", "/")
+                        .replaceAll("^//+", "/");
 
                 for (String b : blacklist) {
-                    if (cmd.equals(b) || cleanCmd.equals(b)) {
+                    if (cmd.equalsIgnoreCase(b) || cleanCmd.equalsIgnoreCase(b))
+                    {
                         flag("Blacklisted Command", "Chat");
                         return false;
                     }

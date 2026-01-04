@@ -28,7 +28,7 @@ public class PositionCheck extends Check {
         if (data.isTeleporting()) {
             if (packet instanceof PacketPlayInFlying && ((PacketPlayInFlying) packet).hasPos) {
                 PacketPlayInFlying p = (PacketPlayInFlying) packet;
-                updateLastPos(p.a(0), p.b(0), p.c(0));
+                lastPos.set(new Position(p.a(0), p.b(0), p.c(0)));
             }
             return true;
         }
@@ -74,13 +74,9 @@ public class PositionCheck extends Check {
                         return false;
                     }
                 }
-                updateLastPos(x, y, z);
+                lastPos.set(new Position(x, y, z));
             }
         }
         return true;
-    }
-
-    private void updateLastPos(double x, double y, double z) {
-        lastPos.set(new Position(x, y, z));
     }
 }

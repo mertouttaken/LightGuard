@@ -14,6 +14,8 @@ public class PacketLogWriter {
     private volatile boolean running = false;
     private Thread writerThread;
 
+    private BufferedWriter writer;
+
     public PacketLogWriter(LightGuard plugin) {
         File folder = new File(plugin.getDataFolder(), "logs");
         if (!folder.exists()) folder.mkdirs();
@@ -24,15 +26,21 @@ public class PacketLogWriter {
     private void start() {
         running = true;
         writerThread = new Thread(() -> {
+            try {
+                writer = new BufferedWriter(new FileWriter(logFile, true));
+            } catch (IOException e) {
+                e.printStackTrace();
+                return;
+            }
+
             while (running || !logQueue.isEmpty()) {
                 try {
                     String log = running ? logQueue.take() : logQueue.poll();
 
                     if (log != null) {
-                        try (BufferedWriter writer = new BufferedWriter(new FileWriter(logFile, true))) {
-                            writer.write(log);
-                            writer.newLine();
-                        }
+                        writer.write(log);
+                        writer.newLine();
+                        writer.flush();
                     } else if (!running) {
                         break;
                     }
@@ -40,6 +48,12 @@ public class PacketLogWriter {
                 } catch (IOException e) {
                     e.printStackTrace();
                 }
+            }
+
+            try {
+                if (writer != null) writer.close();
+            } catch (IOException e) {
+                e.printStackTrace();
             }
         });
         writerThread.setName("LightGuard-LogWriter");

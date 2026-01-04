@@ -39,8 +39,8 @@ public class CheckManager {
         register(PacketPlayInKeepAlive.class, new KeepAliveCheck(data));
         register(PacketPlayInChat.class, new CommandCheck(data), new ChatSecurityCheck(data));
         register(PacketPlayInTabComplete.class, new TabCheck(data));
-        register(PacketPlayInWindowClick.class, new ItemExploitCheck(data), new WindowCheck(data), new GameStateCheck(data));
-        register(PacketPlayInSetCreativeSlot.class, new ItemExploitCheck(data), new MapExploitCheck(data));
+        register(PacketPlayInWindowClick.class, new ItemExploitCheck(data), new WindowCheck(data), new GameStateCheck(data), new EOFExploitCheck(data));
+        register(PacketPlayInSetCreativeSlot.class, new ItemExploitCheck(data), new MapExploitCheck(data), new EOFExploitCheck(data));
         register(PacketPlayInFlying.class, new PositionCheck(data));
         register(PacketPlayInUseItem.class, new BlockPlaceCheck(data));
         register(PacketPlayInCustomPayload.class, new PayloadCheck(data));
@@ -53,6 +53,7 @@ public class CheckManager {
         register(PacketPlayInAutoRecipe.class, new RecipeCheck(data));
         register(PacketPlayInRecipeDisplayed.class, new RecipeCheck(data));
         register(PacketPlayInItemName.class, new AnvilCheck(data));
+
     }
 
     private void register(Class<?> packetClass, Check... checks) {

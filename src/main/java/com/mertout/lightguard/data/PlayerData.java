@@ -18,7 +18,7 @@ public class PlayerData {
     private volatile boolean printerMode = false;
     private volatile long lastTeleportTime;
     private volatile int currentPPS = 0;
-    private volatile long lastVehicleJump;
+    private long lastVehicleJump;
 
     private final AtomicLong lastChannelRegister = new AtomicLong(System.currentTimeMillis());
     private final AtomicInteger recentChannelRegisters = new AtomicInteger(0);

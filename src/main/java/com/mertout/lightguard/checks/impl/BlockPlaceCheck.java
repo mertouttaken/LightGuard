@@ -4,10 +4,8 @@ import com.mertout.lightguard.checks.Check;
 import com.mertout.lightguard.data.PlayerData;
 import com.mertout.lightguard.utils.NBTChecker;
 import net.minecraft.server.v1_16_R3.*;
-import org.bukkit.Bukkit;
 import org.bukkit.craftbukkit.v1_16_R3.entity.CraftPlayer;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
@@ -39,17 +37,7 @@ public class BlockPlaceCheck extends Check {
         this.kickOnIllegal = plugin.getConfig().getBoolean("checks.block-place.kick-on-illegal-block", false);
         this.maxItemDepth = plugin.getConfig().getInt("checks.item.max-depth", 15);
 
-        List<String> configList = plugin.getConfig().getStringList("checks.block-place.illegal-blocks");
-        for (String key : configList) {
-            try {
-                MinecraftKey mcKey = new MinecraftKey(key.toLowerCase());
-                Item item = IRegistry.ITEM.get(mcKey);
-                if (item != null && item != Items.AIR) {
-                    illegalNMSItems.add(item);
-                }
-            } catch (Exception e) {
-            }
-        }
+        this.illegalNMSItems.addAll(plugin.getConfigManager().getIllegalBlocks());
     }
 
     @Override

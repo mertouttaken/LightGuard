@@ -31,33 +31,29 @@ public class NBTChecker {
 
     private static boolean checkRecursively(NBTBase current, Set<NBTBase> visited, int depth, int maxDepth) {
         if (depth > maxDepth) return true;
-        if (visited.contains(current)) return true;
 
-        visited.add(current);
+        if (!visited.add(current)) return true;
 
-        try {
-            if (current instanceof NBTTagList) {
-                NBTTagList list = (NBTTagList) current;
-                if (list.size() > maxListSize) return true;
+        if (current instanceof NBTTagList) {
+            NBTTagList list = (NBTTagList) current;
+            if (list.size() > maxListSize) return true;
 
-                for (int i = 0; i < list.size(); i++) {
-                    NBTBase child = list.get(i);
-                    if (checkRecursively(child, visited, depth + 1, maxDepth)) return true;
-                }
-            } else if (current instanceof NBTTagCompound) {
-                NBTTagCompound compound = (NBTTagCompound) current;
-                for (String key : compound.getKeys()) {
-                    NBTBase child = compound.get(key);
-                    if (checkRecursively(child, visited, depth + 1, maxDepth)) return true;
-                }
-            } else if (current instanceof NBTTagIntArray) {
-                if (((NBTTagIntArray) current).getInts().length > maxArraySize) return true;
-            } else if (current instanceof NBTTagByteArray) {
-                if (((NBTTagByteArray) current).getBytes().length > maxArraySize) return true;
+            for (int i = 0; i < list.size(); i++) {
+                NBTBase child = list.get(i);
+                if (checkRecursively(child, visited, depth + 1, maxDepth)) return true;
             }
-        } finally {
-            visited.remove(current);
+        } else if (current instanceof NBTTagCompound) {
+            NBTTagCompound compound = (NBTTagCompound) current;
+            for (String key : compound.getKeys()) {
+                NBTBase child = compound.get(key);
+                if (checkRecursively(child, visited, depth + 1, maxDepth)) return true;
+            }
+        } else if (current instanceof NBTTagIntArray) {
+            if (((NBTTagIntArray) current).getInts().length > maxArraySize) return true;
+        } else if (current instanceof NBTTagByteArray) {
+            if (((NBTTagByteArray) current).getBytes().length > maxArraySize) return true;
         }
+
         return false;
     }
 }

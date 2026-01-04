@@ -72,6 +72,15 @@ public class FloodCheck extends Check {
         packetTrackers.entrySet().removeIf(entry -> (now - entry.getValue().lastTime.get()) > 60000);
     }
 
+    // FIX: Atomic Check Helper
+    private boolean checkAndReset(AtomicLong lastTimeAtom, long now, long interval) {
+        long lastTime = lastTimeAtom.get();
+        if (now - lastTime > interval) {
+            return lastTimeAtom.compareAndSet(lastTime, now);
+        }
+        return false;
+    }
+
     @Override
     public boolean check(Object packet) {
         if (!isEnabled()) return true;
@@ -83,11 +92,10 @@ public class FloodCheck extends Check {
         double tps = plugin.getTPS();
         if (tps < 18.0) multiplier = 1.5; else if (tps < 19.5) multiplier = 1.2;
 
-        if (now - lastCheck.get() > 1000) {
+        if (checkAndReset(lastCheck, now, 1000)) {
             data.setPPS(globalPacketCount.get());
             globalPacketCount.set(0);
             currentWeight.reset();
-            lastCheck.set(now);
         }
 
         int currentGlobal = globalPacketCount.incrementAndGet();
@@ -99,9 +107,8 @@ public class FloodCheck extends Check {
             if (currentWeight.sum() > (maxMatrixWeight * multiplier)) return false;
         }
 
-        if (now - lastBurstCheck.get() > 500) {
+        if (checkAndReset(lastBurstCheck, now, 500)) {
             burstCount.set(0);
-            lastBurstCheck.set(now);
         }
         int currentBurst = burstCount.incrementAndGet();
         if (currentBurst > (burstLimit * multiplier)) {
@@ -109,9 +116,8 @@ public class FloodCheck extends Check {
             return false;
         }
 
-        if (now - lastByteCheck.get() > 1000) {
+        if (checkAndReset(lastByteCheck, now, 1000)) {
             totalBytes.set(0);
-            lastByteCheck.set(now);
         }
         long size = estimatePacketSize(packet);
         long currentBytes = totalBytes.addAndGet(size);
@@ -125,8 +131,9 @@ public class FloodCheck extends Check {
             PacketTracker tracker = packetTrackers.computeIfAbsent(packetName, k -> new PacketTracker());
             long lastTime = tracker.lastTime.get();
             if (now - lastTime > limitConfig.interval) {
-                tracker.count.set(0);
-                tracker.lastTime.set(now);
+                if (tracker.lastTime.compareAndSet(lastTime, now)) {
+                    tracker.count.set(0);
+                }
             }
             int count = tracker.count.incrementAndGet();
             if (count > (int)(limitConfig.max * multiplier)) {

@@ -61,6 +61,9 @@ checks:
     enabled: true
     check-inventory-open: true
 
+  eof-exploit:
+    enabled: true
+
   vehicle:
     enabled: true
     check-steer: true
@@ -381,3 +384,7 @@ mechanics:
   prevent-invalid-trade: true
   prevent-piston-crash: true
   trapdoor-rail-redstone: true
+  prevent-anvil-dupe: true
+  prevent-furnace-dupe: true
+  prevent-hopper-dupe: true
+  prevent-end-teleport-exploits: true
