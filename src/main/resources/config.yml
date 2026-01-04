@@ -31,6 +31,9 @@ checks:
   recipe:
     enabled: true
 
+  keep-alive:
+    enabled: true
+
   raw-packet:
     enabled: true
     # Maximum raw packet size (in Bytes).
@@ -221,7 +224,7 @@ checks:
       - "END_PORTAL_FRAME"
       - "LIGHT"
 
-  item:
+  item-exploit:
     enabled: true
     max-item-depth: 2 # Nested NBT (Shulker inside Shulker) forbidden.
     max-nbt-size: 2048

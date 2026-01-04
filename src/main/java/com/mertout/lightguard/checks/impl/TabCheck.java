@@ -6,6 +6,8 @@ import net.minecraft.server.v1_16_R3.PacketPlayInTabComplete;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.VarHandle;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 
 public class TabCheck extends Check {
@@ -23,8 +25,8 @@ public class TabCheck extends Check {
     private final List<String> blockedSubstrings;
     private final List<String> blacklistedCmds;
 
-    private long lastTabTime = 0;
-    private int tabBurst = 0;
+    private final AtomicLong lastTabTime = new AtomicLong(0);
+    private final AtomicInteger tabBurst = new AtomicInteger(0);
 
     public TabCheck(PlayerData data) {
         super(data, "Tab", "tab");
@@ -45,13 +47,14 @@ public class TabCheck extends Check {
         if (packet instanceof PacketPlayInTabComplete) {
 
             long now = System.currentTimeMillis();
-            if (now - lastTabTime > 1000) {
-                tabBurst = 0;
-                lastTabTime = now;
+            long last = lastTabTime.get();
+
+            if (now - last > 1000) {
+                tabBurst.set(0);
+                lastTabTime.set(now);
             }
 
-            tabBurst++;
-            if (tabBurst > 4) {
+            if (tabBurst.incrementAndGet() > 4) {
                 return false;
             }
 

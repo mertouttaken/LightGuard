@@ -35,7 +35,7 @@ public class BlockPlaceCheck extends Check {
         this.checkCoordinates = plugin.getConfig().getBoolean("checks.block-place.check-coordinates", true);
         this.preventIllegalBlocks = plugin.getConfig().getBoolean("checks.block-place.prevent-illegal-blocks");
         this.kickOnIllegal = plugin.getConfig().getBoolean("checks.block-place.kick-on-illegal-block", false);
-        this.maxItemDepth = plugin.getConfig().getInt("checks.item.max-depth", 15);
+        this.maxItemDepth = plugin.getConfig().getInt("checks.item-exploit.max-depth", 15);
 
         this.illegalNMSItems.addAll(plugin.getConfigManager().getIllegalBlocks());
     }

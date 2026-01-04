@@ -125,7 +125,6 @@ public class MechanicListener implements Listener {
             if (event.getBlock().getWorld().getEnvironment() == org.bukkit.World.Environment.NETHER) {
                 if (event.getBlock().getY() >= 127) {
                     event.setCancelled(true);
-                    event.getPlayer().sendMessage("§cNether tavanına blok koyamazsın!");
                 }
             }
         }
@@ -135,7 +134,14 @@ public class MechanicListener implements Listener {
     public void onShear(PlayerShearEntityEvent e) {
         if (plugin.getConfig().getBoolean("mechanics.shears-cooldown") && checkCooldown(e.getPlayer().getUniqueId(), 500)) e.setCancelled(true);
     }
+    @EventHandler(priority = org.bukkit.event.EventPriority.LOW, ignoreCancelled = true)
+    public void onDispenseShears(org.bukkit.event.block.BlockDispenseEvent event) {
+        if (!plugin.getConfig().getBoolean("mechanics.shears-cooldown")) return;
 
+            if (event.getItem().getType() == Material.SHEARS) {
+            event.setCancelled(true);
+        }
+    }
     @EventHandler(priority = EventPriority.LOWEST)
     public void onInteract(PlayerInteractEvent e) {
         if (e.getClickedBlock() == null) return;
@@ -289,7 +295,6 @@ public class MechanicListener implements Listener {
             Player player = (Player) event.getPlayer();
             if (!mule.getWorld().equals(player.getWorld()) || mule.getLocation().distanceSquared(player.getLocation()) > 64) {
                 event.setCancelled(true);
-                player.sendMessage("§cGüvenlik: Uzaktaki binek envanteri açılamaz.");
                 return;
             }
             if (!mule.getLocation().getChunk().isLoaded()) {
@@ -330,8 +335,6 @@ public class MechanicListener implements Listener {
 
         if (name.contains("TRAPDOOR") || name.contains("RAIL") ||
                 type == Material.COMPARATOR || type == Material.OBSERVER) {
-
-            long key = ((long) event.getBlock().getX() & 0xFFFFFFF) | (((long) event.getBlock().getZ() & 0xFFFFFFF) << 28);
 
             if (event.getOldCurrent() > 0 && event.getNewCurrent() > 0) {
                 if (Math.random() > 0.8) {
