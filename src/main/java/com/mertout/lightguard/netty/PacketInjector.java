@@ -47,8 +47,6 @@ public class PacketInjector implements Listener {
     public void onQuit(PlayerQuitEvent event) {
         try {
             removeSync(event.getPlayer());
-        } catch (Exception e) {
-            plugin.getLogger().warning("Failed to eject packet handler for " + event.getPlayer().getName());
         } finally {
             plugin.getPlayerDataManager().removeData(event.getPlayer().getUniqueId());
         }
@@ -93,7 +91,7 @@ public class PacketInjector implements Listener {
 
                 String message = rootCause.getMessage();
                 if (message != null && message.contains("Expected root tag to be a CompoundTag") && message.contains("was 69")) {
-                    plugin.getLogger().warning("§c[LightGuard-CRITICAL] Protocol Exploit (Bad NBT Tag 69) detected and blocked from " + p.getName() + ".");
+                    plugin.getLogger().warning("§c[LightGuard] Protocol Exploit (Bad NBT Tag 69) detected and blocked from " + p.getName() + ".");
                     plugin.getServer().getScheduler().runTask(plugin, () ->
                             p.kickPlayer("§4[LightGuard] &cBad Package (NBT Exploit) Detected. Please reconnect."));
                     return;
@@ -116,26 +114,40 @@ public class PacketInjector implements Listener {
                 super.write(ctx, msg, promise);
             }
         };
+
         try {
             ChannelPipeline pipeline = ((CraftPlayer) player).getHandle().playerConnection.networkManager.channel.pipeline();
+
+            try {
+                if (pipeline.get("lightguard_handler") != null) pipeline.remove("lightguard_handler");
+                if (pipeline.get("lightguard_raw") != null) pipeline.remove("lightguard_raw");
+            } catch (Exception ignored) {
+            }
+
             String[] targetHandlers = {"splitter", "decoder", "prepender", "packet_handler"};
             String target = null;
             for (String handlerName : targetHandlers) {
                 if (pipeline.get(handlerName) != null) { target = handlerName; break; }
             }
-            if (pipeline.get("lightguard_raw") == null) {
-                RawPacketInspector inspector = new RawPacketInspector(plugin, player.getName());
+
+            RawPacketInspector inspector = new RawPacketInspector(plugin, player.getName());
+            try {
                 if (pipeline.context("decoder") != null) pipeline.addBefore("decoder", "lightguard_raw", inspector);
                 else if (target != null) pipeline.addAfter(target, "lightguard_raw", inspector);
                 else pipeline.addFirst("lightguard_raw", inspector);
+            } catch (IllegalArgumentException e) {
             }
-            if (pipeline.get("lightguard_handler") == null) {
+
+            try {
                 if (pipeline.get("packet_handler") != null) pipeline.addBefore("packet_handler", "lightguard_handler", channelHandler);
                 else pipeline.addLast("lightguard_handler", channelHandler);
+            } catch (IllegalArgumentException e) {
             }
-        } catch (Exception e) { e.printStackTrace(); }
-    }
 
+        } catch (Exception e) {
+            plugin.getLogger().warning("Failed to inject " + player.getName() + ": " + e.getMessage());
+        }
+    }
 
     private void removeSync(Player player) {
         try {
@@ -147,27 +159,17 @@ public class PacketInjector implements Listener {
                 ChannelPipeline pipeline = channel.pipeline();
 
                 try {
-                    if (pipeline.get("lightguard_handler") != null) {
-                        pipeline.remove("lightguard_handler");
-                    }
-                } catch (java.util.NoSuchElementException | java.lang.IllegalArgumentException ignored) {
-                } catch (Exception e) {
-                    plugin.getLogger().warning("Error removing lightguard_handler for " + player.getName() + ": " + e.getMessage());
-                }
+                    if (pipeline.get("lightguard_handler") != null) pipeline.remove("lightguard_handler");
+                } catch (Exception ignored) {}
 
                 try {
-                    if (pipeline.get("lightguard_raw") != null) {
-                        pipeline.remove("lightguard_raw");
-                    }
-                } catch (java.util.NoSuchElementException | java.lang.IllegalArgumentException ignored) {
-                } catch (Exception e) {
-                    plugin.getLogger().warning("Error removing lightguard_raw for " + player.getName() + ": " + e.getMessage());
-                }
+                    if (pipeline.get("lightguard_raw") != null) pipeline.remove("lightguard_raw");
+                } catch (Exception ignored) {}
             }
         } catch (Exception e) {
-            plugin.getLogger().warning("Failed to eject " + player.getName() + ": " + e.getMessage());
         }
     }
+
     public void remove(Player player) {
         removeSync(player);
     }

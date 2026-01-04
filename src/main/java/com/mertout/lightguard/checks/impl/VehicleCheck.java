@@ -4,6 +4,7 @@ import com.mertout.lightguard.checks.Check;
 import com.mertout.lightguard.data.PlayerData;
 import net.minecraft.server.v1_16_R3.PacketPlayInSteerVehicle;
 import net.minecraft.server.v1_16_R3.PacketPlayInVehicleMove;
+import org.bukkit.Bukkit;
 
 public class VehicleCheck extends Check {
 
@@ -24,9 +25,15 @@ public class VehicleCheck extends Check {
         if (!isEnabled()) return true;
 
         if (packet instanceof PacketPlayInSteerVehicle || packet instanceof PacketPlayInVehicleMove) {
-            if (preventInvalidMove && !data.getPlayer().isInsideVehicle()) {
-                flag("Vehicle Desync (No Vehicle)", packet.getClass().getSimpleName());
-                return false;
+            if (preventInvalidMove) {
+                Bukkit.getScheduler().runTask(plugin, () -> {
+                    if (!data.getPlayer().isOnline()) return;
+
+                    if (!data.getPlayer().isInsideVehicle()) {
+                        flag("Vehicle Desync (No Vehicle)", packet.getClass().getSimpleName());
+                        data.getPlayer().leaveVehicle();
+                    }
+                });
             }
         }
 

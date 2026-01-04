@@ -2,8 +2,10 @@ package com.mertout.lightguard.checks.impl;
 
 import com.mertout.lightguard.checks.Check;
 import com.mertout.lightguard.data.PlayerData;
+import com.mertout.lightguard.utils.GeyserUtil; // IMPORT EKLENDİ
 import net.minecraft.server.v1_16_R3.BlockPosition;
 import net.minecraft.server.v1_16_R3.PacketPlayInUpdateSign;
+import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.block.Block;
 
@@ -41,24 +43,30 @@ public class SignCheck extends Check {
         if (packet instanceof PacketPlayInUpdateSign) {
             try {
                 BlockPosition pos = (BlockPosition) POS_FIELD.get(packet);
-
                 Location blockLoc = new Location(data.getPlayer().getWorld(), pos.getX(), pos.getY(), pos.getZ());
 
-                if (!blockLoc.getWorld().isChunkLoaded(blockLoc.getBlockX() >> 4, blockLoc.getBlockZ() >> 4)) {
-                    flag("Sign Edit in Unloaded Chunk", "PacketPlayInUpdateSign");
-                    return false;
-                }
+                boolean isBedrock = GeyserUtil.isBedrockPlayer(data.getPlayer());
 
-                if (data.getPlayer().getLocation().distanceSquared(blockLoc) > 100) {
+                double maxDist = isBedrock ? 225.0 : 100.0;
+
+                if (data.getPlayer().getLocation().distanceSquared(blockLoc) > maxDist) {
                     flag("Sign Edit too far", "PacketPlayInUpdateSign");
                     return false;
                 }
 
-                Block block = blockLoc.getBlock();
-                if (!block.getType().name().contains("SIGN")) {
-                    flag("Sign Edit on Non-Sign Block", "PacketPlayInUpdateSign");
-                    return false;
-                }
+                Bukkit.getScheduler().runTask(plugin, () -> {
+                    if (!data.getPlayer().isOnline()) return;
+
+                    if (!blockLoc.getWorld().isChunkLoaded(blockLoc.getBlockX() >> 4, blockLoc.getBlockZ() >> 4)) {
+                        return;
+                    }
+
+                    Block block = blockLoc.getBlock();
+                    if (!block.getType().name().contains("SIGN")) {
+                        flag("Sign Edit on Non-Sign Block", "PacketPlayInUpdateSign");
+                        data.getPlayer().sendBlockChange(blockLoc, block.getBlockData());
+                    }
+                });
 
                 String[] lines = (String[]) LINES_FIELD.get(packet);
                 if (lines == null) return true;

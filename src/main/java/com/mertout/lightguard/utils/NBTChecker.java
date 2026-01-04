@@ -24,6 +24,11 @@ public class NBTChecker {
 
     public static boolean isNBTDangerous(NBTTagCompound rootTag, int maxDepth) {
         if (rootTag == null) return false;
+
+        if (rootTag.getKeys().size() > maxListSize) {
+            return true;
+        }
+
         Set<NBTBase> visited = Collections.newSetFromMap(new IdentityHashMap<>());
         AtomicInteger nodeCounter = new AtomicInteger(0);
 
@@ -51,6 +56,9 @@ public class NBTChecker {
             }
         } else if (current instanceof NBTTagCompound) {
             NBTTagCompound compound = (NBTTagCompound) current;
+
+            if (compound.getKeys().size() > maxListSize) return true;
+
             for (String key : compound.getKeys()) {
                 NBTBase child = compound.get(key);
                 if (checkRecursively(child, visited, depth + 1, maxDepth, nodeCounter)) return true;

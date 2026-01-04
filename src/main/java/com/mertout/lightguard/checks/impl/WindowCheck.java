@@ -58,67 +58,81 @@ public class WindowCheck extends Check {
                 int windowId = (int) WINDOW_ID_GETTER.invoke(click);
                 int slot = (int) SLOT_GETTER.invoke(click);
                 InventoryClickType clickType = (InventoryClickType) CLICK_TYPE_GETTER.invoke(click);
-                Container activeContainer = ((CraftPlayer) data.getPlayer()).getHandle().activeContainer;
-
-                if (activeContainer == null) {
-                    flag("Null Container Access", packetName);
-                    resync();
-                    return false;
-                }
-
-                if (windowId != 0 && windowId != activeContainer.windowId) {
-                    flag("Inventory Desync (Client: " + windowId + " Server: " + activeContainer.windowId + ")", packetName);
-                    resync();
-                    return false;
-                }
 
                 if (slot < 0 && slot != -999 && slot != -1) {
                     flag("Negative Slot Crash", packetName);
                     return false;
                 }
 
-                GameMode mode = data.getPlayer().getGameMode();
-                if (slot != -999 && slot != -1 && mode != GameMode.SPECTATOR && mode != GameMode.CREATIVE) {
-                    if (activeContainer.slots == null || slot >= activeContainer.slots.size()) {
-                        flag("Slot Index Out of Bounds", packetName);
-                        resync();
-                        return false;
+                Bukkit.getScheduler().runTask(plugin, () -> {
+                    if (!data.getPlayer().isOnline()) return;
+
+                    try {
+                        Container activeContainer = ((CraftPlayer) data.getPlayer()).getHandle().activeContainer;
+
+                        if (activeContainer == null) {
+                            flag("Null Container Access", packetName);
+                            resync();
+                            data.getPlayer().closeInventory();
+                            return;
+                        }
+
+                        if (windowId != 0 && windowId != activeContainer.windowId) {
+                            flag("Inventory Desync (Client: " + windowId + " Server: " + activeContainer.windowId + ")", packetName);
+                            resync();
+                            return;
+                        }
+
+                        GameMode mode = data.getPlayer().getGameMode();
+                        if (slot != -999 && slot != -1 && mode != GameMode.SPECTATOR && mode != GameMode.CREATIVE) {
+                            if (activeContainer.slots == null || slot >= activeContainer.slots.size()) {
+                                flag("Slot Index Out of Bounds", packetName);
+                                resync();
+                                return;
+                            }
+                        }
+
+                        InventoryView view = data.getPlayer().getOpenInventory();
+                        InventoryType type = (view != null) ? view.getType() : InventoryType.CRAFTING;
+
+                        if (clickType == InventoryClickType.QUICK_MOVE) {
+                            long now = System.currentTimeMillis();
+                            if (now - lastQuickMoveTime.get() > 1000) {
+                                quickMoveCount.set(0);
+                                lastQuickMoveTime.set(now);
+                            }
+                            int limit = (type == InventoryType.FURNACE || type == InventoryType.BLAST_FURNACE || type == InventoryType.SMOKER || type == InventoryType.MERCHANT) ? 8 : 15;
+
+                            if (quickMoveCount.incrementAndGet() > limit) {
+                                flag("QuickMove Spam", packetName);
+                                resync();
+                                return;
+                            }
+                        }
+
+                        // Illegal Swap Kontrolleri
+                        if ((type == InventoryType.MERCHANT || type == InventoryType.FURNACE) && slot == 2 && clickType == InventoryClickType.SWAP) {
+                            flag("Illegal Result Slot Swap", packetName);
+                            resync();
+                            return;
+                        }
+
+                        if (preventLecternSpam && type == InventoryType.LECTERN && (clickType == InventoryClickType.QUICK_MOVE || clickType == InventoryClickType.SWAP)) {
+                            flag("Lectern Illegal Click", packetName);
+                            resync();
+                            return;
+                        }
+
+                        if (preventSwapInGui && windowId > 0 && clickType == InventoryClickType.SWAP) {
+                            flag("Illegal GUI Swap", packetName);
+                            resync();
+                            return;
+                        }
+
+                    } catch (Exception e) {
+                        plugin.getLogger().warning("WindowCheck sync task error: " + e.getMessage());
                     }
-                }
-
-                InventoryView view = data.getPlayer().getOpenInventory();
-                InventoryType type = (view != null) ? view.getType() : InventoryType.CRAFTING;
-
-                if (clickType == InventoryClickType.QUICK_MOVE) {
-                    long now = System.currentTimeMillis();
-                    if (now - lastQuickMoveTime.get() > 1000) {
-                        quickMoveCount.set(0);
-                        lastQuickMoveTime.set(now);
-                    }
-                    int limit = (type == InventoryType.FURNACE || type == InventoryType.BLAST_FURNACE || type == InventoryType.SMOKER || type == InventoryType.MERCHANT) ? 8 : 15;
-
-                    if (quickMoveCount.incrementAndGet() > limit) {
-                        flag("QuickMove Spam", packetName);
-                        resync();
-                        return false;
-                    }
-                }
-
-                if ((type == InventoryType.MERCHANT || type == InventoryType.FURNACE) && slot == 2 && clickType == InventoryClickType.SWAP) {
-                    flag("Illegal Result Slot Swap", packetName);
-                    return false;
-                }
-
-                if (preventLecternSpam && type == InventoryType.LECTERN && (clickType == InventoryClickType.QUICK_MOVE || clickType == InventoryClickType.SWAP)) {
-                    flag("Lectern Illegal Click", packetName);
-                    return false;
-                }
-
-                if (preventSwapInGui && windowId > 0 && clickType == InventoryClickType.SWAP) {
-                    flag("Illegal GUI Swap", packetName);
-                    resync();
-                    return false;
-                }
+                });
 
             } catch (Throwable t) {
                 plugin.getLogger().warning("WindowCheck error: " + t.getMessage());
