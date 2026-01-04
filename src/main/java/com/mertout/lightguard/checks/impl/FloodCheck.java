@@ -36,6 +36,9 @@ public class FloodCheck extends Check {
     private final DoubleAdder currentWeight = new DoubleAdder();
     private final Map<String, PacketTracker> packetTrackers = new ConcurrentHashMap<>();
 
+    private final AtomicLong lastMicroCheck = new AtomicLong(System.currentTimeMillis());
+    private final AtomicInteger microPacketCount = new AtomicInteger(0);
+
     public FloodCheck(PlayerData data) {
         super(data, "Flood", "flood");
         this.maxGlobalPPS = plugin.getConfig().getInt("checks.flood.max-global-pps", 600);
@@ -72,7 +75,6 @@ public class FloodCheck extends Check {
         packetTrackers.entrySet().removeIf(entry -> (now - entry.getValue().lastTime.get()) > 60000);
     }
 
-    // FIX: Atomic Check Helper
     private boolean checkAndReset(AtomicLong lastTimeAtom, long now, long interval) {
         long lastTime = lastTimeAtom.get();
         if (now - lastTime > interval) {
@@ -96,6 +98,18 @@ public class FloodCheck extends Check {
             data.setPPS(globalPacketCount.get());
             globalPacketCount.set(0);
             currentWeight.reset();
+        }
+
+        if (checkAndReset(lastMicroCheck, now, 100)) {
+            microPacketCount.set(0);
+        }
+
+        int currentMicro = microPacketCount.incrementAndGet();
+        int microLimit = Math.max(20, (int)((maxGlobalPPS * multiplier) / 5));
+
+        if (currentMicro > microLimit) {
+            flag("Micro-Burst Flood (" + currentMicro + "/100ms)", packetName);
+            return false;
         }
 
         int currentGlobal = globalPacketCount.incrementAndGet();

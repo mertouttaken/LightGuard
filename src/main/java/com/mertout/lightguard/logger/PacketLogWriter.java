@@ -9,7 +9,7 @@ import java.util.concurrent.LinkedBlockingQueue;
 
 public class PacketLogWriter {
 
-    private final LinkedBlockingQueue<String> logQueue = new LinkedBlockingQueue<>();
+    private final LinkedBlockingQueue<String> logQueue = new LinkedBlockingQueue<>(10000);
     private final File logFile;
     private volatile boolean running = false;
     private Thread writerThread;
@@ -62,7 +62,10 @@ public class PacketLogWriter {
     }
 
     public void log(String message) {
-        logQueue.offer(message);
+        if (!logQueue.offer(message))
+        {
+            logQueue.offer(message);
+        }
     }
 
     public void shutdown() {

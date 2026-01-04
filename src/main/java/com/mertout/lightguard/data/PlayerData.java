@@ -54,7 +54,7 @@ public class PlayerData {
     public void setPPS(int pps) { this.currentPPS = pps; }
 
     public void setLastTeleportTime(long time) { this.lastTeleportTime = time; }
-    public boolean isTeleporting() { return System.currentTimeMillis() - lastTeleportTime < 3000; }
+    public boolean isTeleporting() { return System.currentTimeMillis() - lastTeleportTime < 1000; }
 
     public long getLastVehicleJump() { return lastVehicleJump; }
     public void setLastVehicleJump(long lastVehicleJump) { this.lastVehicleJump = lastVehicleJump; }

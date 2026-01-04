@@ -230,6 +230,7 @@ checks:
     max-list-size: 10 # An item can have max 10 lines of lore.
     max-list-size-nbt: 100
     max-array-size: 256
+    max-total-nodes: 1000
     max-depth: 7
     max-attributes: 7
     max-attribute-value: 100.0

@@ -38,6 +38,8 @@ public class WindowCheck extends Check {
     private final AtomicLong lastQuickMoveTime = new AtomicLong();
     private final AtomicInteger quickMoveCount = new AtomicInteger();
 
+    private long lastResync = 0;
+
     public WindowCheck(PlayerData data) {
         super(data, "Window", "window");
         this.preventLecternSpam = plugin.getConfig().getBoolean("checks.window.prevent-lectern-spam");
@@ -122,6 +124,10 @@ public class WindowCheck extends Check {
     }
 
     private void resync() {
-        Bukkit.getScheduler().runTask(plugin, () -> data.getPlayer().updateInventory());
+        long now = System.currentTimeMillis();
+        if (now - lastResync > 1000) { // Saniyede max 1 resync
+            lastResync = now;
+            Bukkit.getScheduler().runTask(plugin, () -> data.getPlayer().updateInventory());
+        }
     }
 }

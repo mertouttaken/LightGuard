@@ -136,17 +136,38 @@ public class PacketInjector implements Listener {
         } catch (Exception e) { e.printStackTrace(); }
     }
 
+
     private void removeSync(Player player) {
         try {
-            Channel channel = ((CraftPlayer) player).getHandle().playerConnection.networkManager.channel;
-            if (channel != null && channel.isOpen()) {
-                ChannelPipeline pipeline = channel.pipeline();
-                if (pipeline.get("lightguard_handler") != null) pipeline.remove("lightguard_handler");
-                if (pipeline.get("lightguard_raw") != null) pipeline.remove("lightguard_raw");
-            }
-        } catch (Exception ignored) {}
-    }
+            if (player == null || !player.isOnline()) return;
 
+            Channel channel = ((CraftPlayer) player).getHandle().playerConnection.networkManager.channel;
+
+            if (channel != null) {
+                ChannelPipeline pipeline = channel.pipeline();
+
+                try {
+                    if (pipeline.get("lightguard_handler") != null) {
+                        pipeline.remove("lightguard_handler");
+                    }
+                } catch (java.util.NoSuchElementException | java.lang.IllegalArgumentException ignored) {
+                } catch (Exception e) {
+                    plugin.getLogger().warning("Error removing lightguard_handler for " + player.getName() + ": " + e.getMessage());
+                }
+
+                try {
+                    if (pipeline.get("lightguard_raw") != null) {
+                        pipeline.remove("lightguard_raw");
+                    }
+                } catch (java.util.NoSuchElementException | java.lang.IllegalArgumentException ignored) {
+                } catch (Exception e) {
+                    plugin.getLogger().warning("Error removing lightguard_raw for " + player.getName() + ": " + e.getMessage());
+                }
+            }
+        } catch (Exception e) {
+            plugin.getLogger().warning("Failed to eject " + player.getName() + ": " + e.getMessage());
+        }
+    }
     public void remove(Player player) {
         removeSync(player);
     }
