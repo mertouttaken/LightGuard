@@ -32,10 +32,11 @@ public class PayloadCheck extends Check {
         if (packet instanceof PacketPlayInCustomPayload) {
             PacketPlayInCustomPayload p = (PacketPlayInCustomPayload) packet;
             String packetName = "PacketPlayInCustomPayload";
+
             String channel = p.tag.toString();
 
             for (String blocked : blockedChannels) {
-                if (channel.equalsIgnoreCase(blocked) || channel.toLowerCase().contains(blocked.toLowerCase())) {
+                if (channel.equalsIgnoreCase(blocked)) {
                     flag("Blocked Channel: " + channel, packetName);
                     return false;
                 }
@@ -66,7 +67,7 @@ public class PayloadCheck extends Check {
             }
 
 
-            if (channel.equals("minecraft:register") || channel.equals("REGISTER")) {
+            if (channel.equalsIgnoreCase("minecraft:register") || channel.equalsIgnoreCase("REGISTER")) {
                 ByteBuf data = p.data;
                 int readableBytes = data.readableBytes();
                 int channelCount = 0;
@@ -101,13 +102,13 @@ public class PayloadCheck extends Check {
             }
 
             try {
-                if (p.data.readableBytes() > maxPayloadSize && !channel.equals("WDL|INIT")) {
+                if (p.data.readableBytes() > maxPayloadSize && !channel.equalsIgnoreCase("WDL|INIT")) {
                     flag("Oversized Payload (" + p.data.readableBytes() + " bytes)", packetName);
                     return false;
                 }
             } catch (Exception ignored) { return false; }
 
-            if (channel.equals("minecraft:brand") || channel.equals("MC|Brand")) {
+            if (channel.equalsIgnoreCase("minecraft:brand") || channel.equalsIgnoreCase("MC|Brand")) {
                 if (brandCheckEnabled) {
                     ByteBuf copy = p.data.copy();
                     try {

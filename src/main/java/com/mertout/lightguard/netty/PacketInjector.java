@@ -3,7 +3,11 @@ package com.mertout.lightguard.netty;
 import com.mertout.lightguard.LightGuard;
 import com.mertout.lightguard.data.PlayerData;
 import io.netty.channel.*;
+import net.minecraft.server.v1_16_R3.MinecraftServer;
 import net.minecraft.server.v1_16_R3.PacketPlayOutKeepAlive;
+import net.minecraft.server.v1_16_R3.ServerConnection;
+import org.bukkit.Bukkit;
+import org.bukkit.craftbukkit.v1_16_R3.CraftServer;
 import org.bukkit.craftbukkit.v1_16_R3.entity.CraftPlayer;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
@@ -13,6 +17,9 @@ import org.bukkit.event.player.PlayerQuitEvent;
 
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.VarHandle;
+import java.lang.reflect.Field;
+import java.util.List;
+import java.util.NoSuchElementException;
 
 public class PacketInjector implements Listener {
 
@@ -31,37 +38,87 @@ public class PacketInjector implements Listener {
     public PacketInjector(LightGuard plugin) {
         this.plugin = plugin;
         plugin.getServer().getPluginManager().registerEvents(this, plugin);
+
+        injectServerConnection();
+
         for (Player p : plugin.getServer().getOnlinePlayers()) {
             plugin.getPlayerDataManager().createData(p);
-            inject(p);
+            injectPlayer(p);
+        }
+    }
+
+    private void injectServerConnection() {
+        try {
+            ServerConnection serverConnection = ((CraftServer) Bukkit.getServer()).getServer().getServerConnection();
+            if (serverConnection == null) return;
+
+            Field channelsField = ServerConnection.class.getDeclaredField("g");
+            channelsField.setAccessible(true);
+            List<ChannelFuture> futures = (List<ChannelFuture>) channelsField.get(serverConnection);
+
+            for (ChannelFuture future : futures) {
+                future.channel().pipeline().addFirst(new ChannelInboundHandlerAdapter() {
+                    @Override
+                    public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
+                        if (msg instanceof Channel) {
+                            Channel channel = (Channel) msg;
+                            channel.pipeline().addFirst("lightguard_raw", new RawPacketInspector(plugin, "PRE_LOGIN_CONNECTION"));
+                        }
+                        super.channelRead(ctx, msg);
+                    }
+                });
+            }
+        } catch (Exception e) {
+            plugin.getLogger().warning("Failed to inject into ServerConnection (Pre-Login protection might be disabled): " + e.getMessage());
         }
     }
 
     @EventHandler
     public void onJoin(PlayerJoinEvent event) {
         plugin.getPlayerDataManager().createData(event.getPlayer());
-        inject(event.getPlayer());
+        injectPlayer(event.getPlayer());
     }
 
     @EventHandler
     public void onQuit(PlayerQuitEvent event) {
         try {
-            removeSync(event.getPlayer());
+            removePlayer(event.getPlayer());
         } finally {
             plugin.getPlayerDataManager().removeData(event.getPlayer().getUniqueId());
         }
     }
 
-    private void inject(Player player) {
-        ChannelDuplexHandler channelHandler = new ChannelDuplexHandler() {
+    private void injectPlayer(Player player) {
+        try {
+            Channel channel = ((CraftPlayer) player).getHandle().playerConnection.networkManager.channel;
+
+            if (channel.pipeline().get("lightguard_handler") != null) {
+                channel.pipeline().remove("lightguard_handler");
+            }
+
+            ChannelDuplexHandler channelHandler = createPacketHandler(player);
+
+            String target = "packet_handler";
+            if (channel.pipeline().get(target) != null) {
+                channel.pipeline().addBefore(target, "lightguard_handler", channelHandler);
+            } else {
+                channel.pipeline().addLast("lightguard_handler", channelHandler);
+            }
+
+        } catch (Exception e) {
+            plugin.getLogger().warning("Failed to inject player " + player.getName() + ": " + e.getMessage());
+        }
+    }
+
+    private ChannelDuplexHandler createPacketHandler(Player player) {
+        return new ChannelDuplexHandler() {
             @Override
             public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
-                Player p = player;
                 long start = System.nanoTime();
                 boolean blocked = false;
 
                 try {
-                    PlayerData data = plugin.getPlayerDataManager().getData(p.getUniqueId());
+                    PlayerData data = plugin.getPlayerDataManager().getData(player.getUniqueId());
                     if (data != null) {
                         if (!data.getCheckManager().handlePacket(msg)) {
                             blocked = true;
@@ -71,39 +128,33 @@ public class PacketInjector implements Listener {
                     super.channelRead(ctx, msg);
                 } catch (Exception e) {
                     if (plugin.getConfig().getBoolean("settings.sentinel.enabled", true)) {
-                        plugin.getLogger().warning("[Sentinel] Packet error from " + p.getName() + ": " + e.getMessage());
+                        plugin.getLogger().warning("[Sentinel] Packet error from " + player.getName() + ": " + e.getMessage());
                         return;
                     }
                     throw e;
                 } finally {
                     long duration = System.nanoTime() - start;
-
                     if (plugin.getMetrics() != null) {
                         plugin.getMetrics().recordPacket(blocked, duration);
                     }
-
                     if (plugin.getPacketLoggerManager() != null) {
-                        plugin.getPacketLoggerManager().processPacket(p, msg, duration);
+                        plugin.getPacketLoggerManager().processPacket(player, msg, duration);
                     }
                 }
             }
 
             @Override
             public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
-                Player p = player;
-                Throwable rootCause = cause;
-                while (rootCause.getCause() != null && rootCause.getCause() != rootCause) {
-                    rootCause = rootCause.getCause();
+                Throwable root = cause;
+                while (root.getCause() != null && root.getCause() != root) {
+                    root = root.getCause();
                 }
-
-                String message = rootCause.getMessage();
-                if (message != null && message.contains("Expected root tag to be a CompoundTag") && message.contains("was 69")) {
-                    plugin.getLogger().warning("§c[LightGuard] Protocol Exploit (Bad NBT Tag 69) detected and blocked from " + p.getName() + ".");
-                    plugin.getServer().getScheduler().runTask(plugin, () ->
-                            p.kickPlayer("§4[LightGuard] §cBad Package (NBT Exploit) Detected. Please reconnect."));
+                String msg = root.getMessage();
+                if (msg != null && msg.contains("Expected root tag to be a CompoundTag") && msg.contains("was 69")) {
+                    plugin.getLogger().warning("§c[LightGuard] Protocol Exploit (Bad NBT 69) blocked from " + player.getName());
+                    Bukkit.getScheduler().runTask(plugin, () -> player.kickPlayer("§cInvalid Protocol Data"));
                     return;
                 }
-
                 super.exceptionCaught(ctx, cause);
             }
 
@@ -115,73 +166,29 @@ public class PacketInjector implements Listener {
                         try {
                             long id = (long) KEEP_ALIVE_ID.get(msg);
                             data.getPendingKeepAlives().put(id, System.currentTimeMillis());
-                        } catch (Exception e) {}
+                        } catch (Exception ignored) {}
                     }
                 }
                 super.write(ctx, msg, promise);
             }
         };
-
-        try {
-            ChannelPipeline pipeline = ((CraftPlayer) player).getHandle().playerConnection.networkManager.channel.pipeline();
-
-            try {
-                if (pipeline.get("lightguard_handler") != null) pipeline.remove("lightguard_handler");
-                if (pipeline.get("lightguard_raw") != null) pipeline.remove("lightguard_raw");
-            } catch (Exception ignored) {
-            }
-
-            String[] targetHandlers = {"splitter", "decoder", "prepender", "packet_handler"};
-            String target = null;
-            for (String handlerName : targetHandlers) {
-                if (pipeline.get(handlerName) != null) { target = handlerName; break; }
-            }
-
-            RawPacketInspector inspector = new RawPacketInspector(plugin, player.getName());
-            try {
-                if (pipeline.context("decoder") != null) pipeline.addBefore("decoder", "lightguard_raw", inspector);
-                else if (target != null) pipeline.addAfter(target, "lightguard_raw", inspector);
-                else pipeline.addFirst("lightguard_raw", inspector);
-            } catch (IllegalArgumentException e) {
-            }
-
-            try {
-                if (pipeline.get("packet_handler") != null) pipeline.addBefore("packet_handler", "lightguard_handler", channelHandler);
-                else pipeline.addLast("lightguard_handler", channelHandler);
-            } catch (IllegalArgumentException e) {
-            }
-
-        } catch (Exception e) {
-            plugin.getLogger().warning("Failed to inject " + player.getName() + ": " + e.getMessage());
-        }
     }
 
-    private void removeSync(Player player) {
+    private void removePlayer(Player player) {
         try {
             if (player == null || !player.isOnline()) return;
-
             Channel channel = ((CraftPlayer) player).getHandle().playerConnection.networkManager.channel;
-
             if (channel != null) {
-                ChannelPipeline pipeline = channel.pipeline();
-
-                try {
-                    if (pipeline.get("lightguard_handler") != null) pipeline.remove("lightguard_handler");
-                } catch (Exception ignored) {}
-
-                try {
-                    if (pipeline.get("lightguard_raw") != null) pipeline.remove("lightguard_raw");
-                } catch (Exception ignored) {}
+                if (channel.pipeline().get("lightguard_handler") != null) {
+                    channel.pipeline().remove("lightguard_handler");
+                }
             }
-        } catch (Exception e) {
-        }
-    }
-
-    public void remove(Player player) {
-        removeSync(player);
+        } catch (Exception ignored) {}
     }
 
     public void ejectAll() {
-        for (Player p : plugin.getServer().getOnlinePlayers()) { remove(p); }
+        for (Player p : plugin.getServer().getOnlinePlayers()) {
+            removePlayer(p);
+        }
     }
 }

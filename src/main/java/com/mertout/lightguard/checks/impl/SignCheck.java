@@ -2,7 +2,7 @@ package com.mertout.lightguard.checks.impl;
 
 import com.mertout.lightguard.checks.Check;
 import com.mertout.lightguard.data.PlayerData;
-import com.mertout.lightguard.utils.GeyserUtil; // IMPORT EKLENDİ
+import com.mertout.lightguard.utils.GeyserUtil;
 import net.minecraft.server.v1_16_R3.BlockPosition;
 import net.minecraft.server.v1_16_R3.PacketPlayInUpdateSign;
 import org.bukkit.Bukkit;
@@ -27,6 +27,9 @@ public class SignCheck extends Check {
     }
 
     private static final Pattern ILLEGAL_CHARS = Pattern.compile("[\\x00-\\x1F]");
+
+    private static final Pattern JSON_EXPLIOT_PATTERN = Pattern.compile("[\"'](text|score|selector|extra|translate|clickEvent|hoverEvent|run_command|nbt)[\"']\\s*:");
+
     private final int maxLineLength;
     private final boolean blockJson;
 
@@ -46,7 +49,6 @@ public class SignCheck extends Check {
                 Location blockLoc = new Location(data.getPlayer().getWorld(), pos.getX(), pos.getY(), pos.getZ());
 
                 boolean isBedrock = GeyserUtil.isBedrockPlayer(data.getPlayer());
-
                 double maxDist = isBedrock ? 225.0 : 100.0;
 
                 if (data.getPlayer().getLocation().distanceSquared(blockLoc) > maxDist) {
@@ -73,17 +75,29 @@ public class SignCheck extends Check {
 
                 for (String line : lines) {
                     if (line == null) continue;
+
                     if (line.length() > maxLineLength) {
                         flag("Oversized Sign Line", "PacketPlayInUpdateSign");
                         return false;
                     }
+
                     if (ILLEGAL_CHARS.matcher(line).find()) {
                         flag("Illegal Chars", "PacketPlayInUpdateSign");
                         return false;
                     }
-                    if (blockJson && (line.trim().startsWith("{") || line.contains("\"text\""))) {
-                        flag("JSON Injection", "PacketPlayInUpdateSign");
-                        return false;
+
+                    if (blockJson) {
+                        String trimmed = line.trim();
+
+                        if (JSON_EXPLIOT_PATTERN.matcher(line).find()) {
+                            flag("Dangerous JSON Component", "PacketPlayInUpdateSign");
+                            return false;
+                        }
+
+                        if (trimmed.startsWith("{") && (trimmed.contains("\":") || trimmed.contains("':"))) {
+                            flag("JSON Syntax Detected", "PacketPlayInUpdateSign");
+                            return false;
+                        }
                     }
                 }
 

@@ -1,6 +1,7 @@
 package com.mertout.lightguard.listeners;
 
 import com.mertout.lightguard.LightGuard;
+import com.mertout.lightguard.data.PlayerData;
 import org.bukkit.Material;
 import org.bukkit.World;
 import org.bukkit.entity.*;
@@ -387,6 +388,13 @@ public class MechanicListener implements Listener {
                     event.setCancelled(true);
                 }
             }
+        }
+    }
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    public void onGameModeChange(PlayerGameModeChangeEvent event) {
+        PlayerData data = plugin.getPlayerDataManager().getData(event.getPlayer().getUniqueId());
+        if (data != null) {
+            data.setGameMode(event.getNewGameMode());
         }
     }
 

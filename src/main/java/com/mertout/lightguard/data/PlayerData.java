@@ -1,6 +1,7 @@
 package com.mertout.lightguard.data;
 
 import com.mertout.lightguard.checks.CheckManager;
+import org.bukkit.GameMode;
 import org.bukkit.entity.Player;
 import java.util.Map;
 import java.util.Set;
@@ -20,6 +21,8 @@ public class PlayerData {
     private volatile int currentPPS = 0;
     private long lastVehicleJump;
 
+    private volatile GameMode gameMode;
+
     private volatile int teleportBurst = 0;
 
     private final AtomicLong lastChannelRegister = new AtomicLong(System.currentTimeMillis());
@@ -34,6 +37,7 @@ public class PlayerData {
         this.checkManager = new CheckManager(this);
         this.lastVehicleJump = 0;
         this.lastTeleportTime = System.currentTimeMillis();
+        this.gameMode = player.getGameMode();
     }
 
     public void clearSecurityData() {
@@ -80,4 +84,7 @@ public class PlayerData {
 
     public boolean isPrinterMode() { return printerMode; }
     public void setPrinterMode(boolean printerMode) { this.printerMode = printerMode; }
+
+    public GameMode getGameMode() { return gameMode; }
+    public void setGameMode(GameMode gameMode) { this.gameMode = gameMode; }
 }

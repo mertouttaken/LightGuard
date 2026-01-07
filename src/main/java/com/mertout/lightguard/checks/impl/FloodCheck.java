@@ -27,16 +27,16 @@ public class FloodCheck extends Check {
     private final Map<String, Double> weights = new HashMap<>();
     private final Map<String, LimitConfig> limits = new HashMap<>();
 
-    private final AtomicLong lastCheck = new AtomicLong(System.currentTimeMillis());
-    private final AtomicLong lastBurstCheck = new AtomicLong(System.currentTimeMillis());
-    private final AtomicLong lastByteCheck = new AtomicLong(System.currentTimeMillis());
+    private final AtomicLong lastCheck = new AtomicLong(System.nanoTime() / 1000000L);
+    private final AtomicLong lastBurstCheck = new AtomicLong(System.nanoTime() / 1000000L);
+    private final AtomicLong lastByteCheck = new AtomicLong(System.nanoTime() / 1000000L);
+    private final AtomicLong lastMicroCheck = new AtomicLong(System.nanoTime() / 1000000L);
+
     private final AtomicInteger globalPacketCount = new AtomicInteger(0);
     private final AtomicInteger burstCount = new AtomicInteger(0);
     private final AtomicLong totalBytes = new AtomicLong(0);
     private final DoubleAdder currentWeight = new DoubleAdder();
     private final Map<String, PacketTracker> packetTrackers = new ConcurrentHashMap<>();
-
-    private final AtomicLong lastMicroCheck = new AtomicLong(System.currentTimeMillis());
     private final AtomicInteger microPacketCount = new AtomicInteger(0);
 
     public FloodCheck(PlayerData data) {
@@ -54,6 +54,7 @@ public class FloodCheck extends Check {
         ConfigurationSection sec = plugin.getConfig().getConfigurationSection("checks.flood.matrix.weights");
         if (sec != null) for (String key : sec.getKeys(false)) weights.put(key, sec.getDouble(key));
     }
+
     private void loadLimits() {
         ConfigurationSection sec = plugin.getConfig().getConfigurationSection("checks.flood.limits");
         if (sec != null) {
@@ -71,7 +72,8 @@ public class FloodCheck extends Check {
         return PACKET_NAME_CACHE.computeIfAbsent(packet.getClass(), Class::getSimpleName);
     }
 
-    public void cleanup(long now) {
+    public void cleanup() {
+        long now = System.nanoTime() / 1000000L;
         packetTrackers.entrySet().removeIf(entry -> (now - entry.getValue().lastTime.get()) > 60000);
     }
 
@@ -87,7 +89,7 @@ public class FloodCheck extends Check {
     public boolean check(Object packet) {
         if (!isEnabled()) return true;
 
-        long now = System.currentTimeMillis();
+        long now = System.nanoTime() / 1000000L;
         String packetName = getPacketName(packet);
 
         double multiplier = 1.0;
@@ -98,6 +100,7 @@ public class FloodCheck extends Check {
             data.setPPS(globalPacketCount.get());
             globalPacketCount.set(0);
             currentWeight.reset();
+            cleanup();
         }
 
         if (checkAndReset(lastMicroCheck, now, 100)) {
@@ -172,7 +175,7 @@ public class FloodCheck extends Check {
     }
 
     private static class PacketTracker {
-        final AtomicLong lastTime = new AtomicLong(System.currentTimeMillis());
+        final AtomicLong lastTime = new AtomicLong(System.nanoTime() / 1000000L);
         final AtomicInteger count = new AtomicInteger(0);
     }
     private static class LimitConfig {

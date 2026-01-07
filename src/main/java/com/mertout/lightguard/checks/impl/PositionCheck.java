@@ -3,78 +3,81 @@ package com.mertout.lightguard.checks.impl;
 import com.mertout.lightguard.checks.Check;
 import com.mertout.lightguard.data.PlayerData;
 import net.minecraft.server.v1_16_R3.PacketPlayInFlying;
-import java.util.concurrent.atomic.AtomicReference;
+import org.bukkit.GameMode;
+
+import java.lang.invoke.MethodHandles;
+import java.lang.invoke.VarHandle;
 
 public class PositionCheck extends Check {
 
-    private static class Position {
-        final double x, y, z;
-        Position(double x, double y, double z) { this.x = x; this.y = y; this.z = z; }
+    private static final VarHandle X, Y, Z, HAS_POS;
+
+    static {
+        try {
+            MethodHandles.Lookup lookup = MethodHandles.privateLookupIn(PacketPlayInFlying.class, MethodHandles.lookup());
+            X = lookup.findVarHandle(PacketPlayInFlying.class, "x", double.class);
+            Y = lookup.findVarHandle(PacketPlayInFlying.class, "y", double.class);
+            Z = lookup.findVarHandle(PacketPlayInFlying.class, "z", double.class);
+            HAS_POS = lookup.findVarHandle(PacketPlayInFlying.class, "hasPos", boolean.class);
+        } catch (Exception e) { throw new ExceptionInInitializerError(e); }
     }
 
-    private final AtomicReference<Position> lastPos = new AtomicReference<>(new Position(-1, -1, -1));
+    private double lastX = -1, lastY = -1, lastZ = -1;
 
     public PositionCheck(PlayerData data) {
         super(data, "Position", "position");
     }
 
     @Override
-    public boolean isBedrockCompatible() {
-        return false;
-    }
-
-    @Override
     public boolean check(Object packet) {
-        if (data.isTeleporting()) {
-            if (packet instanceof PacketPlayInFlying && ((PacketPlayInFlying) packet).hasPos) {
-                PacketPlayInFlying p = (PacketPlayInFlying) packet;
-                lastPos.set(new Position(p.a(0), p.b(0), p.c(0)));
-            }
-            return true;
-        }
-
         if (!isEnabled()) return true;
 
         if (packet instanceof PacketPlayInFlying) {
-            PacketPlayInFlying p = (PacketPlayInFlying) packet;
-            if (p.hasPos) {
-                double x = p.a(0);
-                double y = p.b(0);
-                double z = p.c(0);
+            try {
+                boolean hasPos = (boolean) HAS_POS.get(packet);
+                if (!hasPos) return true;
+
+                double x = (double) X.get(packet);
+                double y = (double) Y.get(packet);
+                double z = (double) Z.get(packet);
 
                 if (!Double.isFinite(x) || !Double.isFinite(y) || !Double.isFinite(z)) {
-                    flag("NaN/Infinity Coordinate", "PacketPlayInFlying");
+                    flag("Invalid Player Coordinates", "PacketPlayInFlying");
                     return false;
                 }
 
-                double worldLimit = plugin.getConfig().getDouble("checks.position.out-of-world-limit", 30000000.0);
-                if (Math.abs(x) > worldLimit || Math.abs(z) > worldLimit) {
-                    flag("Out of World Limit", "PacketPlayInFlying");
+                if (Math.abs(x) > 30000000 || Math.abs(z) > 30000000) {
+                    flag("World Border Exploit", "PacketPlayInFlying");
                     return false;
                 }
 
-                Position last = lastPos.get();
-                if (last.x != -1) {
-                    double deltaX = x - last.x;
-                    double deltaY = y - last.y;
-                    double deltaZ = z - last.z;
-                    double speedSquared = deltaX * deltaX + deltaY * deltaY + deltaZ * deltaZ;
+                if (data.getGameMode() == GameMode.SPECTATOR || data.getGameMode() == GameMode.CREATIVE) {
+                    lastX = x; lastY = y; lastZ = z;
+                    return true;
+                }
 
-                    if (data.getPlayer().isGliding()) {
-                        double limit = plugin.getConfig().getDouble("checks.position.elytra-speed-limit", 4.0);
-                        if (speedSquared > limit * limit) {
-                            flag("Elytra Speed Limit (" + String.format("%.2f", Math.sqrt(speedSquared)) + ")", "PacketPlayInFlying");
-                            return false;
-                        }
+                if (lastX != -1) {
+                    double distSq = ((x - lastX) * (x - lastX)) +
+                            ((y - lastY) * (y - lastY)) +
+                            ((z - lastZ) * (z - lastZ));
+
+                    if (data.isTeleporting()) {
+                        lastX = x; lastY = y; lastZ = z;
+                        return true;
                     }
 
-                    double maxOffset = plugin.getConfig().getDouble("checks.position.max-offset", 400.0);
-                    if (speedSquared > maxOffset * maxOffset) {
-                        flag("Moved too fast", "PacketPlayInFlying");
+                    if (distSq > 100.0) {
+                        flag("Excessive Speed / Blink Exploit", "PacketPlayInFlying");
                         return false;
                     }
                 }
-                lastPos.set(new Position(x, y, z));
+
+                lastX = x;
+                lastY = y;
+                lastZ = z;
+
+            } catch (Exception e) {
+                return false;
             }
         }
         return true;

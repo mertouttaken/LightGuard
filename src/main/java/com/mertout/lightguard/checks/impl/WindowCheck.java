@@ -38,7 +38,7 @@ public class WindowCheck extends Check {
     private final AtomicLong lastQuickMoveTime = new AtomicLong();
     private final AtomicInteger quickMoveCount = new AtomicInteger();
 
-    private long lastResync = 0;
+    private final AtomicLong lastSyncTime = new AtomicLong(0);
 
     public WindowCheck(PlayerData data) {
         super(data, "Window", "window");
@@ -64,79 +64,69 @@ public class WindowCheck extends Check {
                     return false;
                 }
 
-                Bukkit.getScheduler().runTask(plugin, () -> {
-                    if (!data.getPlayer().isOnline()) return;
-
-                    try {
-                        Container activeContainer = ((CraftPlayer) data.getPlayer()).getHandle().activeContainer;
-
-                        if (activeContainer == null) {
-                            flag("Null Container Access", packetName);
-                            resync();
-                            data.getPlayer().closeInventory();
-                            return;
-                        }
-
-                        if (windowId != 0 && windowId != activeContainer.windowId) {
-                            flag("Inventory Desync (Client: " + windowId + " Server: " + activeContainer.windowId + ")", packetName);
-                            resync();
-                            return;
-                        }
-
-                        GameMode mode = data.getPlayer().getGameMode();
-                        if (slot != -999 && slot != -1 && mode != GameMode.SPECTATOR && mode != GameMode.CREATIVE) {
-                            if (activeContainer.slots == null || slot >= activeContainer.slots.size()) {
-                                flag("Slot Index Out of Bounds", packetName);
-                                resync();
-                                return;
-                            }
-                        }
-
-                        InventoryView view = data.getPlayer().getOpenInventory();
-                        InventoryType type = (view != null) ? view.getType() : InventoryType.CRAFTING;
-
-                        if (clickType == InventoryClickType.QUICK_MOVE) {
-                            long now = System.currentTimeMillis();
-                            if (now - lastQuickMoveTime.get() > 1000) {
-                                quickMoveCount.set(0);
-                                lastQuickMoveTime.set(now);
-                            }
-                            int limit = (type == InventoryType.FURNACE || type == InventoryType.BLAST_FURNACE || type == InventoryType.SMOKER || type == InventoryType.MERCHANT) ? 8 : 15;
-
-                            if (quickMoveCount.incrementAndGet() > limit) {
-                                flag("QuickMove Spam", packetName);
-                                resync();
-                                return;
-                            }
-                        }
-
-                        // Illegal Swap Kontrolleri
-                        if ((type == InventoryType.MERCHANT || type == InventoryType.FURNACE) && slot == 2 && clickType == InventoryClickType.SWAP) {
-                            flag("Illegal Result Slot Swap", packetName);
-                            resync();
-                            return;
-                        }
-
-                        if (preventLecternSpam && type == InventoryType.LECTERN && (clickType == InventoryClickType.QUICK_MOVE || clickType == InventoryClickType.SWAP)) {
-                            flag("Lectern Illegal Click", packetName);
-                            resync();
-                            return;
-                        }
-
-                        if (preventSwapInGui && windowId > 0 && clickType == InventoryClickType.SWAP) {
-                            flag("Illegal GUI Swap", packetName);
-                            resync();
-                            return;
-                        }
-
-                    } catch (Exception e) {
-                        plugin.getLogger().warning("WindowCheck sync task error: " + e.getMessage());
+                if (clickType == InventoryClickType.QUICK_MOVE) {
+                    long now = System.currentTimeMillis();
+                    if (now - lastQuickMoveTime.get() > 1000) {
+                        quickMoveCount.set(0);
+                        lastQuickMoveTime.set(now);
                     }
-                });
+                    if (quickMoveCount.incrementAndGet() > 20) {
+                        flag("QuickMove Spam (Rate Limit)", packetName);
+                        return false;
+                    }
+                }
+
+                long now = System.currentTimeMillis();
+                if (now - lastSyncTime.get() > 200) {
+                    lastSyncTime.set(now);
+
+                    Bukkit.getScheduler().runTask(plugin, () -> {
+                        if (!data.getPlayer().isOnline()) return;
+
+                        try {
+                            Container activeContainer = ((CraftPlayer) data.getPlayer()).getHandle().activeContainer;
+
+                            if (activeContainer == null) {
+                                resync();
+                                return;
+                            }
+
+                            if (windowId != 0 && windowId != activeContainer.windowId) {
+                                flag("Inventory Desync", packetName);
+                                resync();
+                                return;
+                            }
+
+                            GameMode mode = data.getPlayer().getGameMode();
+                            if (slot != -999 && slot != -1 && mode != GameMode.SPECTATOR && mode != GameMode.CREATIVE) {
+                                if (activeContainer.slots == null || slot >= activeContainer.slots.size()) {
+                                    flag("Slot Index Out of Bounds", packetName);
+                                    resync();
+                                    return;
+                                }
+                            }
+
+                            InventoryView view = data.getPlayer().getOpenInventory();
+                            InventoryType type = (view != null) ? view.getType() : InventoryType.CRAFTING;
+
+                            if (preventLecternSpam && type == InventoryType.LECTERN && (clickType == InventoryClickType.QUICK_MOVE || clickType == InventoryClickType.SWAP)) {
+                                flag("Lectern Illegal Click", packetName);
+                                resync();
+                                return;
+                            }
+
+                            if (preventSwapInGui && windowId > 0 && clickType == InventoryClickType.SWAP) {
+                                flag("Illegal GUI Swap", packetName);
+                                resync();
+                                return;
+                            }
+
+                        } catch (Exception e) {
+                        }
+                    });
+                }
 
             } catch (Throwable t) {
-                plugin.getLogger().warning("WindowCheck error: " + t.getMessage());
-                resync();
                 return false;
             }
         }
@@ -144,10 +134,6 @@ public class WindowCheck extends Check {
     }
 
     private void resync() {
-        long now = System.currentTimeMillis();
-        if (now - lastResync > 1000) {
-            lastResync = now;
-            Bukkit.getScheduler().runTask(plugin, () -> data.getPlayer().updateInventory());
-        }
+        Bukkit.getScheduler().runTask(plugin, () -> data.getPlayer().updateInventory());
     }
 }

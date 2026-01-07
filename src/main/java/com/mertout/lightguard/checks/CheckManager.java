@@ -28,7 +28,7 @@ public class CheckManager {
     public void cleanupChecks(long now) {
         for (Check check : globalChecks) {
             if (check instanceof FloodCheck) {
-                ((FloodCheck) check).cleanup(now);
+                ((FloodCheck) check).cleanup();
             }
         }
     }
