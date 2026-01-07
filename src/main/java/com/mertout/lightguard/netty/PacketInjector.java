@@ -57,27 +57,41 @@ public class PacketInjector implements Listener {
             @Override
             public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
                 Player p = player;
+                long start = System.nanoTime();
+                boolean blocked = false;
+
                 try {
-                    long start = System.nanoTime();
                     if (plugin.getPacketLoggerManager() != null && plugin.getPacketLoggerManager().getWatchdog() != null) {
                         plugin.getPacketLoggerManager().getWatchdog().startProcessing();
                     }
+
                     PlayerData data = plugin.getPlayerDataManager().getData(p.getUniqueId());
                     if (data != null) {
-                        if (!data.getCheckManager().handlePacket(msg)) return;
+                        if (!data.getCheckManager().handlePacket(msg)) {
+                            blocked = true;
+                            return;
+                        }
                     }
                     super.channelRead(ctx, msg);
-                    long duration = System.nanoTime() - start;
-                    if (plugin.getPacketLoggerManager() != null) {
-                        plugin.getPacketLoggerManager().getWatchdog().endProcessing();
-                        plugin.getPacketLoggerManager().processPacket(p, msg, duration);
-                    }
                 } catch (Exception e) {
                     if (plugin.getConfig().getBoolean("settings.sentinel.enabled", true)) {
                         plugin.getLogger().warning("[Sentinel] Packet error from " + p.getName() + ": " + e.getMessage());
                         return;
                     }
                     throw e;
+                } finally {
+                    long duration = System.nanoTime() - start;
+
+                    if (plugin.getMetrics() != null) {
+                        plugin.getMetrics().recordPacket(blocked, duration);
+                    }
+
+                    if (plugin.getPacketLoggerManager() != null) {
+                        if (plugin.getPacketLoggerManager().getWatchdog() != null) {
+                            plugin.getPacketLoggerManager().getWatchdog().endProcessing();
+                        }
+                        plugin.getPacketLoggerManager().processPacket(p, msg, duration);
+                    }
                 }
             }
 
@@ -93,7 +107,7 @@ public class PacketInjector implements Listener {
                 if (message != null && message.contains("Expected root tag to be a CompoundTag") && message.contains("was 69")) {
                     plugin.getLogger().warning("§c[LightGuard] Protocol Exploit (Bad NBT Tag 69) detected and blocked from " + p.getName() + ".");
                     plugin.getServer().getScheduler().runTask(plugin, () ->
-                            p.kickPlayer("§4[LightGuard] &cBad Package (NBT Exploit) Detected. Please reconnect."));
+                            p.kickPlayer("§4[LightGuard] §cBad Package (NBT Exploit) Detected. Please reconnect."));
                     return;
                 }
 

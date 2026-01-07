@@ -1,4 +1,4 @@
-package com.mertout.lightguard.commands;
+package com.mertout.lightguard.commands.subcommands;
 import com.mertout.lightguard.LightGuard;
 import org.bukkit.command.CommandSender;
 

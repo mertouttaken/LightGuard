@@ -200,7 +200,7 @@ checks:
 
   block-place:
     enabled: true
-    kick-on-illegal-block: true # No forgiveness
+    kick-on-illegal-block: false # No forgiveness
     max-pps: 12 # More than 12 blocks per second (Printer/FastPlace) are blocked.
     check-coordinates: true
 

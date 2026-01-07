@@ -51,6 +51,8 @@ public abstract class Check {
             String kickMessage = buildKickMessage(packetName, ping);
             data.getPlayer().kickPlayer(kickMessage);
         });
+
+        plugin.getMetrics().recordViolation(data.getPlayer().getName(), this.name);
     }
 
     private int getPing() {

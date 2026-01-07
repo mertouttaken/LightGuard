@@ -5,6 +5,7 @@ import com.mertout.lightguard.config.ConfigManager;
 import com.mertout.lightguard.data.PlayerDataManager;
 import com.mertout.lightguard.listeners.MechanicListener;
 import com.mertout.lightguard.logger.PacketLoggerManager;
+import com.mertout.lightguard.metrics.MetricsCollector;
 import com.mertout.lightguard.monitor.PerformanceMonitor;
 import com.mertout.lightguard.netty.PacketInjector;
 
@@ -19,6 +20,7 @@ public class LightGuard extends JavaPlugin {
     private PacketInjector packetInjector;
     private PacketLoggerManager packetLoggerManager;
     private PerformanceMonitor performanceMonitor;
+    private MetricsCollector metrics;
 
     private double currentTps = 20.0;
 
@@ -31,6 +33,7 @@ public class LightGuard extends JavaPlugin {
         this.packetLoggerManager = new PacketLoggerManager(this);
         this.playerDataManager = new PlayerDataManager();
         this.performanceMonitor = new PerformanceMonitor(this);
+        this.metrics = new MetricsCollector(this);
 
         // Listeners & Commands
         getServer().getPluginManager().registerEvents(new MechanicListener(this), this);
@@ -72,6 +75,7 @@ public class LightGuard extends JavaPlugin {
     public PlayerDataManager getPlayerDataManager() { return playerDataManager; }
     public PacketLoggerManager getPacketLoggerManager() { return packetLoggerManager; }
     public PerformanceMonitor getPerformanceMonitor() { return performanceMonitor; }
+    public MetricsCollector getMetrics() { return metrics; }
 
     public double getTPS() { return currentTps; }
 }
