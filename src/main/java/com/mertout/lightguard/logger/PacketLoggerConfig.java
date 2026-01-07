@@ -8,8 +8,6 @@ public class PacketLoggerConfig {
     private boolean enabled;
     private long heavyPacketThreshold;
     private OutputMode outputMode;
-    private long watchdogMaxTime;
-    private long watchdogCheckFrequency;
     private FilterMode playerMode;
     private List<String> playerList;
     private FilterMode packetMode;
@@ -24,8 +22,6 @@ public class PacketLoggerConfig {
         this.enabled = config.getBoolean("packet-logger.enabled");
         this.heavyPacketThreshold = config.getLong("packet-logger.heavy-packet-threshold");
         this.outputMode = OutputMode.valueOf(config.getString("packet-logger.output", "FILE").toUpperCase());
-        this.watchdogMaxTime = config.getLong("packet-logger.netty-watchdog.max-time");
-        this.watchdogCheckFrequency = config.getLong("packet-logger.netty-watchdog.check-frequency");
         this.playerMode = FilterMode.valueOf(config.getString("packet-logger.player-mode", "WHITELIST").toUpperCase());
         this.playerList = config.getStringList("packet-logger.players");
         this.packetMode = FilterMode.valueOf(config.getString("packet-logger.packet-mode", "BLACKLIST").toUpperCase());
@@ -36,8 +32,6 @@ public class PacketLoggerConfig {
     public boolean isEnabled() { return enabled; }
     public long getHeavyPacketThreshold() { return heavyPacketThreshold; }
     public OutputMode getOutputMode() { return outputMode; }
-    public long getWatchdogMaxTime() { return watchdogMaxTime; }
-    public long getWatchdogCheckFrequency() { return watchdogCheckFrequency; }
     public FilterMode getPlayerMode() { return playerMode; }
     public List<String> getPlayerList() { return playerList; }
     public FilterMode getPacketMode() { return packetMode; }

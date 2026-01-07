@@ -8,13 +8,11 @@ public class PacketLoggerManager {
     private final LightGuard plugin;
     private final PacketLoggerConfig config;
     private final PacketLogWriter writer;
-    private final NettyWatchdogManager watchdog;
 
     public PacketLoggerManager(LightGuard plugin) {
         this.plugin = plugin;
         this.config = new PacketLoggerConfig(plugin);
         this.writer = new PacketLogWriter(plugin);
-        this.watchdog = new NettyWatchdogManager(plugin, config);
     }
 
     public void processPacket(Player player, Object packet, long durationNs) {
@@ -39,10 +37,8 @@ public class PacketLoggerManager {
     }
 
     public void shutdown() {
-        watchdog.setEnabled(false);
         writer.shutdown();
     }
 
-    public NettyWatchdogManager getWatchdog() { return watchdog; }
     public PacketLoggerConfig getConfig() { return config; }
 }

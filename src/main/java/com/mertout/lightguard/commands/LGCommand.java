@@ -3,7 +3,6 @@ package com.mertout.lightguard.commands;
 import com.mertout.lightguard.LightGuard;
 import com.mertout.lightguard.commands.subcommands.LGProfileCommand;
 import com.mertout.lightguard.commands.subcommands.LGStatsCommand;
-import com.mertout.lightguard.commands.subcommands.LGWatchdogCommand;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
@@ -36,10 +35,6 @@ public class LGCommand implements CommandExecutor {
                 sender.sendMessage("§a[LightGuard] Configuration and caches have been reloaded.");
                 break;
 
-            case "watchdog":
-                new LGWatchdogCommand(plugin).execute(sender);
-                break;
-
             case "tps":
                 sender.sendMessage("§8[§bLightGuard§8] §7Server TPS: §f" + String.format("%.2f", plugin.getTPS()));
                 break;
@@ -49,14 +44,16 @@ public class LGCommand implements CommandExecutor {
                 break;
 
             case "benchmark":
-                sender.sendMessage("§a[LightGuard] Printing benchmark statistics to console...");
-                plugin.getPerformanceMonitor().printStats();
-                break;
-
-            case "resetbench":
-            case "resetbenchmark":
-                plugin.getPerformanceMonitor().reset();
-                sender.sendMessage("§a[LightGuard] Benchmark data has been reset.");
+                if (args.length > 1 && args[1].equalsIgnoreCase("reset"))
+                {
+                    plugin.getPerformanceMonitor().reset();
+                    sender.sendMessage("§a[LightGuard] Benchmark data has been reset.");
+                }
+                else
+                {
+                    sender.sendMessage("§a[LightGuard] Printing benchmark statistics to console...");
+                    plugin.getPerformanceMonitor().printStats();
+                }
                 break;
 
             case "stats":
@@ -80,12 +77,10 @@ public class LGCommand implements CommandExecutor {
         sender.sendMessage("");
         sender.sendMessage("§8§m----------§r §cLightGuard Admin Help §8§m----------");
         sender.sendMessage(" §4/lg reload §8- §cReloads the configuration.");
-        sender.sendMessage(" §4/lg stats §8- §cDisplays security statistics.");
+        sender.sendMessage(" §4/lg stats <reset> §8- §cDisplays security statistics.");
         sender.sendMessage(" §4/lg profile §8- §cToggles the live packet profiler.");
-        sender.sendMessage(" §4/lg watchdog §8- §cToggles the Netty thread monitor.");
         sender.sendMessage(" §4/lg tps §8- §cDisplays current server TPS.");
-        sender.sendMessage(" §4/lg benchmark §8- §cPrints performance tests to console.");
-        sender.sendMessage(" §4/lg resetbench §8- §cClears all benchmark data.");
+        sender.sendMessage(" §4/lg benchmark <reset> §8- §cPrints performance tests to console.");
         sender.sendMessage("§8§m------------------------------------------");
     }
 }

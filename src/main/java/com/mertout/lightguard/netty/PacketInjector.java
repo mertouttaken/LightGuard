@@ -61,10 +61,6 @@ public class PacketInjector implements Listener {
                 boolean blocked = false;
 
                 try {
-                    if (plugin.getPacketLoggerManager() != null && plugin.getPacketLoggerManager().getWatchdog() != null) {
-                        plugin.getPacketLoggerManager().getWatchdog().startProcessing();
-                    }
-
                     PlayerData data = plugin.getPlayerDataManager().getData(p.getUniqueId());
                     if (data != null) {
                         if (!data.getCheckManager().handlePacket(msg)) {
@@ -87,9 +83,6 @@ public class PacketInjector implements Listener {
                     }
 
                     if (plugin.getPacketLoggerManager() != null) {
-                        if (plugin.getPacketLoggerManager().getWatchdog() != null) {
-                            plugin.getPacketLoggerManager().getWatchdog().endProcessing();
-                        }
                         plugin.getPacketLoggerManager().processPacket(p, msg, duration);
                     }
                 }
