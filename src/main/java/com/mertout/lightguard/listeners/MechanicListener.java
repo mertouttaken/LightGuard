@@ -11,20 +11,22 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.block.BlockBreakEvent;
 import org.bukkit.event.block.BlockFromToEvent;
 import org.bukkit.event.block.BlockRedstoneEvent;
+import org.bukkit.event.block.BlockDispenseEvent;
 import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.event.entity.EntityDeathEvent;
-import org.bukkit.event.entity.EntityTeleportEvent;
 import org.bukkit.event.inventory.*;
 import org.bukkit.event.player.*;
 import org.bukkit.event.world.ChunkUnloadEvent;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.InventoryHolder;
+import org.bukkit.Location;
 
 import java.util.*;
 
 public class MechanicListener implements Listener {
     private final LightGuard plugin;
     private final Map<UUID, Long> cooldowns = new HashMap<>();
+    private final Map<Location, Long> dispenserCooldowns = new HashMap<>();
 
     private static final Set<Material> NOISY_BLOCKS = EnumSet.of(
             Material.NOTE_BLOCK, Material.BELL,
@@ -134,14 +136,25 @@ public class MechanicListener implements Listener {
     public void onShear(PlayerShearEntityEvent e) {
         if (plugin.getConfig().getBoolean("mechanics.shears-cooldown") && checkCooldown(e.getPlayer().getUniqueId(), 500)) e.setCancelled(true);
     }
-    @EventHandler(priority = org.bukkit.event.EventPriority.LOW, ignoreCancelled = true)
-    public void onDispenseShears(org.bukkit.event.block.BlockDispenseEvent event) {
-        if (!plugin.getConfig().getBoolean("mechanics.shears-cooldown")) return;
 
-            if (event.getItem().getType() == Material.SHEARS) {
-            event.setCancelled(true);
+    @EventHandler(priority = org.bukkit.event.EventPriority.LOW, ignoreCancelled = true)
+    public void onDispenserSpam(BlockDispenseEvent event) {
+        if (!plugin.getConfig().getBoolean("mechanics.prevent-dispenser-spam", true)) return;
+
+        Material item = event.getItem().getType();
+
+        if (item == Material.SHEARS ||
+                item == Material.WATER_BUCKET ||
+                item == Material.LAVA_BUCKET ||
+                item == Material.FLINT_AND_STEEL ||
+                item == Material.FIRE_CHARGE) {
+
+            if (checkDispenserCooldown(event.getBlock().getLocation(), 500)) {
+                event.setCancelled(true);
+            }
         }
     }
+
     @EventHandler(priority = EventPriority.LOWEST)
     public void onInteract(PlayerInteractEvent e) {
         if (e.getClickedBlock() == null) return;
@@ -398,6 +411,16 @@ public class MechanicListener implements Listener {
         long now = System.currentTimeMillis();
         if (now - cooldowns.getOrDefault(uuid, 0L) < ms) return true;
         cooldowns.put(uuid, now);
+        return false;
+    }
+
+    private boolean checkDispenserCooldown(Location loc, long ms) {
+        long now = System.currentTimeMillis();
+        if (now - dispenserCooldowns.getOrDefault(loc, 0L) < ms) return true;
+        dispenserCooldowns.put(loc, now);
+        if (dispenserCooldowns.size() > 10000) {
+            dispenserCooldowns.clear();
+        }
         return false;
     }
 

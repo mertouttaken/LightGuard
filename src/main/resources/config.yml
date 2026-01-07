@@ -226,17 +226,15 @@ checks:
 
   item-exploit:
     enabled: true
-    max-item-depth: 2 # Nested NBT (Shulker inside Shulker) forbidden.
     max-nbt-size: 2048
-    max-items-per-packet: 100 # Restricted bulk packet sending.
     max-string-len: 100 # Lore/Name length cannot exceed 100 characters.
-    max-list-size: 10 # An item can have max 10 lines of lore.
-    max-list-size-nbt: 100
+    max-lore-size: 10 # An item can have max 10 lines of lore.
+    max-list-size: 100
     max-array-size: 256
     max-total-nodes: 1000
     max-depth: 7
     max-attributes: 7
-    max-attribute-value: 100.0
+    max-attribute-value: 100
 
     illegal-keys:
       - "run_command"
@@ -392,3 +390,4 @@ mechanics:
   prevent-furnace-dupe: true
   prevent-hopper-dupe: true
   prevent-end-teleport-exploits: true
+  prevent-dispenser-spam: true
