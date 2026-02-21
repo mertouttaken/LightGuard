@@ -29,19 +29,32 @@ public class PacketLogWriter {
     private void startWriterThread() {
         Thread writerThread = new Thread(() -> {
             try (BufferedWriter writer = new BufferedWriter(new FileWriter(logFile, true))) {
+                int writeCount = 0;
+
                 while (running && !Thread.currentThread().isInterrupted()) {
                     try {
                         String log = logQueue.poll(5, TimeUnit.SECONDS);
                         if (log != null) {
                             writer.write(log);
                             writer.newLine();
+                            writeCount++;
+
+                            if (writeCount >= 50) {
+                                writer.flush();
+                                writeCount = 0;
+                            }
+                        } else if (writeCount > 0) {
                             writer.flush();
+                            writeCount = 0;
                         }
                     } catch (InterruptedException e) {
                         Thread.currentThread().interrupt();
                     } catch (IOException e) {
                         e.printStackTrace();
                     }
+                }
+                if (writeCount > 0) {
+                    writer.flush();
                 }
             } catch (IOException e) {
                 e.printStackTrace();

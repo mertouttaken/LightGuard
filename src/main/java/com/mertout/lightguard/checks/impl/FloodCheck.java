@@ -13,6 +13,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.DoubleAdder;
+import java.util.concurrent.atomic.LongAdder;
 
 public class FloodCheck extends Check {
 
@@ -32,12 +33,12 @@ public class FloodCheck extends Check {
     private final AtomicLong lastByteCheck = new AtomicLong(System.nanoTime() / 1000000L);
     private final AtomicLong lastMicroCheck = new AtomicLong(System.nanoTime() / 1000000L);
 
-    private final AtomicInteger globalPacketCount = new AtomicInteger(0);
-    private final AtomicInteger burstCount = new AtomicInteger(0);
-    private final AtomicLong totalBytes = new AtomicLong(0);
+    private final LongAdder globalPacketCount = new LongAdder();
+    private final LongAdder burstCount = new LongAdder();
+    private final LongAdder totalBytes = new LongAdder();
     private final DoubleAdder currentWeight = new DoubleAdder();
     private final Map<String, PacketTracker> packetTrackers = new ConcurrentHashMap<>();
-    private final AtomicInteger microPacketCount = new AtomicInteger(0);
+    private final LongAdder microPacketCount = new LongAdder();
 
     public FloodCheck(PlayerData data) {
         super(data, "Flood", "flood");
@@ -110,17 +111,18 @@ public class FloodCheck extends Check {
         }
 
         if (checkAndReset(lastCheck, now, 1000)) {
-            data.setPPS(globalPacketCount.get());
-            globalPacketCount.set(0);
+            data.setPPS((int) globalPacketCount.sum());
+            globalPacketCount.reset();
             currentWeight.reset();
             cleanup();
         }
 
         if (checkAndReset(lastMicroCheck, now, 100)) {
-            microPacketCount.set(0);
+            microPacketCount.reset();
         }
 
-        int currentMicro = microPacketCount.incrementAndGet();
+        microPacketCount.increment();
+        int currentMicro = (int) microPacketCount.sum();
         int microLimit = Math.max(20, (int)((maxGlobalPPS * multiplier) / 5));
 
         if (currentMicro > microLimit) {
@@ -128,7 +130,8 @@ public class FloodCheck extends Check {
             return false;
         }
 
-        int currentGlobal = globalPacketCount.incrementAndGet();
+        globalPacketCount.increment();
+        int currentGlobal = (int) globalPacketCount.sum();
         if (currentGlobal > (maxGlobalPPS * multiplier)) return false;
 
         if (matrixEnabled) {
@@ -138,19 +141,21 @@ public class FloodCheck extends Check {
         }
 
         if (checkAndReset(lastBurstCheck, now, 500)) {
-            burstCount.set(0);
+            burstCount.reset();
         }
-        int currentBurst = burstCount.incrementAndGet();
+        burstCount.increment();
+        int currentBurst = (int) burstCount.sum();
         if (currentBurst > (burstLimit * multiplier)) {
             flag("Packet Burst (" + currentBurst + ")", packetName);
             return false;
         }
 
         if (checkAndReset(lastByteCheck, now, 1000)) {
-            totalBytes.set(0);
+            totalBytes.reset();
         }
         long size = estimatePacketSize(packet);
-        long currentBytes = totalBytes.addAndGet(size);
+        totalBytes.add(size);
+        long currentBytes = totalBytes.sum();
         if (currentBytes > (maxBytesPerSec * multiplier)) {
             flag("High Traffic (" + currentBytes/1024 + " KB/s)", packetName);
             return false;

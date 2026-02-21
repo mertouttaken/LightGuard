@@ -54,6 +54,7 @@ public class CheckManager {
         register(PacketPlayInAutoRecipe.class, new RecipeCheck(data));
         register(PacketPlayInRecipeDisplayed.class, new RecipeCheck(data));
         register(PacketPlayInItemName.class, new AnvilCheck(data));
+        register(PacketPlayInAbilities.class, new AbilitiesCheck(data));
 
     }
 

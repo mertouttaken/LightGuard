@@ -3,7 +3,7 @@ package com.mertout.lightguard.checks.impl;
 import com.mertout.lightguard.checks.Check;
 import com.mertout.lightguard.data.PlayerData;
 import net.minecraft.server.v1_16_R3.PacketPlayInVehicleMove;
-import org.bukkit.Location;
+import net.minecraft.server.v1_16_R3.PacketPlayInSteerVehicle;
 
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.VarHandle;
@@ -11,13 +11,18 @@ import java.lang.invoke.VarHandle;
 public class VehicleCheck extends Check {
 
     private static final VarHandle X, Y, Z;
+    private static final VarHandle STEER_X, STEER_Z;
 
     static {
         try {
-            MethodHandles.Lookup lookup = MethodHandles.privateLookupIn(PacketPlayInVehicleMove.class, MethodHandles.lookup());
-            X = lookup.findVarHandle(PacketPlayInVehicleMove.class, "x", double.class);
-            Y = lookup.findVarHandle(PacketPlayInVehicleMove.class, "y", double.class);
-            Z = lookup.findVarHandle(PacketPlayInVehicleMove.class, "z", double.class);
+            MethodHandles.Lookup lookup = MethodHandles.lookup();
+
+            X = MethodHandles.privateLookupIn(PacketPlayInVehicleMove.class, lookup).findVarHandle(PacketPlayInVehicleMove.class, "x", double.class);
+            Y = MethodHandles.privateLookupIn(PacketPlayInVehicleMove.class, lookup).findVarHandle(PacketPlayInVehicleMove.class, "y", double.class);
+            Z = MethodHandles.privateLookupIn(PacketPlayInVehicleMove.class, lookup).findVarHandle(PacketPlayInVehicleMove.class, "z", double.class);
+
+            STEER_X = MethodHandles.privateLookupIn(PacketPlayInSteerVehicle.class, lookup).findVarHandle(PacketPlayInSteerVehicle.class, "a", float.class);
+            STEER_Z = MethodHandles.privateLookupIn(PacketPlayInSteerVehicle.class, lookup).findVarHandle(PacketPlayInSteerVehicle.class, "b", float.class);
         } catch (Exception e) { throw new ExceptionInInitializerError(e); }
     }
 
@@ -32,6 +37,20 @@ public class VehicleCheck extends Check {
     @Override
     public boolean check(Object packet) {
         if (!isEnabled()) return true;
+
+        if (packet instanceof PacketPlayInSteerVehicle) {
+            try {
+                float steerX = (float) STEER_X.get(packet);
+                float steerZ = (float) STEER_Z.get(packet);
+
+                if (!Float.isFinite(steerX) || !Float.isFinite(steerZ)) {
+                    flag("Invalid Steering Data (NaN/Infinity)", "PacketPlayInSteerVehicle");
+                    return false;
+                }
+            } catch (Exception e) {
+                return false;
+            }
+        }
 
         if (packet instanceof PacketPlayInVehicleMove) {
             try {
