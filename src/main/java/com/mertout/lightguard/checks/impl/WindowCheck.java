@@ -3,13 +3,12 @@ package com.mertout.lightguard.checks.impl;
 import com.mertout.lightguard.checks.Check;
 import com.mertout.lightguard.data.PlayerData;
 import net.minecraft.server.v1_16_R3.Container;
+import net.minecraft.server.v1_16_R3.ContainerLectern;
 import net.minecraft.server.v1_16_R3.PacketPlayInWindowClick;
-import net.minecraft.server.v1_16_R3.InventoryClickType;
 import org.bukkit.Bukkit;
 import org.bukkit.GameMode;
 import org.bukkit.craftbukkit.v1_16_R3.entity.CraftPlayer;
-import org.bukkit.event.inventory.InventoryType;
-import org.bukkit.inventory.InventoryView;
+
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
 import java.lang.reflect.Field;
@@ -38,8 +37,6 @@ public class WindowCheck extends Check {
     private final AtomicLong lastQuickMoveTime = new AtomicLong();
     private final AtomicInteger quickMoveCount = new AtomicInteger();
 
-    private final AtomicLong lastSyncTime = new AtomicLong(0);
-
     public WindowCheck(PlayerData data) {
         super(data, "Window", "window");
         this.preventLecternSpam = plugin.getConfig().getBoolean("checks.window.prevent-lectern-spam");
@@ -57,14 +54,16 @@ public class WindowCheck extends Check {
             try {
                 int windowId = (int) WINDOW_ID_GETTER.invoke(click);
                 int slot = (int) SLOT_GETTER.invoke(click);
-                InventoryClickType clickType = (InventoryClickType) CLICK_TYPE_GETTER.invoke(click);
+
+                Enum<?> clickTypeEnum = (Enum<?>) CLICK_TYPE_GETTER.invoke(click);
+                String clickTypeName = clickTypeEnum != null ? clickTypeEnum.name() : "";
 
                 if (slot < 0 && slot != -999 && slot != -1) {
                     flag("Negative Slot Crash", packetName);
                     return false;
                 }
 
-                if (clickType == InventoryClickType.QUICK_MOVE) {
+                if (clickTypeName.equals(("QUICK_MOVE"))) {
                     long now = System.currentTimeMillis();
                     if (now - lastQuickMoveTime.get() > 1000) {
                         quickMoveCount.set(0);
@@ -76,52 +75,39 @@ public class WindowCheck extends Check {
                     }
                 }
 
-                long now = System.currentTimeMillis();
-                if (now - lastSyncTime.get() > 200) {
-                    lastSyncTime.set(now);
+                net.minecraft.server.v1_16_R3.EntityPlayer nmsPlayer = ((CraftPlayer) data.getPlayer()).getHandle();
+                Container activeContainer = nmsPlayer.activeContainer;
 
-                    Bukkit.getScheduler().runTask(plugin, () -> {
-                        if (!data.getPlayer().isOnline()) return;
+                if (activeContainer == null) {
+                    resync();
+                    return false;
+                }
 
-                        try {
-                            Container activeContainer = ((CraftPlayer) data.getPlayer()).getHandle().activeContainer;
+                if (windowId != 0 && windowId != activeContainer.windowId) {
+                    resync();
+                    return false;
+                }
 
-                            if (activeContainer == null) {
-                                resync();
-                                return;
-                            }
+                if (preventLecternSpam && activeContainer instanceof ContainerLectern) {
+                    if (clickTypeName.equals("QUICK_MOVE") || clickTypeName.equals("SWAP")) {
+                        flag("Lectern Exploit Attempt", packetName);
+                        resync();
+                        return false;
+                    }
+                }
 
-                            if (windowId != 0 && windowId != activeContainer.windowId) {
-                                resync();
-                                return;
-                            }
+                GameMode mode = data.getPlayer().getGameMode();
+                if (slot != -999 && slot != -1 && mode != GameMode.SPECTATOR && mode != GameMode.CREATIVE) {
+                    if (activeContainer.slots == null || slot >= activeContainer.slots.size()) {
+                        resync();
+                        return false;
+                    }
+                }
 
-                            GameMode mode = data.getPlayer().getGameMode();
-                            if (slot != -999 && slot != -1 && mode != GameMode.SPECTATOR && mode != GameMode.CREATIVE) {
-                                if (activeContainer.slots == null || slot >= activeContainer.slots.size()) {
-                                    resync();
-                                    return;
-                                }
-                            }
-
-                            InventoryView view = data.getPlayer().getOpenInventory();
-                            InventoryType type = (view != null) ? view.getType() : InventoryType.CRAFTING;
-
-                            if (preventLecternSpam && type == InventoryType.LECTERN && (clickType == InventoryClickType.QUICK_MOVE || clickType == InventoryClickType.SWAP)) {
-                                flag("Lectern Illegal Click", packetName);
-                                resync();
-                                return;
-                            }
-
-                            if (preventSwapInGui && windowId > 0 && clickType == InventoryClickType.SWAP) {
-                                flag("Illegal GUI Swap", packetName);
-                                resync();
-                                return;
-                            }
-
-                        } catch (Exception e) {
-                        }
-                    });
+                if (preventSwapInGui && windowId > 0 && clickTypeName.equals("SWAP")) {
+                    flag("Illegal GUI Swap", packetName);
+                    resync();
+                    return false;
                 }
 
             } catch (Throwable t) {
@@ -132,6 +118,10 @@ public class WindowCheck extends Check {
     }
 
     private void resync() {
-        Bukkit.getScheduler().runTask(plugin, () -> data.getPlayer().updateInventory());
+        Bukkit.getScheduler().runTask(plugin, () -> {
+            if (data.getPlayer().isOnline()) {
+                data.getPlayer().updateInventory();
+            }
+        });
     }
 }
