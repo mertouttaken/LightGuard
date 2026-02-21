@@ -27,6 +27,8 @@ public class RawPacketInspector extends ChannelInboundHandlerAdapter {
             if (size > limit) {
                 plugin.getLogger().warning("§c[LightGuard] " + playerName + " sent oversized raw packet (" + size + " bytes).");
 
+                io.netty.util.ReferenceCountUtil.release(msg);
+
                 ctx.close();
                 return;
             }

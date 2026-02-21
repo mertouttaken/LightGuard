@@ -32,27 +32,29 @@ public abstract class Check {
     }
 
     protected void flag(String info, String packetName) {
-        int ping = getPing();
-        double tps = plugin.getTPS();
-        Location loc = data.getPlayer().getLocation();
-        String locationStr = String.format("%.1f, %.1f, %.1f", loc.getX(), loc.getY(), loc.getZ());
-
-        plugin.getLogger().warning(String.format(
-                "§c[LightGuard] %s flagged %s (%s) | Info: %s | Ping: %dms | TPS: %.2f | Loc: %s",
-                data.getPlayer().getName(), name, packetName, info, ping, tps, locationStr
-        ));
-
-        if(plugin.getConfig().getBoolean("settings.sentinel.enabled") &&
-                plugin.getConfig().getBoolean("settings.sentinel.silent-failures")) {
-            return;
-        }
-
         Bukkit.getScheduler().runTask(plugin, () -> {
+            if (!data.getPlayer().isOnline()) return;
+
+            int ping = getPing();
+            double tps = plugin.getTPS();
+            Location loc = data.getPlayer().getLocation();
+            String locationStr = String.format("%.1f, %.1f, %.1f", loc.getX(), loc.getY(), loc.getZ());
+
+            plugin.getLogger().warning(String.format(
+                    "§c[LightGuard] %s flagged %s (%s) | Info: %s | Ping: %dms | TPS: %.2f | Loc: %s",
+                    data.getPlayer().getName(), name, packetName, info, ping, tps, locationStr
+            ));
+
+            plugin.getMetrics().recordViolation(data.getPlayer().getName(), this.name);
+
+            if(plugin.getConfig().getBoolean("settings.sentinel.enabled") &&
+                    plugin.getConfig().getBoolean("settings.sentinel.silent-failures")) {
+                return;
+            }
+
             String kickMessage = buildKickMessage(packetName, ping);
             data.getPlayer().kickPlayer(kickMessage);
         });
-
-        plugin.getMetrics().recordViolation(data.getPlayer().getName(), this.name);
     }
 
     private int getPing() {

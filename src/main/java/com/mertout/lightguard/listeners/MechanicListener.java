@@ -397,6 +397,10 @@ public class MechanicListener implements Listener {
             data.setGameMode(event.getNewGameMode());
         }
     }
+    @EventHandler
+    public void onQuit(PlayerQuitEvent event) {
+        cooldowns.remove(event.getPlayer().getUniqueId());
+    }
 
     @EventHandler(priority = EventPriority.LOWEST, ignoreCancelled = true)
     public void onInventoryMoveItem(InventoryMoveItemEvent event) {

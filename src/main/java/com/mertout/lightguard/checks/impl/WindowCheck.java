@@ -70,7 +70,7 @@ public class WindowCheck extends Check {
                         quickMoveCount.set(0);
                         lastQuickMoveTime.set(now);
                     }
-                    if (quickMoveCount.incrementAndGet() > 20) {
+                    if (quickMoveCount.incrementAndGet() > 50) {
                         flag("QuickMove Spam (Rate Limit)", packetName);
                         return false;
                     }
@@ -92,7 +92,6 @@ public class WindowCheck extends Check {
                             }
 
                             if (windowId != 0 && windowId != activeContainer.windowId) {
-                                flag("Inventory Desync", packetName);
                                 resync();
                                 return;
                             }
@@ -100,7 +99,6 @@ public class WindowCheck extends Check {
                             GameMode mode = data.getPlayer().getGameMode();
                             if (slot != -999 && slot != -1 && mode != GameMode.SPECTATOR && mode != GameMode.CREATIVE) {
                                 if (activeContainer.slots == null || slot >= activeContainer.slots.size()) {
-                                    flag("Slot Index Out of Bounds", packetName);
                                     resync();
                                     return;
                                 }

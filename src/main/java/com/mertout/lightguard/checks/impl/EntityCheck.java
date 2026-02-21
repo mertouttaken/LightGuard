@@ -35,17 +35,17 @@ public class EntityCheck extends Check {
     public boolean check(Object packet) {
         if (!isEnabled()) return true;
 
-        if (packet instanceof PacketPlayInUseEntity) {
-            PacketPlayInUseEntity useEntity = (PacketPlayInUseEntity) packet;
+        if (packet instanceof net.minecraft.server.v1_16_R3.PacketPlayInUseEntity) {
+            net.minecraft.server.v1_16_R3.PacketPlayInUseEntity useEntity = (net.minecraft.server.v1_16_R3.PacketPlayInUseEntity) packet;
             int entityId = (int) ENTITY_ID.get(useEntity);
 
             if (preventInvalidEntity) {
-                net.minecraft.server.v1_16_R3.Entity nmsEntity = ((CraftPlayer) data.getPlayer()).getHandle().world.getEntity(entityId);
+                net.minecraft.server.v1_16_R3.Entity nmsEntity = ((org.bukkit.craftbukkit.v1_16_R3.entity.CraftPlayer) data.getPlayer()).getHandle().world.getEntity(entityId);
+
                 if (nmsEntity == null) return false;
 
                 if (preventArmorStandSpam) {
-                    Entity bukkitEntity = nmsEntity.getBukkitEntity();
-                    if (bukkitEntity.getType() == EntityType.ARMOR_STAND) {
+                    if (nmsEntity instanceof net.minecraft.server.v1_16_R3.EntityArmorStand) {
                         long now = System.currentTimeMillis();
                         if (now - lastArmorStandInteract.get() < 200) return false;
                         lastArmorStandInteract.set(now);

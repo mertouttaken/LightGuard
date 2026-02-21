@@ -44,7 +44,7 @@ public class KeepAliveCheck extends Check {
                     flag("Extreme Latency / Timeout", "KeepAlive");
                 }
 
-                if (data.getPendingKeepAlives().size() > 15) {
+                if (data.getPendingKeepAlives().size() > 5) {
                     flag("KeepAlive Hoarding (Ping Spoof)", "KeepAlive");
                     data.cleanOldKeepAlives();
                     return false;

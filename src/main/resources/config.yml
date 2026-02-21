@@ -42,7 +42,7 @@ checks:
 
   packet-size:
     enabled: true
-    max-string-length: 8192
+    max-string-length: 256
     max-buffer-size: 16384
     per-packet-limit: 32000
     excluded-packets:

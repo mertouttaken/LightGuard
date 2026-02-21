@@ -94,7 +94,20 @@ public class FloodCheck extends Check {
 
         double multiplier = 1.0;
         double tps = plugin.getTPS();
-        if (tps < 18.0) multiplier = 1.5; else if (tps < 19.5) multiplier = 1.2;
+
+        boolean adaptiveEnabled = plugin.getConfig().getBoolean("checks.flood.adaptive.enabled", true);
+        if (adaptiveEnabled) {
+            double lowTpsThreshold = plugin.getConfig().getDouble("checks.flood.adaptive.low-tps-threshold", 19.0);
+            double lowMultiplier = plugin.getConfig().getDouble("checks.flood.adaptive.low-tps-multiplier", 0.5);
+            double highTpsThreshold = plugin.getConfig().getDouble("checks.flood.adaptive.high-tps-threshold", 19.9);
+            double highMultiplier = plugin.getConfig().getDouble("checks.flood.adaptive.high-tps-multiplier", 1.0);
+
+            if (tps < lowTpsThreshold) {
+                multiplier = lowMultiplier;
+            } else if (tps >= highTpsThreshold) {
+                multiplier = highMultiplier;
+            }
+        }
 
         if (checkAndReset(lastCheck, now, 1000)) {
             data.setPPS(globalPacketCount.get());

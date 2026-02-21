@@ -28,12 +28,8 @@ public class AnvilCheck extends Check {
     public boolean check(Object packet) {
         if (!isEnabled()) return true;
 
-        if (packet instanceof PacketPlayInItemName) {
+        if (packet instanceof net.minecraft.server.v1_16_R3.PacketPlayInItemName) {
             try {
-                if (data.getPlayer().getOpenInventory().getType() != InventoryType.ANVIL) {
-                    flag("Illegal Item Rename (No Anvil)", "PacketPlayInItemName");
-                    return false;
-                }
 
                 String newName = (String) NAME_FIELD.get(packet);
                 if (newName == null) return true;

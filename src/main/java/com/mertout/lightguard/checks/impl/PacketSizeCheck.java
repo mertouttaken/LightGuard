@@ -30,7 +30,7 @@ public class PacketSizeCheck extends Check {
     public PacketSizeCheck(PlayerData data) {
         super(data, "PacketSize", "packet-size");
         this.excludedPackets = plugin.getConfig().getStringList("checks.packet-size.excluded-packets");
-        this.maxStringLength = plugin.getConfig().getInt("checks.packet-size.max-string-length", 10000);
+        this.maxStringLength = plugin.getConfig().getInt("checks.packet-size.max-string-length", 256);
         this.maxBufferSize = plugin.getConfig().getInt("checks.packet-size.max-buffer-size", 16384);
         this.globalLimit = plugin.getConfig().getInt("checks.packet-size.per-packet-limit", 32000);
     }

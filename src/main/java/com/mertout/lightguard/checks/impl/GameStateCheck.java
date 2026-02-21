@@ -28,15 +28,19 @@ public class GameStateCheck extends Check {
     @Override
     public boolean check(Object packet) {
         if (!isEnabled()) return true;
-        if (packet instanceof PacketPlayInWindowClick) {
+        if (packet instanceof net.minecraft.server.v1_16_R3.PacketPlayInWindowClick) {
             if (checkInvOpen) {
                 int windowId = (int) WINDOW_ID.get(packet);
-                InventoryType currentType = data.getPlayer().getOpenInventory().getType();
-                if (windowId > 0 && currentType == InventoryType.CRAFTING) {
-                    flag("Click in Closed Inventory", "PacketPlayInWindowClick");
-                    Bukkit.getScheduler().runTask(plugin, () -> data.getPlayer().updateInventory());
-                    return false;
-                }
+
+                org.bukkit.Bukkit.getScheduler().runTask(plugin, () -> {
+                    if (!data.getPlayer().isOnline()) return;
+
+                    org.bukkit.event.inventory.InventoryType currentType = data.getPlayer().getOpenInventory().getType();
+                    if (windowId > 0 && currentType == org.bukkit.event.inventory.InventoryType.CRAFTING) {
+                        flag("Click in Closed Inventory", "PacketPlayInWindowClick");
+                        data.getPlayer().updateInventory();
+                    }
+                });
             }
         }
         return true;
