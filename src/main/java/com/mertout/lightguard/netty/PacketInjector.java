@@ -54,9 +54,12 @@ public class PacketInjector implements Listener {
 
             Field channelsField = ServerConnection.class.getDeclaredField("g");
             channelsField.setAccessible(true);
+
             List<ChannelFuture> futures = (List<ChannelFuture>) channelsField.get(serverConnection);
 
-            for (ChannelFuture future : futures) {
+            List<ChannelFuture> safeCopy = new java.util.ArrayList<>(futures);
+
+            for (ChannelFuture future : safeCopy) {
                 future.channel().pipeline().addFirst(new ChannelInboundHandlerAdapter() {
                     @Override
                     public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {

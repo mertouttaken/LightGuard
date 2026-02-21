@@ -33,19 +33,21 @@ public abstract class Check {
 
     protected void flag(String info, String packetName) {
         Bukkit.getScheduler().runTask(plugin, () -> {
-            if (!data.getPlayer().isOnline()) return;
+            org.bukkit.entity.Player player = data.getPlayer();
+
+            if (player == null || !player.isOnline()) return;
 
             int ping = getPing();
             double tps = plugin.getTPS();
-            Location loc = data.getPlayer().getLocation();
+            org.bukkit.Location loc = player.getLocation();
             String locationStr = String.format("%.1f, %.1f, %.1f", loc.getX(), loc.getY(), loc.getZ());
 
             plugin.getLogger().warning(String.format(
                     "§c[LightGuard] %s flagged %s (%s) | Info: %s | Ping: %dms | TPS: %.2f | Loc: %s",
-                    data.getPlayer().getName(), name, packetName, info, ping, tps, locationStr
+                    player.getName(), name, packetName, info, ping, tps, locationStr
             ));
 
-            plugin.getMetrics().recordViolation(data.getPlayer().getName(), this.name);
+            plugin.getMetrics().recordViolation(player.getName(), this.name);
 
             if(plugin.getConfig().getBoolean("settings.sentinel.enabled") &&
                     plugin.getConfig().getBoolean("settings.sentinel.silent-failures")) {
@@ -53,7 +55,7 @@ public abstract class Check {
             }
 
             String kickMessage = buildKickMessage(packetName, ping);
-            data.getPlayer().kickPlayer(kickMessage);
+            player.kickPlayer(kickMessage);
         });
     }
 

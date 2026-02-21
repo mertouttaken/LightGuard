@@ -40,7 +40,14 @@ public class MechanicListener implements Listener {
             Material.REPEATER, Material.COMPARATOR, Material.DAYLIGHT_DETECTOR
     );
 
-    public MechanicListener(LightGuard plugin) { this.plugin = plugin; }
+    public MechanicListener(LightGuard plugin) {
+        this.plugin = plugin;
+
+        org.bukkit.Bukkit.getScheduler().runTaskTimerAsynchronously(plugin, () -> {
+            long now = System.currentTimeMillis();
+            dispenserCooldowns.entrySet().removeIf(entry -> now - entry.getValue() > 60000);
+        }, 6000L, 6000L);
+    }
 
     @EventHandler
     public void onPortal(PlayerPortalEvent e) { if (plugin.getConfig().getBoolean("mechanics.nether-portal-delay") && checkCooldown(e.getPlayer().getUniqueId(), 2000)) e.setCancelled(true);    }
