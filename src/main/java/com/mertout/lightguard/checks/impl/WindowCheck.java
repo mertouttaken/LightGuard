@@ -110,7 +110,9 @@ public class WindowCheck extends Check {
 
                 GameMode mode = data.getPlayer().getGameMode();
                 if (slot != -999 && slot != -1 && mode != GameMode.SPECTATOR && mode != GameMode.CREATIVE) {
-                    if (activeContainer.slots == null || slot >= activeContainer.slots.size()) {
+
+                    java.util.List<?> slotsList = activeContainer.slots;
+                    if (slotsList == null || slot >= slotsList.size()) {
                         resync();
                         return false;
                     }
