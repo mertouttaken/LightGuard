@@ -2,8 +2,11 @@ package com.mertout.lightguard.checks.impl;
 
 import com.mertout.lightguard.checks.Check;
 import com.mertout.lightguard.data.PlayerData;
+import net.minecraft.server.v1_16_R3.ContainerAnvil;
+import net.minecraft.server.v1_16_R3.EntityPlayer;
 import net.minecraft.server.v1_16_R3.PacketPlayInItemName;
-import org.bukkit.event.inventory.InventoryType;
+import org.bukkit.craftbukkit.v1_16_R3.entity.CraftPlayer;
+
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.VarHandle;
 
@@ -28,8 +31,13 @@ public class AnvilCheck extends Check {
     public boolean check(Object packet) {
         if (!isEnabled()) return true;
 
-        if (packet instanceof net.minecraft.server.v1_16_R3.PacketPlayInItemName) {
+        if (packet instanceof PacketPlayInItemName) {
             try {
+                EntityPlayer nmsPlayer = ((CraftPlayer) data.getPlayer()).getHandle();
+                if (!(nmsPlayer.activeContainer instanceof ContainerAnvil)) {
+                    flag("Ghost Anvil Payload (Rename without Anvil)", "PacketPlayInItemName");
+                    return false;
+                }
 
                 String newName = (String) NAME_FIELD.get(packet);
                 if (newName == null) return true;
@@ -68,7 +76,9 @@ public class AnvilCheck extends Check {
                     }
                 }
 
-            } catch (Exception e) {}
+            } catch (Exception e) {
+                return false;
+            }
         }
         return true;
     }
