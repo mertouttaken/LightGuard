@@ -57,13 +57,23 @@ public class PositionCheck extends Check {
                 }
 
                 if (lastX != -1) {
-                    double distSq = ((x - lastX) * (x - lastX)) +
-                            ((y - lastY) * (y - lastY)) +
-                            ((z - lastZ) * (z - lastZ));
+                    double diffX = Math.abs(x - lastX);
+                    double diffY = Math.abs(y - lastY);
+                    double diffZ = Math.abs(z - lastZ);
+
+                    double distSq = (diffX * diffX) + (diffY * diffY) + (diffZ * diffZ);
 
                     if (data.isTeleporting()) {
                         lastX = x; lastY = y; lastZ = z;
                         return true;
+                    }
+
+                    if ((diffX >= 10.0 && diffX % 1.0 == 0.0) ||
+                            (diffZ >= 10.0 && diffZ % 1.0 == 0.0) ||
+                            (diffY >= 10.0 && diffY % 1.0 == 0.0)) {
+
+                        flag("Chunk Crasher (Integer Step Bypass)", "PacketPlayInFlying");
+                        return false;
                     }
 
                     if (distSq > 100.0) {

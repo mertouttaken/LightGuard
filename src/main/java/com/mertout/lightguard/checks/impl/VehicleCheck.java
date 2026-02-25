@@ -12,6 +12,7 @@ public class VehicleCheck extends Check {
 
     private static final VarHandle X, Y, Z;
     private static final VarHandle STEER_X, STEER_Z;
+    private static final VarHandle JUMP_FIELD, UNMOUNT_FIELD;
 
     static {
         try {
@@ -23,6 +24,10 @@ public class VehicleCheck extends Check {
 
             STEER_X = MethodHandles.privateLookupIn(PacketPlayInSteerVehicle.class, lookup).findVarHandle(PacketPlayInSteerVehicle.class, "a", float.class);
             STEER_Z = MethodHandles.privateLookupIn(PacketPlayInSteerVehicle.class, lookup).findVarHandle(PacketPlayInSteerVehicle.class, "b", float.class);
+
+            JUMP_FIELD = MethodHandles.privateLookupIn(PacketPlayInSteerVehicle.class, lookup).findVarHandle(PacketPlayInSteerVehicle.class, "c", boolean.class);
+            UNMOUNT_FIELD = MethodHandles.privateLookupIn(PacketPlayInSteerVehicle.class, lookup).findVarHandle(PacketPlayInSteerVehicle.class, "d", boolean.class);
+
         } catch (Exception e) {
             throw new ExceptionInInitializerError(e);
         }
@@ -49,6 +54,14 @@ public class VehicleCheck extends Check {
                     flag("Invalid Steering Data (NaN/Infinity)", "PacketPlayInSteerVehicle");
                     return false;
                 }
+                boolean isJumping = (boolean) JUMP_FIELD.get(packet);
+                boolean isUnmounting = (boolean) UNMOUNT_FIELD.get(packet);
+
+                if (isJumping && isUnmounting) {
+                    flag("Contradictory Vehicle Flags (Jump + Unmount)", "PacketPlayInSteerVehicle");
+                    return false;
+                }
+
             } catch (Exception e) {
                 return false;
             }

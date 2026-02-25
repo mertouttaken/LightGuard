@@ -60,6 +60,9 @@ checks:
     max-line-length: 45 # Max characters per line
     block-json-syntax: true # Blocks JSON injection like {"text":"..."}
 
+  client-settings:
+    enabled: true
+
   game-state:
     enabled: true
     check-inventory-open: true
@@ -391,3 +394,4 @@ mechanics:
   prevent-hopper-dupe: true
   prevent-end-teleport-exploits: true
   prevent-dispenser-spam: true
+  prevent-bed-crop-dupe: true

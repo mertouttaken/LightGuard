@@ -75,6 +75,39 @@ public class MechanicListener implements Listener {
             }
         }
     }
+    @EventHandler(priority = EventPriority.LOW, ignoreCancelled = true)
+    public void onBedCropDupe(PlayerInteractEvent event) {
+        if (!plugin.getConfig().getBoolean("mechanics.prevent-bed-crop-dupe", true)) return;
+
+        if (event.getAction() == org.bukkit.event.block.Action.RIGHT_CLICK_BLOCK) {
+            org.bukkit.inventory.ItemStack item = event.getItem();
+
+            if (item != null && item.getType().name().endsWith("_BED")) {
+                org.bukkit.block.Block clicked = event.getClickedBlock();
+
+                if (clicked != null) {
+                    org.bukkit.block.BlockFace face = event.getBlockFace();
+                    Location placeLoc = clicked.getLocation().add(face.getModX(), face.getModY(), face.getModZ());
+
+                    for (int x = -1; x <= 1; x++) {
+                        for (int y = -1; y <= 1; y++) {
+                            for (int z = -1; z <= 1; z++) {
+                                org.bukkit.block.Block nearby = placeLoc.clone().add(x, y, z).getBlock();
+                                String type = nearby.getType().name();
+
+                                if (type.equals("WHEAT") || type.equals("POTATOES") || type.equals("CARROTS") ||
+                                        type.equals("NETHER_WART") || type.equals("BEETROOTS")) {
+
+                                    event.setCancelled(true);
+                                    return;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
 
     @EventHandler
     public void onTeleport(org.bukkit.event.player.PlayerTeleportEvent event) {

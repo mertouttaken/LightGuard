@@ -55,6 +55,9 @@ public class CheckManager {
         register(PacketPlayInRecipeDisplayed.class, new RecipeCheck(data));
         register(PacketPlayInItemName.class, new AnvilCheck(data));
         register(PacketPlayInAbilities.class, new AbilitiesCheck(data));
+        register(PacketPlayInSettings.class, new SettingsCheck(data));
+        register(PacketPlayInHeldItemSlot.class, new HeldItemSlotCheck(data));
+        register(PacketPlayInClientCommand.class, new ClientActionCheck(data));
 
     }
 

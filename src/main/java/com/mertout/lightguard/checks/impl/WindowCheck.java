@@ -17,15 +17,21 @@ import java.util.concurrent.atomic.AtomicLong;
 
 public class WindowCheck extends Check {
 
-    private static final MethodHandle WINDOW_ID_GETTER, SLOT_GETTER, CLICK_TYPE_GETTER;
+    private static final MethodHandle WINDOW_ID_GETTER, SLOT_GETTER, BUTTON_GETTER, CLICK_TYPE_GETTER;
 
     static {
         try {
             MethodHandles.Lookup lookup = MethodHandles.lookup();
+
             Field fWindowId = PacketPlayInWindowClick.class.getDeclaredField("a"); fWindowId.setAccessible(true);
             WINDOW_ID_GETTER = lookup.unreflectGetter(fWindowId);
+
             Field fSlot = PacketPlayInWindowClick.class.getDeclaredField("slot"); fSlot.setAccessible(true);
             SLOT_GETTER = lookup.unreflectGetter(fSlot);
+
+            Field fButton = PacketPlayInWindowClick.class.getDeclaredField("button"); fButton.setAccessible(true);
+            BUTTON_GETTER = lookup.unreflectGetter(fButton);
+
             Field fShift = PacketPlayInWindowClick.class.getDeclaredField("shift"); fShift.setAccessible(true);
             CLICK_TYPE_GETTER = lookup.unreflectGetter(fShift);
         } catch (Exception e) { throw new RuntimeException("Failed to init WindowCheck", e); }
@@ -54,9 +60,15 @@ public class WindowCheck extends Check {
             try {
                 int windowId = (int) WINDOW_ID_GETTER.invoke(click);
                 int slot = (int) SLOT_GETTER.invoke(click);
+                int button = (int) BUTTON_GETTER.invoke(click);
 
                 Enum<?> clickTypeEnum = (Enum<?>) CLICK_TYPE_GETTER.invoke(click);
                 String clickTypeName = clickTypeEnum != null ? clickTypeEnum.name() : "";
+
+                if (button < 0 || button > 99) {
+                    flag("Invalid Button ID Exploit (" + button + ")", packetName);
+                    return false;
+                }
 
                 if (slot < 0 && slot != -999 && slot != -1) {
                     flag("Negative Slot Crash", packetName);
