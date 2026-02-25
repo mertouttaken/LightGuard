@@ -57,11 +57,30 @@ public class PacketInjector implements Listener {
             try {
                 channelsField = ServerConnection.class.getDeclaredField("listeningChannels");
             } catch (NoSuchFieldException e) {
-                channelsField = ServerConnection.class.getDeclaredField("g");
+                try {
+                    channelsField = ServerConnection.class.getDeclaredField("g");
+                } catch (NoSuchFieldException ex) {
+                    for (Field f : ServerConnection.class.getDeclaredFields()) {
+                        if (List.class.isAssignableFrom(f.getType())) {
+                            f.setAccessible(true);
+                            Object val = f.get(serverConnection);
+                            if (val instanceof List && !((List<?>) val).isEmpty() && ((List<?>) val).get(0) instanceof io.netty.channel.ChannelFuture) {
+                                channelsField = f;
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+
+            if (channelsField == null) {
+                plugin.getLogger().warning("Failed to inject into ServerConnection: Channels field not found. (Pre-Login protection disabled)");
+                return;
             }
 
             channelsField.setAccessible(true);
 
+            @SuppressWarnings("unchecked")
             List<io.netty.channel.ChannelFuture> futures = (List<io.netty.channel.ChannelFuture>) channelsField.get(serverConnection);
 
             List<io.netty.channel.ChannelFuture> safeCopy = new java.util.ArrayList<>(futures);
@@ -79,7 +98,7 @@ public class PacketInjector implements Listener {
                 });
             }
         } catch (Exception e) {
-            plugin.getLogger().warning("Failed to inject into ServerConnection (Pre-Login protection might be disabled): " + e.getMessage());
+            plugin.getLogger().warning("Failed to inject into ServerConnection: " + e.getMessage());
         }
     }
 

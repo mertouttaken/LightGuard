@@ -24,24 +24,32 @@ public class ConfigManager {
     public FileConfiguration getConfig() {
         return plugin.getConfig();
     }
-    public Set<Item> getIllegalBlocks() {
-        if (cachedIllegalBlocks == null) {
-            cachedIllegalBlocks = new HashSet<>();
-            List<String> list = plugin.getConfig().getStringList("checks.block-place.illegal-blocks");
 
-            for (String key : list) {
-                try {
-                    MinecraftKey mcKey = new MinecraftKey(key.toLowerCase());
-                    Item item = IRegistry.ITEM.get(mcKey);
-                    if (item != null && item != Items.AIR) {
-                        cachedIllegalBlocks.add(item);
+    public Set<Item> getIllegalBlocks() {
+        Set<Item> localBlocks = cachedIllegalBlocks;
+        if (localBlocks == null) {
+            synchronized (this) {
+                localBlocks = cachedIllegalBlocks;
+                if (localBlocks == null) {
+                    localBlocks = new HashSet<>();
+                    List<String> list = plugin.getConfig().getStringList("checks.block-place.illegal-blocks");
+
+                    for (String key : list) {
+                        try {
+                            MinecraftKey mcKey = new MinecraftKey(key.toLowerCase());
+                            Item item = IRegistry.ITEM.get(mcKey);
+                            if (item != null && item != Items.AIR) {
+                                localBlocks.add(item);
+                            }
+                        } catch (Exception e) {
+                            plugin.getLogger().warning("Invalid block name in config: " + key);
+                        }
                     }
-                } catch (Exception e) {
-                    plugin.getLogger().warning("Invalid block name in config: " + key);
+                    cachedIllegalBlocks = localBlocks;
                 }
             }
         }
-        return cachedIllegalBlocks;
+        return localBlocks;
     }
     public void reload() {
         plugin.reloadConfig();

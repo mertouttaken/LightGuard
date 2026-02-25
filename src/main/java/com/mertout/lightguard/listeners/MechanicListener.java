@@ -2,6 +2,7 @@ package com.mertout.lightguard.listeners;
 
 import com.mertout.lightguard.LightGuard;
 import com.mertout.lightguard.data.PlayerData;
+import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.World;
 import org.bukkit.entity.*;
@@ -23,11 +24,12 @@ import org.bukkit.inventory.InventoryHolder;
 import org.bukkit.Location;
 
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 
 public class MechanicListener implements Listener {
     private final LightGuard plugin;
-    private final Map<UUID, Long> cooldowns = new HashMap<>();
-    private final Map<Location, Long> dispenserCooldowns = new HashMap<>();
+    private final Map<UUID, Long> cooldowns = new ConcurrentHashMap<>();
+    private final Map<Location, Long> dispenserCooldowns = new ConcurrentHashMap<>();
 
     private static final Set<Material> NOISY_BLOCKS = EnumSet.of(
             Material.NOTE_BLOCK, Material.BELL,
@@ -43,9 +45,10 @@ public class MechanicListener implements Listener {
     public MechanicListener(LightGuard plugin) {
         this.plugin = plugin;
 
-        org.bukkit.Bukkit.getScheduler().runTaskTimerAsynchronously(plugin, () -> {
+        Bukkit.getScheduler().runTaskTimerAsynchronously(plugin, () -> {
             long now = System.currentTimeMillis();
             dispenserCooldowns.entrySet().removeIf(entry -> now - entry.getValue() > 60000);
+            cooldowns.entrySet().removeIf(entry -> now - entry.getValue() > 300000);
         }, 6000L, 6000L);
     }
 

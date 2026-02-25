@@ -11,9 +11,9 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 public class NBTChecker {
 
-    private static int maxListSize = 500;
-    private static int maxArraySize = 1024;
-    private static int maxTotalNodes = 2000;
+    private static volatile int maxListSize = 500;
+    private static volatile int maxArraySize = 1024;
+    private static volatile int maxTotalNodes = 2000;
 
     public static void reload() {
         FileConfiguration config = LightGuard.getInstance().getConfig();
