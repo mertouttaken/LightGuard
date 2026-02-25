@@ -14,11 +14,11 @@ public class PositionCheck extends Check {
 
     static {
         try {
-            MethodHandles.Lookup lookup = MethodHandles.privateLookupIn(PacketPlayInFlying.class, MethodHandles.lookup());
-            X = lookup.findVarHandle(PacketPlayInFlying.class, "x", double.class);
-            Y = lookup.findVarHandle(PacketPlayInFlying.class, "y", double.class);
-            Z = lookup.findVarHandle(PacketPlayInFlying.class, "z", double.class);
-            HAS_POS = lookup.findVarHandle(PacketPlayInFlying.class, "hasPos", boolean.class);
+            MethodHandles.Lookup lookup = MethodHandles.lookup();
+            X = MethodHandles.privateLookupIn(PacketPlayInFlying.class, lookup).findVarHandle(PacketPlayInFlying.class, "x", double.class);
+            Y = MethodHandles.privateLookupIn(PacketPlayInFlying.class, lookup).findVarHandle(PacketPlayInFlying.class, "y", double.class);
+            Z = MethodHandles.privateLookupIn(PacketPlayInFlying.class, lookup).findVarHandle(PacketPlayInFlying.class, "z", double.class);
+            HAS_POS = MethodHandles.privateLookupIn(PacketPlayInFlying.class, lookup).findVarHandle(PacketPlayInFlying.class, "hasPos", boolean.class);
         } catch (Exception e) { throw new ExceptionInInitializerError(e); }
     }
 
@@ -61,8 +61,6 @@ public class PositionCheck extends Check {
                     double diffY = Math.abs(y - lastY);
                     double diffZ = Math.abs(z - lastZ);
 
-                    double distSq = (diffX * diffX) + (diffY * diffY) + (diffZ * diffZ);
-
                     if (data.isTeleporting()) {
                         lastX = x; lastY = y; lastZ = z;
                         return true;
@@ -72,10 +70,11 @@ public class PositionCheck extends Check {
                             (diffZ >= 10.0 && diffZ % 1.0 == 0.0) ||
                             (diffY >= 10.0 && diffY % 1.0 == 0.0)) {
 
-                        flag("Chunk Crasher (Integer Step Bypass)", "PacketPlayInFlying");
+                        flag("Chunk Crasher (Integer Step)", "PacketPlayInFlying");
                         return false;
                     }
 
+                    double distSq = (diffX * diffX) + (diffY * diffY) + (diffZ * diffZ);
                     if (distSq > 100.0) {
                         flag("Excessive Speed / Blink Exploit", "PacketPlayInFlying");
                         return false;

@@ -116,6 +116,21 @@ public class MechanicListener implements Listener {
             event.getPlayer().closeInventory();
         }
     }
+    @EventHandler(priority = EventPriority.MONITOR)
+    public void onRespawn(PlayerRespawnEvent event) {
+        PlayerData data = plugin.getPlayerDataManager().getData(event.getPlayer().getUniqueId());
+        if (data != null) {
+            data.setLastTeleportTime(System.currentTimeMillis() + 2000L);
+        }
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR)
+    public void onWorldChange(PlayerChangedWorldEvent event) {
+        PlayerData data = plugin.getPlayerDataManager().getData(event.getPlayer().getUniqueId());
+        if (data != null) {
+            data.setLastTeleportTime(System.currentTimeMillis() + 2000L);
+        }
+    }
 
     @EventHandler(priority = org.bukkit.event.EventPriority.LOWEST)
     public void onBlockInteract(org.bukkit.event.player.PlayerInteractEvent event) {

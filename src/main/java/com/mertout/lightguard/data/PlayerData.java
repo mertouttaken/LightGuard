@@ -72,7 +72,7 @@ public class PlayerData {
         if (teleportBurst > 3) {
             return false;
         }
-        return System.currentTimeMillis() - lastTeleportTime < 750L;
+        return System.currentTimeMillis() - lastTeleportTime < 2000L;
     }
 
     public long getLastVehicleJump() { return lastVehicleJump; }

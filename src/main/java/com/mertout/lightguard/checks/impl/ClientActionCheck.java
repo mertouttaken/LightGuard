@@ -18,6 +18,9 @@ public class ClientActionCheck extends Check {
         } catch (Exception e) { throw new ExceptionInInitializerError(e); }
     }
 
+    private long lastRespawnTime = 0;
+    private int respawnCount = 0;
+
     public ClientActionCheck(PlayerData data) {
         super(data, "ClientAction", "bad-packets");
     }
@@ -31,8 +34,17 @@ public class ClientActionCheck extends Check {
                 PacketPlayInClientCommand.EnumClientCommand action = (PacketPlayInClientCommand.EnumClientCommand) ACTION_FIELD.get(packet);
 
                 if (action == PacketPlayInClientCommand.EnumClientCommand.PERFORM_RESPAWN) {
-                    if (!data.getPlayer().isDead() && data.getPlayer().getHealth() > 0) {
-                        flag("Invalid Respawn Packet (Not Dead)", "PacketPlayInClientCommand");
+                    long now = System.currentTimeMillis();
+
+                    if (now - lastRespawnTime > 1000) {
+                        respawnCount = 0;
+                        lastRespawnTime = now;
+                    }
+
+                    respawnCount++;
+
+                    if (respawnCount > 4) {
+                        flag("Respawn Packet Spam (" + respawnCount + "/s)", "PacketPlayInClientCommand");
                         return false;
                     }
                 }
