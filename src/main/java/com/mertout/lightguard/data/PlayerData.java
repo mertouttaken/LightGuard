@@ -31,6 +31,8 @@ public class PlayerData {
     private final Map<Long, Long> pendingKeepAlives = new ConcurrentHashMap<>();
     private final Set<String> registeredChannels = ConcurrentHashMap.newKeySet();
 
+    private boolean brandSent = false;
+
     public PlayerData(Player player) {
         this.player = player;
         this.uuid = player.getUniqueId();
@@ -74,6 +76,9 @@ public class PlayerData {
         }
         return System.currentTimeMillis() - lastTeleportTime < 2000L;
     }
+
+    public boolean isBrandSent() { return brandSent; }
+    public void setBrandSent(boolean brandSent) { this.brandSent = brandSent; }
 
     public long getLastVehicleJump() { return lastVehicleJump; }
     public void setLastVehicleJump(long lastVehicleJump) { this.lastVehicleJump = lastVehicleJump; }

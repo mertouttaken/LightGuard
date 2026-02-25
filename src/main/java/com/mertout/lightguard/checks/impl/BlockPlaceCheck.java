@@ -54,6 +54,18 @@ public class BlockPlaceCheck extends Check {
             String packetName = "PacketPlayInUseItem";
             long now = System.currentTimeMillis();
 
+            EntityPlayer nmsPlayer = ((CraftPlayer) data.getPlayer()).getHandle();
+
+            if (nmsPlayer.getHealth() <= 0 || nmsPlayer.dead) {
+                flag("Invalid Sequence (Place while Dead)", packetName);
+                return false;
+            }
+
+            if (nmsPlayer.activeContainer != null && nmsPlayer.activeContainer.windowId != 0) {
+                flag("Invalid Sequence (Place while GUI Open)", packetName);
+                return false;
+            }
+
             if (now - lastPlaceTime.get() > 1000) {
                 placePackets.set(0);
                 lastPlaceTime.set(now);
@@ -88,7 +100,6 @@ public class BlockPlaceCheck extends Check {
             }
 
             EnumHand hand = p.b();
-            EntityPlayer nmsPlayer = ((CraftPlayer) data.getPlayer()).getHandle();
             ItemStack nmsItem = (hand == EnumHand.MAIN_HAND) ? nmsPlayer.inventory.getItemInHand() : nmsPlayer.inventory.extraSlots.get(0);
 
             if (nmsItem != null && !nmsItem.isEmpty()) {
@@ -101,9 +112,18 @@ public class BlockPlaceCheck extends Check {
                     }
                 }
 
-                if (nmsItem.hasTag() && NBTChecker.isNBTDangerous(nmsItem.getTag(), maxItemDepth)) {
-                    flag("Dangerous NBT", packetName);
-                    return false;
+                if (nmsItem.hasTag()) {
+                    NBTTagCompound tag = nmsItem.getTag();
+
+                    if (!(tag instanceof NBTTagCompound)) {
+                        flag("Invalid Plain NBT", packetName);
+                        return false;
+                    }
+
+                    if (NBTChecker.isNBTDangerous(tag, maxItemDepth)) {
+                        flag("Dangerous NBT", packetName);
+                        return false;
+                    }
                 }
             }
         }

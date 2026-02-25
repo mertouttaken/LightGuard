@@ -4,7 +4,6 @@ import com.mertout.lightguard.checks.Check;
 import com.mertout.lightguard.data.PlayerData;
 import net.minecraft.server.v1_16_R3.PacketPlayInCustomPayload;
 import io.netty.buffer.ByteBuf;
-import java.nio.charset.StandardCharsets;
 import java.util.*;
 
 public class PayloadCheck extends Check {
@@ -12,17 +11,11 @@ public class PayloadCheck extends Check {
     private static final int MAX_CHANNELS_PER_PLAYER = 124;
     private final List<String> blockedChannels;
     private final int maxPayloadSize;
-    private final boolean brandCheckEnabled;
-    private final int maxBrandLength;
-    private final boolean blockInvalidBrandChars;
 
     public PayloadCheck(PlayerData data) {
         super(data, "Payload", "payload");
         this.blockedChannels = plugin.getConfig().getStringList("checks.payload.blocked-channels");
         this.maxPayloadSize = plugin.getConfig().getInt("checks.payload.max-size", 2048);
-        this.brandCheckEnabled = plugin.getConfig().getBoolean("checks.client-brand.enabled");
-        this.maxBrandLength = plugin.getConfig().getInt("checks.client-brand.max-length", 20);
-        this.blockInvalidBrandChars = plugin.getConfig().getBoolean("checks.client-brand.block-invalid-chars");
     }
 
     @Override
@@ -52,6 +45,7 @@ public class PayloadCheck extends Check {
                         copy = dataBuffer.copy();
                         if (copy.readableBytes() > 0) {
                             byte firstByte = copy.readByte();
+                            // NBT kökü mutlaka Compound (0x0A) veya End (0x00) olmalı
                             if (firstByte != 0x0A && firstByte != 0x00) {
                                 flag("Malformed NBT Root Tag (" + firstByte + ")", packetName);
                                 return false;
@@ -65,7 +59,6 @@ public class PayloadCheck extends Check {
                     }
                 }
             }
-
 
             if (channel.equalsIgnoreCase("minecraft:register") || channel.equalsIgnoreCase("REGISTER")) {
                 ByteBuf data = p.data;
@@ -98,7 +91,6 @@ public class PayloadCheck extends Check {
                     flag("Max Channel Limit Reached", packetName);
                     return false;
                 }
-
             }
 
             try {
@@ -107,46 +99,7 @@ public class PayloadCheck extends Check {
                     return false;
                 }
             } catch (Exception ignored) { return false; }
-
-            if (channel.equalsIgnoreCase("minecraft:brand") || channel.equalsIgnoreCase("MC|Brand")) {
-                if (brandCheckEnabled) {
-                    ByteBuf copy = p.data.copy();
-                    try {
-                        String brand = readString(copy);
-                        if (brand.length() > maxBrandLength) {
-                            flag("Oversized Client Brand", packetName);
-                            return false;
-                        }
-                        if (blockInvalidBrandChars && !brand.matches("[a-zA-Z0-9_ .-]+")) {
-                            flag("Invalid Brand Characters", packetName);
-                            return false;
-                        }
-                    } finally { copy.release(); }
-                }
-            }
         }
         return true;
-    }
-
-    private String readString(ByteBuf buf) {
-        try {
-            int len = readVarInt(buf);
-            if (len > 32767 || buf.readableBytes() < len) return "";
-            byte[] bytes = new byte[len];
-            buf.readBytes(bytes);
-            return new String(bytes, StandardCharsets.UTF_8);
-        } catch (Exception e) { return ""; }
-    }
-
-    private int readVarInt(ByteBuf buf) {
-        int numRead = 0; int result = 0; byte read;
-        do {
-            read = buf.readByte();
-            int value = (read & 0x7F);
-            result |= (value << (7 * numRead));
-            numRead++;
-            if (numRead > 5) throw new RuntimeException("VarInt is too big");
-        } while ((read & 0x80) != 0);
-        return result;
     }
 }

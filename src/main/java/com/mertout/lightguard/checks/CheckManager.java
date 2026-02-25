@@ -58,6 +58,7 @@ public class CheckManager {
         register(PacketPlayInSettings.class, new SettingsCheck(data));
         register(PacketPlayInHeldItemSlot.class, new HeldItemSlotCheck(data));
         register(PacketPlayInClientCommand.class, new ClientActionCheck(data));
+        register(PacketPlayInClientCommand.class, new BrandCheck(data));
 
     }
 
