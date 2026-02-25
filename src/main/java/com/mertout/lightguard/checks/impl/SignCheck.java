@@ -46,18 +46,33 @@ public class SignCheck extends Check {
         if (packet instanceof PacketPlayInUpdateSign) {
             try {
                 BlockPosition pos = (BlockPosition) POS_FIELD.get(packet);
-                Location blockLoc = new Location(data.getPlayer().getWorld(), pos.getX(), pos.getY(), pos.getZ());
+
+                double pX = data.getLastKnownX();
+                double pY = data.getLastKnownY();
+                double pZ = data.getLastKnownZ();
+
+                if (pX == 0 && pZ == 0) {
+                    Location temp = data.getPlayer().getLocation();
+                    pX = temp.getX(); pY = temp.getY(); pZ = temp.getZ();
+                }
+
+                double distX = pos.getX() - pX;
+                double distY = pos.getY() - pY;
+                double distZ = pos.getZ() - pZ;
+                double distanceSq = (distX * distX) + (distY * distY) + (distZ * distZ);
 
                 boolean isBedrock = GeyserUtil.isBedrockPlayer(data.getPlayer());
                 double maxDist = isBedrock ? 225.0 : 100.0;
 
-                if (data.getPlayer().getLocation().distanceSquared(blockLoc) > maxDist) {
+                if (distanceSq > maxDist) {
                     flag("Sign Edit too far", "PacketPlayInUpdateSign");
                     return false;
                 }
 
                 Bukkit.getScheduler().runTask(plugin, () -> {
                     if (!data.getPlayer().isOnline()) return;
+
+                    Location blockLoc = new Location(data.getPlayer().getWorld(), pos.getX(), pos.getY(), pos.getZ());
 
                     if (!blockLoc.getWorld().isChunkLoaded(blockLoc.getBlockX() >> 4, blockLoc.getBlockZ() >> 4)) {
                         return;

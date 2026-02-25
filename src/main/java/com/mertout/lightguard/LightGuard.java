@@ -1,6 +1,7 @@
 package com.mertout.lightguard;
 
 import com.mertout.lightguard.commands.LGCommand;
+import com.mertout.lightguard.commands.subcommands.LGProfileCommand;
 import com.mertout.lightguard.config.ConfigManager;
 import com.mertout.lightguard.data.PlayerDataManager;
 import com.mertout.lightguard.listeners.MechanicListener;
@@ -65,6 +66,8 @@ public class LightGuard extends JavaPlugin {
     }
     @Override
     public void onDisable() {
+        LGProfileCommand.cancelAll();
+
         if (packetInjector != null) packetInjector.ejectAll();
         if (packetLoggerManager != null) packetLoggerManager.shutdown();
         instance = null;

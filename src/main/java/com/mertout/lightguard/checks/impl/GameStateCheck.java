@@ -37,8 +37,11 @@ public class GameStateCheck extends Check {
 
                     org.bukkit.event.inventory.InventoryType currentType = data.getPlayer().getOpenInventory().getType();
                     if (windowId > 0 && currentType == org.bukkit.event.inventory.InventoryType.CRAFTING) {
-                        flag("Click in Closed Inventory", "PacketPlayInWindowClick");
+
                         data.getPlayer().updateInventory();
+                        plugin.getLogger().warning("§c[LightGuard] " + data.getPlayer().getName() + " flagged GameState (Click in Closed Inventory)");
+                        plugin.getMetrics().recordViolation(data.getPlayer().getName(), "GameState");
+                        data.getPlayer().kickPlayer("§cInvalid Game State");
                     }
                 });
             }

@@ -31,7 +31,15 @@ public class PlayerData {
     private final Map<Long, Long> pendingKeepAlives = new ConcurrentHashMap<>();
     private final Set<String> registeredChannels = ConcurrentHashMap.newKeySet();
 
-    private boolean brandSent = false;
+    private volatile boolean brandSent = false;
+
+    private volatile double lastKnownX = 0;
+    private volatile double lastKnownY = 0;
+    private volatile double lastKnownZ = 0;
+
+    public double getLastKnownX() { return lastKnownX; }
+    public double getLastKnownY() { return lastKnownY; }
+    public double getLastKnownZ() { return lastKnownZ; }
 
     public PlayerData(Player player) {
         this.player = player;
@@ -50,6 +58,11 @@ public class PlayerData {
     public void cleanOldKeepAlives() {
         long now = System.currentTimeMillis();
         pendingKeepAlives.entrySet().removeIf(entry -> (now - entry.getValue()) > 60000);
+    }
+    public void updateLocation(double x, double y, double z) {
+        this.lastKnownX = x;
+        this.lastKnownY = y;
+        this.lastKnownZ = z;
     }
 
     public AtomicLong getLastChannelRegister() { return lastChannelRegister; }

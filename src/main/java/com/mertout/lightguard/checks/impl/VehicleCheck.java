@@ -33,9 +33,9 @@ public class VehicleCheck extends Check {
         }
     }
 
-    private double lastX = -1;
-    private double lastY = -1;
-    private double lastZ = -1;
+    private volatile double lastX = -1;
+    private volatile double lastY = -1;
+    private volatile double lastZ = -1;
 
     public VehicleCheck(PlayerData data) {
         super(data, "Vehicle", "vehicle");

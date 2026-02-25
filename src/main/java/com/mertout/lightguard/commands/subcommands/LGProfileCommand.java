@@ -70,4 +70,10 @@ public class LGProfileCommand {
         newTask.runTaskTimer(LightGuard.getInstance(), 0L, 40L);
         activeTasks.put(senderId, newTask);
     }
+    public static void cancelAll() {
+        for (BukkitRunnable task : activeTasks.values()) {
+            if (!task.isCancelled()) task.cancel();
+        }
+        activeTasks.clear();
+    }
 }

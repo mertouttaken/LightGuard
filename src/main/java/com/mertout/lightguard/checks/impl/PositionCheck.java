@@ -22,7 +22,7 @@ public class PositionCheck extends Check {
         } catch (Exception e) { throw new ExceptionInInitializerError(e); }
     }
 
-    private double lastX = -1, lastY = -1, lastZ = -1;
+    private volatile double lastX = -1, lastY = -1, lastZ = -1;
 
     public PositionCheck(PlayerData data) {
         super(data, "Position", "position");
@@ -84,6 +84,8 @@ public class PositionCheck extends Check {
                 lastX = x;
                 lastY = y;
                 lastZ = z;
+
+                data.updateLocation(x, y, z);
 
             } catch (Exception e) {
                 return false;
