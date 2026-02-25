@@ -17,13 +17,15 @@ public class VehicleCheck extends Check {
         try {
             MethodHandles.Lookup lookup = MethodHandles.lookup();
 
-            X = MethodHandles.privateLookupIn(PacketPlayInVehicleMove.class, lookup).findVarHandle(PacketPlayInVehicleMove.class, "x", double.class);
-            Y = MethodHandles.privateLookupIn(PacketPlayInVehicleMove.class, lookup).findVarHandle(PacketPlayInVehicleMove.class, "y", double.class);
-            Z = MethodHandles.privateLookupIn(PacketPlayInVehicleMove.class, lookup).findVarHandle(PacketPlayInVehicleMove.class, "z", double.class);
+            X = MethodHandles.privateLookupIn(PacketPlayInVehicleMove.class, lookup).findVarHandle(PacketPlayInVehicleMove.class, "a", double.class);
+            Y = MethodHandles.privateLookupIn(PacketPlayInVehicleMove.class, lookup).findVarHandle(PacketPlayInVehicleMove.class, "b", double.class);
+            Z = MethodHandles.privateLookupIn(PacketPlayInVehicleMove.class, lookup).findVarHandle(PacketPlayInVehicleMove.class, "c", double.class);
 
             STEER_X = MethodHandles.privateLookupIn(PacketPlayInSteerVehicle.class, lookup).findVarHandle(PacketPlayInSteerVehicle.class, "a", float.class);
             STEER_Z = MethodHandles.privateLookupIn(PacketPlayInSteerVehicle.class, lookup).findVarHandle(PacketPlayInSteerVehicle.class, "b", float.class);
-        } catch (Exception e) { throw new ExceptionInInitializerError(e); }
+        } catch (Exception e) {
+            throw new ExceptionInInitializerError(e);
+        }
     }
 
     private double lastX = -1;

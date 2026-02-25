@@ -52,19 +52,26 @@ public class PacketInjector implements Listener {
             ServerConnection serverConnection = ((CraftServer) Bukkit.getServer()).getServer().getServerConnection();
             if (serverConnection == null) return;
 
-            Field channelsField = ServerConnection.class.getDeclaredField("g");
+            Field channelsField = null;
+
+            try {
+                channelsField = ServerConnection.class.getDeclaredField("listeningChannels");
+            } catch (NoSuchFieldException e) {
+                channelsField = ServerConnection.class.getDeclaredField("g");
+            }
+
             channelsField.setAccessible(true);
 
-            List<ChannelFuture> futures = (List<ChannelFuture>) channelsField.get(serverConnection);
+            List<io.netty.channel.ChannelFuture> futures = (List<io.netty.channel.ChannelFuture>) channelsField.get(serverConnection);
 
-            List<ChannelFuture> safeCopy = new java.util.ArrayList<>(futures);
+            List<io.netty.channel.ChannelFuture> safeCopy = new java.util.ArrayList<>(futures);
 
-            for (ChannelFuture future : safeCopy) {
-                future.channel().pipeline().addFirst(new ChannelInboundHandlerAdapter() {
+            for (io.netty.channel.ChannelFuture future : safeCopy) {
+                future.channel().pipeline().addFirst(new io.netty.channel.ChannelInboundHandlerAdapter() {
                     @Override
-                    public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
-                        if (msg instanceof Channel) {
-                            Channel channel = (Channel) msg;
+                    public void channelRead(io.netty.channel.ChannelHandlerContext ctx, Object msg) throws Exception {
+                        if (msg instanceof io.netty.channel.Channel) {
+                            io.netty.channel.Channel channel = (io.netty.channel.Channel) msg;
                             channel.pipeline().addFirst("lightguard_raw", new RawPacketInspector(plugin, "PRE_LOGIN_CONNECTION"));
                         }
                         super.channelRead(ctx, msg);
