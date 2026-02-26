@@ -72,6 +72,10 @@ public class CheckManager {
     }
 
     public boolean handlePacket(Object packet) {
+        if (data == null || !data.getPlayer().isOnline()) {
+            return false;
+        }
+
         boolean sentinelEnabled = plugin.getConfig().getBoolean("settings.sentinel.enabled", true);
         List<String> criticalChecks = plugin.getConfig().getStringList("settings.sentinel.critical-checks");
 

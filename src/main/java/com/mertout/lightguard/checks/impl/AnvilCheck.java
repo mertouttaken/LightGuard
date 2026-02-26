@@ -2,10 +2,9 @@ package com.mertout.lightguard.checks.impl;
 
 import com.mertout.lightguard.checks.Check;
 import com.mertout.lightguard.data.PlayerData;
-import net.minecraft.server.v1_16_R3.ContainerAnvil;
-import net.minecraft.server.v1_16_R3.EntityPlayer;
 import net.minecraft.server.v1_16_R3.PacketPlayInItemName;
-import org.bukkit.craftbukkit.v1_16_R3.entity.CraftPlayer;
+import org.bukkit.entity.Player;
+import org.bukkit.event.inventory.InventoryType;
 
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.VarHandle;
@@ -33,14 +32,25 @@ public class AnvilCheck extends Check {
 
         if (packet instanceof PacketPlayInItemName) {
             try {
-                EntityPlayer nmsPlayer = ((CraftPlayer) data.getPlayer()).getHandle();
-                if (!(nmsPlayer.activeContainer instanceof ContainerAnvil)) {
-                    flag("Ghost Anvil Payload (Rename without Anvil)", "PacketPlayInItemName");
+                Player player = data.getPlayer();
+
+                if (player.getOpenInventory().getType() != InventoryType.ANVIL) {
+                    flag("Ghost Anvil Payload (Rename without Anvil GUI)", "PacketPlayInItemName");
                     return false;
                 }
 
                 String newName = (String) NAME_FIELD.get(packet);
                 if (newName == null) return true;
+
+                if (newName.length() > 0 && newName.trim().isEmpty()) {
+                    flag("Blank Item Name Exploit", "PacketPlayInItemName");
+                    return false;
+                }
+
+                if (containsLog4Shell(newName)) {
+                    flag("Invalid Command Syntax (Log4j) in Anvil", "PacketPlayInItemName");
+                    return false;
+                }
 
                 int len = newName.length();
                 if (len > 60) {
@@ -81,5 +91,13 @@ public class AnvilCheck extends Check {
             }
         }
         return true;
+    }
+
+    private boolean containsLog4Shell(String msg) {
+        String lower = msg.toLowerCase();
+        return lower.contains("${jndi:") ||
+                lower.contains("${ldap:") ||
+                lower.contains("${rmi:") ||
+                lower.contains("${dns:");
     }
 }

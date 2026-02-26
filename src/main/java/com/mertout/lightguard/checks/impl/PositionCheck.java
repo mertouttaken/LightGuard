@@ -42,7 +42,12 @@ public class PositionCheck extends Check {
                 double z = (double) Z.get(packet);
 
                 if (!Double.isFinite(x) || !Double.isFinite(y) || !Double.isFinite(z)) {
-                    flag("Invalid Player Coordinates", "PacketPlayInFlying");
+                    flag("Invalid Player Coordinates (NaN/Inf)", "PacketPlayInFlying");
+                    return false;
+                }
+
+                if (Math.abs(x) >= 2.147483647E9 || Math.abs(z) >= 2.147483647E9 || Math.abs(y) >= 1.0E9) {
+                    flag("Impossible Position (Integer Overflow Attempt)", "PacketPlayInFlying");
                     return false;
                 }
 
@@ -64,6 +69,11 @@ public class PositionCheck extends Check {
                     if (data.isTeleporting()) {
                         lastX = x; lastY = y; lastZ = z;
                         return true;
+                    }
+
+                    if (diffY == 0.1 && !data.isTeleporting()) {
+                        flag("Invalid Vertical Movement (0.1 Fly Exploit)", "PacketPlayInFlying");
+                        return false;
                     }
 
                     if ((diffX >= 10.0 && diffX % 1.0 == 0.0) ||

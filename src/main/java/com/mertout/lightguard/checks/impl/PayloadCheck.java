@@ -50,7 +50,6 @@ public class PayloadCheck extends Check {
                         copy = dataBuffer.copy();
                         if (copy.readableBytes() > 0) {
                             byte firstByte = copy.readByte();
-                            // NBT kökü mutlaka Compound (0x0A) veya End (0x00) olmalı
                             if (firstByte != 0x0A && firstByte != 0x00) {
                                 flag("Malformed NBT Root Tag (" + firstByte + ")", packetName);
                                 return false;
@@ -63,6 +62,20 @@ public class PayloadCheck extends Check {
                         if (copy != null) copy.release();
                     }
                 }
+
+                org.bukkit.Bukkit.getScheduler().runTask(plugin, () -> {
+                    if (data.getPlayer().isOnline()) {
+                        org.bukkit.inventory.ItemStack main = data.getPlayer().getInventory().getItemInMainHand();
+                        org.bukkit.inventory.ItemStack off = data.getPlayer().getInventory().getItemInOffHand();
+
+                        boolean hasBook = main.getType().name().contains("BOOK") || off.getType().name().contains("BOOK");
+
+                        if (!hasBook) {
+                            data.getPlayer().kickPlayer("§cGhost Book Exploit");
+                            plugin.getLogger().warning("§c[LightGuard] " + data.getPlayer().getName() + " sent Book Payload without holding a book!");
+                        }
+                    }
+                });
             }
 
             if (channel.equalsIgnoreCase("minecraft:register") || channel.equalsIgnoreCase("REGISTER")) {

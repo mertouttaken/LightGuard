@@ -6,7 +6,6 @@ import net.minecraft.server.v1_16_R3.Container;
 import net.minecraft.server.v1_16_R3.ContainerLectern;
 import net.minecraft.server.v1_16_R3.PacketPlayInWindowClick;
 import org.bukkit.Bukkit;
-import org.bukkit.GameMode;
 import org.bukkit.craftbukkit.v1_16_R3.entity.CraftPlayer;
 
 import java.lang.invoke.MethodHandle;
@@ -72,6 +71,12 @@ public class WindowCheck extends Check {
 
                 if (slot < 0 && slot != -999 && slot != -1) {
                     flag("Negative Slot Crash", packetName);
+                    return false;
+                }
+
+                if (slot > 127) {
+                    flag("Impossible Slot ID (>127)", packetName);
+                    resync();
                     return false;
                 }
 
