@@ -43,6 +43,23 @@ public class PayloadCheck extends Check {
             if (channel.equalsIgnoreCase("MC|BEdit") || channel.equalsIgnoreCase("minecraft:bedit") ||
                     channel.equalsIgnoreCase("MC|BSign") || channel.equalsIgnoreCase("minecraft:bsign")) {
 
+                org.bukkit.inventory.PlayerInventory inv = data.getPlayer().getInventory();
+                org.bukkit.Material mainHand = inv.getItemInMainHand().getType();
+                org.bukkit.Material offHand = inv.getItemInOffHand().getType();
+
+                boolean isHoldingBook = mainHand.name().contains("BOOK") || offHand.name().contains("BOOK") ||
+                        mainHand.name().contains("WRIT") || offHand.name().contains("WRIT");
+
+                if (!isHoldingBook) {
+                    flag("Ghost Book Exploit (No book in hand)", packetName);
+                    org.bukkit.Bukkit.getScheduler().runTask(plugin, () -> {
+                        if (data.getPlayer().isOnline()) {
+                            data.getPlayer().kickPlayer("§cGhost Book Exploit");
+                        }
+                    });
+                    return false;
+                }
+
                 ByteBuf dataBuffer = p.data;
                 if (dataBuffer.readableBytes() > 0) {
                     ByteBuf copy = null;
@@ -62,20 +79,6 @@ public class PayloadCheck extends Check {
                         if (copy != null) copy.release();
                     }
                 }
-
-                org.bukkit.Bukkit.getScheduler().runTask(plugin, () -> {
-                    if (data.getPlayer().isOnline()) {
-                        org.bukkit.inventory.ItemStack main = data.getPlayer().getInventory().getItemInMainHand();
-                        org.bukkit.inventory.ItemStack off = data.getPlayer().getInventory().getItemInOffHand();
-
-                        boolean hasBook = main.getType().name().contains("BOOK") || off.getType().name().contains("BOOK");
-
-                        if (!hasBook) {
-                            data.getPlayer().kickPlayer("§cGhost Book Exploit");
-                            plugin.getLogger().warning("§c[LightGuard] " + data.getPlayer().getName() + " sent Book Payload without holding a book!");
-                        }
-                    }
-                });
             }
 
             if (channel.equalsIgnoreCase("minecraft:register") || channel.equalsIgnoreCase("REGISTER")) {

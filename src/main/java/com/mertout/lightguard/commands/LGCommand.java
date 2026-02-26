@@ -36,7 +36,7 @@ public class LGCommand implements CommandExecutor {
                 break;
 
             case "tps":
-                sender.sendMessage("§8[§bLightGuard§8] §7Server TPS: §f" + String.format("%.2f", plugin.getTPS()));
+                sender.sendMessage("§a[LightGuard] §7Server TPS: §f" + String.format("%.2f", plugin.getTPS()));
                 break;
 
             case "profile":
@@ -60,7 +60,7 @@ public class LGCommand implements CommandExecutor {
                 if (plugin.getMetrics() != null) {
                     new LGStatsCommand(plugin).execute(sender, args);
                 } else {
-                    sender.sendMessage("§cStatistics system is disabled.");
+                    sender.sendMessage("§c[LightGuard] Statistics system is disabled.");
                 }
                 break;
 
