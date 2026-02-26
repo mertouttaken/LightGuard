@@ -34,9 +34,13 @@ public class CheckManager {
     }
 
     private void loadChecks() {
+
         globalChecks.add(new FloodCheck(data));
         globalChecks.add(new PacketSizeCheck(data));
         globalChecks.add(new EOFExploitCheck(data));
+
+        globalChecks.add(new ProtocolExploitCheck(data));
+
         register(PacketPlayInKeepAlive.class, new KeepAliveCheck(data));
         register(PacketPlayInChat.class, new CommandCheck(data), new ChatSecurityCheck(data));
         register(PacketPlayInTabComplete.class, new TabCheck(data));
@@ -44,7 +48,9 @@ public class CheckManager {
         register(PacketPlayInSetCreativeSlot.class, new ItemExploitCheck(data), new MapExploitCheck(data));
         register(PacketPlayInFlying.class, new PositionCheck(data));
         register(PacketPlayInUseItem.class, new BlockPlaceCheck(data));
-        register(PacketPlayInCustomPayload.class, new PayloadCheck(data));
+
+        register(PacketPlayInCustomPayload.class, new PayloadCheck(data), new BrandCheck(data));
+
         register(PacketPlayInBEdit.class, new BookExploitCheck(data));
         register(PacketPlayInUpdateSign.class, new SignCheck(data));
         register(PacketPlayInSteerVehicle.class, new VehicleCheck(data));
@@ -58,8 +64,8 @@ public class CheckManager {
         register(PacketPlayInSettings.class, new SettingsCheck(data));
         register(PacketPlayInHeldItemSlot.class, new HeldItemSlotCheck(data));
         register(PacketPlayInClientCommand.class, new ClientActionCheck(data));
-        register(PacketPlayInClientCommand.class, new BrandCheck(data));
 
+        register(PacketPlayInSpectate.class, new SpectateCheck(data));
     }
 
     private void register(Class<?> packetClass, Check... checks) {

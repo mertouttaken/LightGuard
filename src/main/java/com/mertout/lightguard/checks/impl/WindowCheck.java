@@ -95,7 +95,7 @@ public class WindowCheck extends Check {
                     return false;
                 }
 
-                if (windowId != 0 && windowId != activeContainer.windowId) {
+                if (windowId != activeContainer.windowId) {
                     resync();
                     return false;
                 }
@@ -108,11 +108,10 @@ public class WindowCheck extends Check {
                     }
                 }
 
-                GameMode mode = data.getPlayer().getGameMode();
-                if (slot != -999 && slot != -1 && mode != GameMode.SPECTATOR && mode != GameMode.CREATIVE) {
-
+                if (slot != -999 && slot != -1) {
                     java.util.List<?> slotsList = activeContainer.slots;
                     if (slotsList == null || slot >= slotsList.size()) {
+                        flag("Invalid Slot ID (Out of Bounds)", packetName);
                         resync();
                         return false;
                     }
