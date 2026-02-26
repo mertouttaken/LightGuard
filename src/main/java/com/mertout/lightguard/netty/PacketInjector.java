@@ -122,6 +122,32 @@ public class PacketInjector implements Listener {
         try {
             Channel channel = ((CraftPlayer) player).getHandle().playerConnection.networkManager.channel;
 
+            if (channel.pipeline().get("lg_raw_player") != null) {
+                channel.pipeline().remove("lg_raw_player");
+            }
+            ChannelInboundHandlerAdapter rawHandler = new ChannelInboundHandlerAdapter() {
+                @Override
+                public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
+                    if (msg instanceof ByteBuf) {
+                        ByteBuf buf = (ByteBuf) msg;
+                        int limit = plugin.getConfig().getInt("checks.raw-packet.max-raw-size", 40960);
+                        if (buf.readableBytes() > limit) {
+                            plugin.getLogger().warning("§c[LightGuard] " + player.getName() + " sent an oversized raw buffer in-game! (size " + buf.readableBytes() + ".)");
+                            buf.release();
+                            ctx.close();
+                            return;
+                        }
+                    }
+                    super.channelRead(ctx, msg);
+                }
+            };
+
+            if (channel.pipeline().get("decoder") != null) {
+                channel.pipeline().addBefore("decoder", "lg_raw_player", rawHandler);
+            } else {
+                channel.pipeline().addFirst("lg_raw_player", rawHandler);
+            }
+
             if (channel.pipeline().get("lightguard_handler") != null) {
                 channel.pipeline().remove("lightguard_handler");
             }

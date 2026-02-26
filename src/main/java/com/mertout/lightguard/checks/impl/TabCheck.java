@@ -76,6 +76,12 @@ public class TabCheck extends Check {
 
             String lowerBuffer = buffer.toLowerCase();
 
+            if (lowerBuffer.startsWith("//calc") || lowerBuffer.startsWith("//eval") ||
+                    lowerBuffer.startsWith("//solve") || lowerBuffer.startsWith("//math")) {
+                flag("WorldEdit Math Exploit Attempt", packet.getClass().getSimpleName());
+                return false;
+            }
+
             for (String s : blockedSubstrings) {
                 if (lowerBuffer.contains(s)) {
                     flag("Malicious Syntax in Tab (" + s + ")", "PacketPlayInTabComplete");

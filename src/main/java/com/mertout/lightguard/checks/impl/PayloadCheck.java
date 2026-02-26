@@ -28,6 +28,11 @@ public class PayloadCheck extends Check {
 
             String channel = p.tag.toString();
 
+            if (channel.length() > 128) {
+                flag("Oversized Channel Name (" + channel.length() + " chars)", packetName);
+                return false;
+            }
+
             for (String blocked : blockedChannels) {
                 if (channel.equalsIgnoreCase(blocked)) {
                     flag("Blocked Channel: " + channel, packetName);
