@@ -2,8 +2,9 @@ package com.mertout.lightguard.netty;
 
 import com.mertout.lightguard.LightGuard;
 import com.mertout.lightguard.data.PlayerData;
+import io.netty.buffer.ByteBuf;
 import io.netty.channel.*;
-import net.minecraft.server.v1_16_R3.MinecraftServer;
+import net.minecraft.server.v1_16_R3.PacketPlayInCustomPayload;
 import net.minecraft.server.v1_16_R3.PacketPlayOutKeepAlive;
 import net.minecraft.server.v1_16_R3.ServerConnection;
 import org.bukkit.Bukkit;
@@ -150,6 +151,14 @@ public class PacketInjector implements Listener {
                     PlayerData data = plugin.getPlayerDataManager().getData(player.getUniqueId());
                     if (data != null) {
                         if (!data.getCheckManager().handlePacket(msg)) {
+
+                            if (msg instanceof PacketPlayInCustomPayload) {
+                                ByteBuf buf = ((PacketPlayInCustomPayload) msg).data;
+                                if (buf != null && buf.refCnt() > 0) {
+                                    buf.release();
+                                }
+                            }
+
                             blocked = true;
                             return;
                         }

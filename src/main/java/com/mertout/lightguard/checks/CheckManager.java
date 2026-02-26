@@ -37,7 +37,6 @@ public class CheckManager {
 
         globalChecks.add(new FloodCheck(data));
         globalChecks.add(new PacketSizeCheck(data));
-        globalChecks.add(new EOFExploitCheck(data));
 
         globalChecks.add(new ProtocolExploitCheck(data));
 
