@@ -30,7 +30,6 @@ public class AnvilCheck extends Check {
         if (!(packet instanceof PacketPlayInItemName)) return true;
 
         try {
-            // 🛡️ DÜZELTME: Bukkit (getOpenInventory) çağrısı YASAK! Netty Cache'e (ProtocolPlayer) soruyoruz.
             if (!player.isAnvilOpen()) {
                 plugin.getActionQueue().pushKick(player.getPlayer(), "Ghost Anvil Payload (Desync)");
                 return false;
@@ -41,19 +40,16 @@ public class AnvilCheck extends Check {
 
             int len = newName.length();
 
-            // 1. OOM / Allocation Koruması
             if (len > 60) {
                 plugin.getActionQueue().pushKick(player.getPlayer(), "Oversized Anvil Rename");
                 return false;
             }
 
-            // 2. Boş İsim (Blank Exploit) Koruması
             if (len > 0 && newName.trim().isEmpty()) {
                 plugin.getActionQueue().pushKick(player.getPlayer(), "Blank Item Name Exploit");
                 return false;
             }
 
-            // 3. Log4Shell Koruması (Sadece <60 char olduğu için toLowerCase yapmak güvenli)
             if (containsLog4Shell(newName)) {
                 plugin.getActionQueue().pushKick(player.getPlayer(), "Invalid Command Syntax (Log4j)");
                 return false;
@@ -61,7 +57,6 @@ public class AnvilCheck extends Check {
 
             boolean hasColor = false;
 
-            // 4. Allocation-Free Karakter Taraması (Crash/Unicode Koruması)
             for (int i = 0; i < len; i++) {
                 char c = newName.charAt(i);
 
@@ -75,13 +70,12 @@ public class AnvilCheck extends Check {
                 }
             }
 
-            // 5. Yetki Kontrolü: Bukkit (hasPermission) YASAK! Netty Cache'e sorulur.
             if (hasColor && !player.isAdmin()) {
-                return false; // Yetkisi yoksa sadece paketi çöpe at, adamı kicklemeye gerek yok.
+                return false;
             }
 
         } catch (Exception e) {
-            return false; // Hata durumunda (Fail-safe) paketi yut.
+            return false;
         }
 
         return true;

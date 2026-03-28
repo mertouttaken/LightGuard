@@ -41,8 +41,6 @@ public class PayloadCheck extends Check {
         if (channel.equalsIgnoreCase("MC|BEdit") || channel.equalsIgnoreCase("minecraft:bedit") ||
                 channel.equalsIgnoreCase("MC|BSign") || channel.equalsIgnoreCase("minecraft:bsign")) {
 
-            // 🛡️ KRİTİK DÜZELTME: Bukkit API (inv.getItemInMainHand) Netty Thread'de çökme (Race Condition) yapar!
-            // Bunun yerine oyuncunun ProtocolPlayer cache'inden okuyoruz.
             if (!player.isHoldingBook()) {
                 plugin.getActionQueue().pushKick(player.getPlayer(), "Ghost Book Exploit (No Book in Hand)");
                 return false;

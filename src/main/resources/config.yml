@@ -1,6 +1,18 @@
 settings:
   prefix: "&8[&cLightGuard&8] &7"
 
+  kick-layout:
+    - "&4&m-----------------------------------------"
+    - "&c&lLIGHTGUARD SECURITY"
+    - ""
+    - "&fUser: &7%player%"
+    - "&fDetection: &c%check% &7(&e%packet%&7)"
+    - "&fPing: &e%ping%ms"
+    - ""
+    - "&4&l⛔ ACTION BLOCKED ⛔"
+    - "&7You have violated server security."
+    - "&4&m-----------------------------------------"
+
   sentinel:
     enabled: true
     silent-failures: false # Log on error instead of crashing the server
@@ -226,6 +238,7 @@ checks:
     max-depth: 7
     max-attributes: 7
     max-attribute-value: 100
+    max-enchant-level: 20
 
     illegal-keys:
       - "run_command"

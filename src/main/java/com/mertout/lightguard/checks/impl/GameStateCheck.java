@@ -32,16 +32,12 @@ public class GameStateCheck extends Check {
         if (checkInvOpen) {
             int windowId = (int) WINDOW_ID.get(packet);
 
-            // 🛡️ MÜKEMMEL DÜZELTME: Bukkit API / RunTask YASAK!
-            // Direkt Netty thread'indeki ProtocolPlayer cache'ine soruyoruz.
             if (windowId > 0 && !player.isInventoryOpen()) {
 
-                // Menüsü açık değilken, menüye tıklama paketi gönderiyor! (Ghost Click / Desync Dupe Exploit)
                 plugin.getActionQueue().pushKick(player.getPlayer(), "Invalid Game State (Ghost Click)");
-                return false; // PAKETİ ANINDA NETTY HATTINDA YUT, SUNUCUYA ULAŞMASIN!
+                return false;
             }
 
-            // Eğer açtığı sandığın WindowID'si ile tıkladığı ID uyuşmuyorsa
             if (windowId > 0 && player.getOpenWindowId() != windowId) {
                 plugin.getActionQueue().pushKick(player.getPlayer(), "Window ID Mismatch (Spoof)");
                 return false;

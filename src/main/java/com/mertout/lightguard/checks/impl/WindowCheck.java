@@ -44,14 +44,11 @@ public class WindowCheck extends Check {
 
             if (button < 0 || button > 99 || slot > 127) return false;
 
-            // 🛡️ DÜZELTME: Netty Thread'de QuickMove Sayacı (ProtocolPlayer Cache)
             if (typeName.equals("QUICK_MOVE") && player.incrementAndGetQuickMoveCount(System.currentTimeMillis()) > 50) {
                 return false;
             }
 
-            // 🛡️ KRİTİK: Window ID Doğrulaması (Desync Dupe Koruması)
             if (windowId > 0 && player.getOpenWindowId() != windowId) {
-                // Oyuncunun ekranında açık olmayan bir menüye paket yolluyor!
                 return false;
             }
 

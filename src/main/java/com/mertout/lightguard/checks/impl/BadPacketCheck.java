@@ -48,7 +48,6 @@ public class BadPacketCheck extends Check {
         PacketPlayInUseEntity useEntity = (PacketPlayInUseEntity) packet;
         int entityId = (int) ENTITY_ID.get(useEntity);
 
-        // 🛡️ DÜZELTME: Bukkit API YASAK. entityId doğrudan ProtocolPlayer önbelleğinden okunur.
         if (entityId == player.getEntityId() && preventSelfInteract) {
             plugin.getActionQueue().pushKick(player.getPlayer(), "Self Interaction (Bad Packet)");
             return false;

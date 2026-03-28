@@ -34,9 +34,8 @@ public class TabCheck extends Check {
     public boolean check(Object packet, ProtocolPlayer player) {
         if (!(packet instanceof PacketPlayInTabComplete)) return true;
 
-        // 🛡️ DÜZELTME: Sayaçlar artık ProtocolPlayer içinde (Veri Kanaması Bitti)
         if (player.incrementAndGetTabCount(System.currentTimeMillis()) > 4) {
-            return false; // Tab spamını sessizce yut
+            return false;
         }
 
         String buffer = (String) BUFFER_FIELD.get(packet);
@@ -49,7 +48,6 @@ public class TabCheck extends Check {
 
         String lowerBuffer = buffer.toLowerCase();
 
-        // WorldEdit / FAWE Math Exploit Koruması
         if (lowerBuffer.startsWith("//calc") || lowerBuffer.startsWith("//eval") ||
                 lowerBuffer.startsWith("//solve") || lowerBuffer.startsWith("//math")) {
             plugin.getActionQueue().pushKick(player.getPlayer(), "WorldEdit Math Exploit Attempt");

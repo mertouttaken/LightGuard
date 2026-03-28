@@ -46,16 +46,13 @@ public class HeldItemSlotCheck extends Check {
         try {
             int slot = (int) SLOT_GETTER.invoke(packet);
 
-            // Adamın Hotbar'da 0 ile 8 arası slotları vardır.
-            // 36. slota (Örn: kafalığa) elindeki eşya gibi geçmeye çalışırsa sunucuyu crashletebilir.
             if (slot < 0 || slot >= 36) {
-                // 🛡️ DÜZELTME: MPSC Action Queue kullanıldı.
                 plugin.getActionQueue().pushKick(player.getPlayer(), "Invalid Held Item Slot Exploit (" + slot + ")");
                 return false;
             }
 
         } catch (Throwable t) {
-            return false; // Hata durumunda paketi yut
+            return false;
         }
 
         return true;

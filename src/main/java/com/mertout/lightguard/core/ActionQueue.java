@@ -4,6 +4,7 @@ import com.mertout.lightguard.LightGuard;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 
+import java.util.List;
 import java.util.Queue;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
@@ -24,16 +25,21 @@ public class ActionQueue {
 
     private void startConsumerTask() {
         Bukkit.getScheduler().runTaskTimer(plugin, () -> {
-            int processed = 0;
             Action action;
+            while ((action = queue.poll()) != null) {
+                if (action.player.isOnline()) {
+                    List<String> layout = plugin.getConfig().getStringList("settings.kick-layout");
+                    StringBuilder sb = new StringBuilder();
 
-            while ((action = queue.poll()) != null && processed < 50) {
-                if (action.type == ActionType.KICK) {
-                    if (action.player.isOnline()) {
-                        action.player.kickPlayer("§cLightGuard Security:\n" + action.reason);
+                    for (String line : layout) {
+                        sb.append(line.replace("&", "§")
+                                        .replace("%player%", action.player.getName())
+                                        .replace("%check%", action.reason)
+                                        .replace("%ping%", String.valueOf(plugin.getProtocolManager().get(action.player.getUniqueId()).getPlayer().getPing())))
+                                .append("\n");
                     }
+                    action.player.kickPlayer(sb.toString());
                 }
-                processed++;
             }
         }, 1L, 1L);
     }

@@ -43,7 +43,6 @@ public class SignCheck extends Check {
             BlockPosition pos = (BlockPosition) POS_FIELD.get(packet);
             if (pos == null) return true;
 
-            // 🛡️ DÜZELTME 1: Bukkit API (getLocation) YASAK. ProtocolPlayer O(1) Cache kullanıldı.
             double pX = player.getLastX();
             double pY = player.getLastY();
             double pZ = player.getLastZ();
@@ -54,7 +53,6 @@ public class SignCheck extends Check {
                 double distZ = pos.getZ() - pZ;
                 double distanceSq = (distX * distX) + (distY * distY) + (distZ * distZ);
 
-                // Bedrock desteği cache üzerinden (isAdmin/isBedrock flagleri ProtocolPlayer'a eklenmeli)
                 double maxDist = player.isBedrock() ? 225.0 : 100.0;
 
                 if (distanceSq > maxDist) {
@@ -63,13 +61,11 @@ public class SignCheck extends Check {
                 }
             }
 
-            // 🛡️ DÜZELTME 2: Asenkron Chunk Kontrolü (Ana Thread'i kitlemeden!)
             String worldName = player.getPlayer().getWorld().getName();
             if (!plugin.getWorldChunkManager().isChunkLoadedAsynchronously(worldName, pos.getX() >> 4, pos.getZ() >> 4)) {
-                return false; // Yüklenmemiş chunk'ta tabela düzenlenemez.
+                return false;
             }
 
-            // 🛡️ DÜZELTME 3: İçerik Taraması (Allocation-Free)
             String[] lines = (String[]) LINES_FIELD.get(packet);
             if (lines == null) return true;
 

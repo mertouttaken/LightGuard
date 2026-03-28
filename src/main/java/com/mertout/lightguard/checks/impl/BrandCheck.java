@@ -62,7 +62,6 @@ public class BrandCheck extends Check {
 
             if (key != null && (key.getKey().equals("brand") || key.toString().endsWith("brand"))) {
 
-                // 🛡️ DÜZELTME: Veri kanaması kapatıldı, durum ProtocolPlayer'dan O(1) hızında okunur.
                 if (player.isBrandSent()) {
                     plugin.getActionQueue().pushKick(player.getPlayer(), "Invalid Brand Sequence (Resent Brand)");
                     return false;
@@ -75,7 +74,6 @@ public class BrandCheck extends Check {
                 serializer.markReaderIndex();
                 try {
                     int len = readVarInt(serializer);
-                    // OOM (Out Of Memory) Koruması
                     if (len > 0 && len < 32767 && serializer.readableBytes() >= len) {
                         byte[] bytes = new byte[len];
                         serializer.readBytes(bytes);
@@ -98,13 +96,12 @@ public class BrandCheck extends Check {
                     return false;
                 }
 
-                // Crash/Bypass Koruması
                 if (blockInvalidChars && !brand.matches("^[\\x20-\\x7E]+$")) {
                     plugin.getActionQueue().pushKick(player.getPlayer(), "Illegal Characters in Brand");
                     return false;
                 }
 
-                player.setBrandSent(true); // Artık bir daha brand atamaz
+                player.setBrandSent(true);
             }
         } catch (Throwable t) {
             return false;

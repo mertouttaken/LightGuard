@@ -17,11 +17,11 @@ public class SettingsCheck extends Check {
     static {
         try {
             MethodHandles.Lookup lookup = MethodHandles.lookup();
-            Field fLocale = PacketPlayInSettings.class.getDeclaredField("a"); // 1.16.5 'a' field
+            Field fLocale = PacketPlayInSettings.class.getDeclaredField("a");
             fLocale.setAccessible(true);
             LOCALE_GETTER = lookup.unreflectGetter(fLocale);
 
-            Field fViewDistance = PacketPlayInSettings.class.getDeclaredField("b"); // 1.16.5 'b' field
+            Field fViewDistance = PacketPlayInSettings.class.getDeclaredField("b");
             fViewDistance.setAccessible(true);
             VIEW_DISTANCE_GETTER = lookup.unreflectGetter(fViewDistance);
         } catch (Exception e) {
@@ -41,13 +41,11 @@ public class SettingsCheck extends Check {
             String locale = (String) LOCALE_GETTER.invoke(packet);
             int viewDistance = (int) VIEW_DISTANCE_GETTER.invoke(packet);
 
-            // 1. Locale Boyut Kontrolü (OOM Protection)
             if (locale != null && locale.length() > 32) {
                 plugin.getActionQueue().pushKick(player.getPlayer(), "Oversized Locale String");
                 return false;
             }
 
-            // 2. Görüş Mesafesi Sınırı (Crasher Protection)
             if (viewDistance < 0 || viewDistance > 128) {
                 plugin.getActionQueue().pushKick(player.getPlayer(), "Invalid View Distance Exploit");
                 return false;

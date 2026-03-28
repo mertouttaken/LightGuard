@@ -17,13 +17,10 @@ public class AbilitiesCheck extends Check {
 
         PacketPlayInAbilities abilities = (PacketPlayInAbilities) packet;
 
-        // 🛡️ DÜZELTME: Bukkit API (GameMode) yerine ProtocolPlayer'daki Netty Cache'i okuyoruz.
         if (!player.isCreativeOrSpectator()) {
 
-            // Yine Bukkit API (getAllowFlight) yerine ProtocolPlayer Cache'i!
             if (abilities.isFlying() && !player.isAllowedFlight()) {
 
-                // MPSC Kuyruğu ile Lock-Free kick!
                 plugin.getActionQueue().pushKick(player.getPlayer(), "Illegal Flying State (Spoof)");
                 return false;
             }

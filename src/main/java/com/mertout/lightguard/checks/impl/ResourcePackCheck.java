@@ -17,7 +17,6 @@ public class ResourcePackCheck extends Check {
 
         PacketPlayInResourcePackStatus statusPacket = (PacketPlayInResourcePackStatus) packet;
 
-        // Geçersiz durum kontrolü (Malformed packet protection)
         if (statusPacket.status == null) {
             plugin.getActionQueue().pushKick(player.getPlayer(), "Invalid Resource Pack Status");
             return false;

@@ -17,7 +17,6 @@ public class RecipeCheck extends Check {
     public boolean check(Object packet, ProtocolPlayer player) {
         if (packet instanceof PacketPlayInAutoRecipe || packet instanceof PacketPlayInRecipeDisplayed) {
 
-            // 🛡️ DÜZELTME: Sayaç ProtocolPlayer üzerinde çalışır.
             if (player.incrementAndGetRecipeCount(System.currentTimeMillis()) > MAX_RECIPE_PACKETS) {
                 plugin.getActionQueue().pushKick(player.getPlayer(), "Recipe Book Spam Detected");
                 return false;

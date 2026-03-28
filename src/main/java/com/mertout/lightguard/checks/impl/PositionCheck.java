@@ -10,8 +10,7 @@ import java.lang.invoke.VarHandle;
 
 public class PositionCheck extends Check {
 
-    private static final VarHandle X, Y, Z, HAS_POS;
-    private static final VarHandle YAW, PITCH, HAS_LOOK;
+    private static final VarHandle X, Y, Z, HAS_POS, YAW, PITCH, HAS_LOOK, ON_GROUND;
 
     static {
         try {
@@ -23,6 +22,7 @@ public class PositionCheck extends Check {
             YAW = MethodHandles.privateLookupIn(PacketPlayInFlying.class, lookup).findVarHandle(PacketPlayInFlying.class, "yaw", float.class);
             PITCH = MethodHandles.privateLookupIn(PacketPlayInFlying.class, lookup).findVarHandle(PacketPlayInFlying.class, "pitch", float.class);
             HAS_LOOK = MethodHandles.privateLookupIn(PacketPlayInFlying.class, lookup).findVarHandle(PacketPlayInFlying.class, "hasLook", boolean.class);
+            ON_GROUND = MethodHandles.privateLookupIn(PacketPlayInFlying.class, lookup).findVarHandle(PacketPlayInFlying.class, "f", boolean.class);
         } catch (Exception e) { throw new ExceptionInInitializerError(e); }
     }
 
@@ -35,7 +35,10 @@ public class PositionCheck extends Check {
         if (!(packet instanceof PacketPlayInFlying)) return true;
 
         try {
-            // --- 1. ROTASYON (YAW/PITCH) KONTROLLERİ ---
+            if (player.isDead()) {
+                return false;
+            }
+
             boolean hasLook = (boolean) HAS_LOOK.get(packet);
             if (hasLook) {
                 float yaw = (float) YAW.get(packet);
@@ -57,7 +60,6 @@ public class PositionCheck extends Check {
                 }
             }
 
-            // --- 2. POZİSYON (X/Y/Z) KONTROLLERİ ---
             boolean hasPos = (boolean) HAS_POS.get(packet);
             if (!hasPos) return true;
 
@@ -70,75 +72,58 @@ public class PositionCheck extends Check {
                 return false;
             }
 
-            // SG YAMASI: Integer Overflow Koruması (Devasa sayılarla sunucuyu çökertme)
-            if (Math.abs(x) >= 2.147483647E9 || Math.abs(z) >= 2.147483647E9 || Math.abs(y) >= 1.0E9) {
-                plugin.getActionQueue().pushKick(player.getPlayer(), "Impossible Position (Overflow)");
+            if (Math.abs(x) > 29999984 || Math.abs(z) > 29999984 || Math.abs(y) > 1000000) {
+                plugin.getActionQueue().pushKick(player.getPlayer(), "Illegal Position (Border/Overflow)");
                 return false;
             }
 
-            if (Math.abs(x) > 30000000 || Math.abs(z) > 30000000) {
-                plugin.getActionQueue().pushKick(player.getPlayer(), "World Border Exploit");
-                return false;
-            }
-
-            // --- 3. ASENKRON CHUNK AWARENESS (Chunk Crasher & NoCom Koruması) ---
             int chunkX = (int) x >> 4;
             int chunkZ = (int) z >> 4;
             String worldName = player.getPlayer().getWorld().getName();
 
-            // Saniyenin binde birinde O(1) hızında Lock-Free chunk sorgusu
             if (!plugin.getWorldChunkManager().isChunkLoadedAsynchronously(worldName, chunkX, chunkZ)) {
                 if (!player.isInTeleportGrace()) {
-                    // Yüklenmemiş chunk'a gitmeye çalışıyor, paketi sessizce REDDET (laglı gibi geriye atar)
                     return false;
                 }
             }
 
-            // --- 4. HAREKET (MOVEMENT) & HIZ ANALİZİ ---
             double lastX = player.getLastX();
             double lastY = player.getLastY();
             double lastZ = player.getLastZ();
 
-            if (lastX != -1) {
-                double diffX = Math.abs(x - lastX);
-                double diffY = Math.abs(y - lastY);
-                double diffZ = Math.abs(z - lastZ);
+            if (lastX != -1 && !player.isInTeleportGrace()) {
+                double diffX = x - lastX;
+                double diffY = y - lastY;
+                double diffZ = z - lastZ;
 
-                if (player.isInTeleportGrace()) {
-                    player.setLastLocation(x, y, z);
-                    return true;
-                }
-
-                // 🛡️ DÜZELTME: Float / Double Sayılar "==" ile karşılaştırılamaz!
-                // Epsilon mantığı kullanılarak 0.1 fly tespiti çok daha keskinleştirildi.
-                if (Math.abs(diffY - 0.1) < 1e-7 && !player.isInTeleportGrace()) {
-                    plugin.getActionQueue().pushKick(player.getPlayer(), "Invalid Vertical Step (0.1 Fly Exploit)");
+                if (Math.abs(Math.abs(diffY) - 0.1) < 1e-7) {
+                    plugin.getActionQueue().pushKick(player.getPlayer(), "Invalid Vertical Step (0.1 Fly)");
                     return false;
                 }
 
                 if ((diffX >= 10.0 && diffX % 1.0 == 0.0) ||
                         (diffZ >= 10.0 && diffZ % 1.0 == 0.0) ||
                         (diffY >= 10.0 && diffY % 1.0 == 0.0)) {
-                    plugin.getActionQueue().pushKick(player.getPlayer(), "Chunk Crasher (Integer Step)");
+                    plugin.getActionQueue().pushKick(player.getPlayer(), "Integer Step Exploit");
                     return false;
                 }
 
                 double distSq = (diffX * diffX) + (diffY * diffY) + (diffZ * diffZ);
                 if (distSq > 100.0) {
-                    plugin.getActionQueue().pushKick(player.getPlayer(), "Excessive Speed / Blink Exploit");
+                    plugin.getActionQueue().pushKick(player.getPlayer(), "Excessive Movement (Blink)");
                     return false;
                 }
             }
 
-            // Durumu ProtocolPlayer'a (Oyuncuya özel objeye) kaydet
             player.setLastLocation(x, y, z);
 
         } catch (Exception e) {
-            return false; // Hata durumunda fail-safe olarak paketi yut
+            return false;
         }
 
         return true;
     }
+
     @Override
     public boolean isBedrockCompatible() {
         return false;

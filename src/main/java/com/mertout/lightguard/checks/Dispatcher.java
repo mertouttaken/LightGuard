@@ -64,8 +64,14 @@ public class Dispatcher {
     }
 
     public boolean dispatch(Object packet, ProtocolPlayer player) {
+        String packetName = packet.getClass().getSimpleName();
         if (!player.getStateMachine().analyzeCrashCombo(packet.getClass().getSimpleName())) {
             plugin.getActionQueue().pushKick(player.getPlayer(), "Exploit Combo Pattern (Crash Attempt)");
+            return false;
+        }
+
+        if (!player.getStateMachine().isActionValid(packetName, player)) {
+            plugin.getActionQueue().pushKick(player.getPlayer(), "Invalid Sequence / State Action");
             return false;
         }
 

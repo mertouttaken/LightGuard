@@ -39,7 +39,6 @@ public class CommandCheck extends Check {
         String msg = (String) MSG_FIELD.get(packet);
         if (msg == null) return true;
 
-        // 1. OOM / Allocation Koruması
         if (msg.length() > 256) {
             plugin.getActionQueue().pushKick(player.getPlayer(), "Oversized Chat Message");
             return false;
@@ -48,7 +47,6 @@ public class CommandCheck extends Check {
         if (msg.startsWith("/")) {
             String rawCmd = msg.split(" ")[0].toLowerCase();
 
-            // 2. Unicode Normalizasyonu (Homoglyph Attack Koruması)
             String normalizedCmd = Normalizer.normalize(rawCmd, Normalizer.Form.NFKC);
             normalizedCmd = STRIP_PATTERN.matcher(normalizedCmd).replaceAll("");
 
@@ -63,13 +61,11 @@ public class CommandCheck extends Check {
                 }
             }
 
-            // 3. Log4Shell JNDI Exploit Koruması
             if (containsLog4Shell(rawCmd) || containsLog4Shell(cleanCmd)) {
                 plugin.getActionQueue().pushKick(player.getPlayer(), "Invalid Command Syntax (Log4j)");
                 return false;
             }
 
-            // 4. WorldEdit (FAWE) Crash / Yetkisiz Syntax Koruması
             if (blockSyntax && (msg.contains("::") || (msg.startsWith("//") && !msg.startsWith("//calc")))) {
                 plugin.getActionQueue().pushKick(player.getPlayer(), "Invalid Command Syntax");
                 return false;

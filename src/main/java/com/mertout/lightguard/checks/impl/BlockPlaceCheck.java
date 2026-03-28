@@ -27,7 +27,6 @@ public class BlockPlaceCheck extends Check {
         PacketPlayInUseItem p = (PacketPlayInUseItem) packet;
         long now = System.currentTimeMillis();
 
-        // 🛡️ DÜZELTME 1: NMS Player okumak YASAK. Tüm statüler ProtocolPlayer önbelleğinden gelir.
         if (player.isDead()) {
             plugin.getActionQueue().pushKick(player.getPlayer(), "Invalid Sequence (Place while Dead)");
             return false;
@@ -38,7 +37,6 @@ public class BlockPlaceCheck extends Check {
             return false;
         }
 
-        // 🛡️ DÜZELTME 2: Veri Kanamasını önlemek için sayım ProtocolPlayer üzerinde yapılır.
         if (player.incrementAndGetBlockPlaceCount(now) > maxPPS) {
             plugin.getActionQueue().pushKick(player.getPlayer(), "Block Place Flood");
             return false;
@@ -50,7 +48,6 @@ public class BlockPlaceCheck extends Check {
             }
         }
 
-        // 3. KOORDİNAT KONTROLLERİ
         MovingObjectPositionBlock position = p.c();
         if (position == null || position.getDirection() == null) return false;
 

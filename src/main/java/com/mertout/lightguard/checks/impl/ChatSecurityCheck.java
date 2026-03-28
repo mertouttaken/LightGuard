@@ -45,7 +45,6 @@ public class ChatSecurityCheck extends Check {
             return false;
         }
 
-        // Allocation-Free Unicode Taraması
         if (containsBlockedUnicode(message)) {
             plugin.getActionQueue().pushKick(player.getPlayer(), "Illegal Unicode Character in Chat");
             return false;

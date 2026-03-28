@@ -3,18 +3,31 @@ package com.mertout.lightguard.data;
 public class ProtocolStateMachine {
 
     private int ghostWindowClicks = 0;
+    private int ghostHotbarSwaps = 0;
 
     private long lastTabComplete = 0;
     private long lastPayload = 0;
     private int comboSpamCount = 0;
 
-    public boolean validateWindowClick(ProtocolPlayer player) {
-        if (!player.isInventoryOpen()) {
-            ghostWindowClicks++;
-            if (ghostWindowClicks > 3) return false;
-        } else {
-            ghostWindowClicks = 0; // Menü açıldığında sayacı sıfırla
+    public boolean isActionValid(String packetName, ProtocolPlayer pp) {
+        if (pp.isDead() && (packetName.contains("Position") || packetName.contains("Flying"))) {
+            return false;
         }
+
+        if (!pp.isInventoryOpen()) {
+            if (packetName.equals("PacketPlayInWindowClick")) {
+                ghostWindowClicks++;
+                if (ghostWindowClicks > 5) return false;
+            }
+            else if (packetName.equals("PacketPlayInHeldItemSlot")) {
+                ghostHotbarSwaps++;
+                if (ghostHotbarSwaps > 8) return false;
+            }
+        } else {
+            ghostWindowClicks = 0;
+            ghostHotbarSwaps = 0;
+        }
+
         return true;
     }
 

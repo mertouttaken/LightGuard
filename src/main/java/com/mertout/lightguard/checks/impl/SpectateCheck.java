@@ -15,7 +15,6 @@ public class SpectateCheck extends Check {
     public boolean check(Object packet, ProtocolPlayer player) {
         if (!(packet instanceof PacketPlayInSpectate)) return true;
 
-        // 🛡️ DÜZELTME: Bukkit API YASAK. ProtocolPlayer O(1) Cache kullanıldı.
         if (!player.isCreativeOrSpectator()) {
             plugin.getActionQueue().pushKick(player.getPlayer(), "GameMode Spoof (Spectate Packet)");
             return false;
