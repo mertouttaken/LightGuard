@@ -10,9 +10,6 @@ public class ProtocolStateMachine {
     private int comboSpamCount = 0;
 
     public boolean isActionValid(String packetName, ProtocolPlayer pp) {
-        if (pp.isDead() && (packetName.contains("Position") || packetName.contains("Flying"))) {
-            return false;
-        }
 
         if (!pp.isInventoryOpen()) {
             if (packetName.equals("PacketPlayInWindowClick")) {
@@ -23,7 +20,6 @@ public class ProtocolStateMachine {
             }
             else if (packetName.equals("PacketPlayInHeldItemSlot")) {
                 ghostHotbarSwaps++;
-                // 🛡️ ELİTE TİER FİX: Int Overflow Koruması
                 if (ghostHotbarSwaps > 10000) ghostHotbarSwaps = 10000;
 
                 if (ghostHotbarSwaps > 8) return false;

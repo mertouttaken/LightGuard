@@ -19,7 +19,6 @@ public class SettingsCheck extends Check {
         VarHandle locale = null;
         VarHandle viewDist = null;
         try {
-            // 🛡️ CİLA: Alanları isimle değil, TİPİNE göre buluyoruz (Mapping bağımsız)
             Field localeField = Arrays.stream(PacketPlayInSettings.class.getDeclaredFields())
                     .filter(f -> f.getType() == String.class)
                     .findFirst()
@@ -57,10 +56,9 @@ public class SettingsCheck extends Check {
     public boolean check(Object packet, ProtocolPlayer player) {
         if (!(packet instanceof PacketPlayInSettings)) return true;
 
-        if (LOCALE_HANDLE == null) return true; // Fail-safe
+        if (LOCALE_HANDLE == null) return true;
 
         try {
-            // Dil ayarı (Locale) kontrolü
             String locale = (String) LOCALE_HANDLE.get(packet);
 
             if (locale == null || locale.length() > maxLength) {
@@ -68,12 +66,10 @@ public class SettingsCheck extends Check {
                 return false;
             }
 
-            // Görüş mesafesi (View Distance) kontrolü
             if (VIEW_DIST_HANDLE != null) {
                 int viewDistance = (int) VIEW_DIST_HANDLE.get(packet);
-                // 1.16.5'te view distance 0 ile 32 arasında olmalıdır.
                 if (viewDistance < 0 || viewDistance > 32) {
-                    return false; // Lag makinesi engelleme
+                    return false;
                 }
             }
 

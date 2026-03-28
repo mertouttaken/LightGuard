@@ -18,12 +18,11 @@ public class PreLoginRawFilter extends ChannelInboundHandlerAdapter {
     private final LightGuard plugin;
     private int totalReadBytes = 0;
 
-    // 🛡️ CİLA: Eşik değeri 10KB'tan 128KB'a yükseltildi.
-    // Modern protokollerde 10KB meşru girişler için bile çok düşüktür.
-    private static final int PRE_LOGIN_MAX_BYTES = 131072; // 128 KB
+    private final int preLoginMaxBytes;
 
     public PreLoginRawFilter(LightGuard plugin) {
         this.plugin = plugin;
+        this.preLoginMaxBytes = plugin.getConfig().getInt("checks.raw-packet.pre-login-max-size", 131072);
     }
 
     @Override
@@ -36,9 +35,11 @@ public class PreLoginRawFilter extends ChannelInboundHandlerAdapter {
 
             totalReadBytes += readable;
 
-            if (totalReadBytes > PRE_LOGIN_MAX_BYTES) {
+            if (totalReadBytes > preLoginMaxBytes) {
                 String ip = address.getHostAddress();
-                plugin.getLogger().warning("§c[LightGuard] Pre-Login Flooder Blocked: " + ip + " (Sent >128KB raw data)");
+
+                int limitInKB = preLoginMaxBytes / 1024;
+                plugin.getLogger().warning("§c[LightGuard] Pre-Login Flooder Blocked: " + ip + " (Sent >" + limitInKB + "KB raw data)");
 
                 buf.release();
                 ctx.close();

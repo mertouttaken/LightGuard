@@ -31,7 +31,6 @@ public class PacketLoggerConfig {
         this.packetList = new HashSet<>(config.getStringList("packet-logger.packets"));
     }
 
-    // Getters... (Set<String> dönecek şekilde güncellendi)
     public boolean isEnabled() { return enabled; }
     public long getHeavyPacketThreshold() { return heavyPacketThreshold; }
     public OutputMode getOutputMode() { return outputMode; }

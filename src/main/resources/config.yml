@@ -60,9 +60,12 @@ checks:
   # Intercepts raw network bytes BEFORE they are processed by the server (Netty level).
   raw-packet:
     enabled: true
-    # Maximum raw packet size (in Bytes). 
-    # Anything larger is instantly dropped, mitigating massive protocol-level injections.
+    # Maximum raw packet size (in Bytes) for authenticated players.
+    # 40960 Bytes = 40 KB
     max-raw-size: 40960
+    # Maximum raw byte accumulation for unauthenticated connections (Pre-Login).
+    # 131072 Bytes = 128 KB
+    pre-login-max-size: 131072
 
   # Limits the dimensions of individual packet fields to prevent memory allocation attacks.
   packet-size:

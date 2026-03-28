@@ -66,7 +66,7 @@ public class Dispatcher {
 
     public boolean dispatch(Object packet, ProtocolPlayer player) {
         long startTime = System.nanoTime();
-        boolean blocked = true; // Varsayılan olarak bloklandı kabul edip sonunda düzelteceğiz
+        boolean blocked = true;
 
         try {
             String packetName = packet.getClass().getSimpleName();
