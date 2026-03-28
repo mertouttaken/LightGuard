@@ -108,9 +108,22 @@ public class PositionCheck extends Check {
                     return false;
                 }
 
-                double distSq = (diffX * diffX) + (diffY * diffY) + (diffZ * diffZ);
-                if (distSq > 100.0) {
-                    plugin.getActionQueue().pushKick(player.getPlayer(), "Excessive Movement (Blink)");
+                double horizontalDistSq = (diffX * diffX) + (diffZ * diffZ);
+                double verticalDist = Math.abs(diffY);
+
+                if (horizontalDistSq > 625.0) {
+                    plugin.getActionQueue().pushKick(player.getPlayer(), "Excessive Horizontal Movement");
+                    return false;
+                }
+
+                if (verticalDist > 50.0) {
+                    plugin.getActionQueue().pushKick(player.getPlayer(), "Excessive Vertical Movement");
+                    return false;
+                }
+
+                double totalDistSq = horizontalDistSq + (diffY * diffY);
+                if (totalDistSq > 2500.0) {
+                    plugin.getActionQueue().pushKick(player.getPlayer(), "Instant Teleport Exploit");
                     return false;
                 }
             }

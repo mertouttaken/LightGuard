@@ -17,7 +17,9 @@ public class NoComCheck extends Check {
         try {
             POS_FIELD = MethodHandles.privateLookupIn(PacketPlayInBlockDig.class, MethodHandles.lookup())
                     .findVarHandle(PacketPlayInBlockDig.class, "a", BlockPosition.class);
-        } catch (Exception e) { throw new ExceptionInInitializerError(e); }
+        } catch (Exception e) {
+            throw new ExceptionInInitializerError(e);
+        }
     }
 
     public NoComCheck(LightGuard plugin) {
@@ -29,6 +31,10 @@ public class NoComCheck extends Check {
         if (!(packet instanceof PacketPlayInBlockDig)) return true;
 
         try {
+            if (player.isInTeleportGrace()) {
+                return true;
+            }
+
             BlockPosition pos = (BlockPosition) POS_FIELD.get(packet);
             if (pos == null) return true;
 
@@ -36,16 +42,22 @@ public class NoComCheck extends Check {
             double pY = player.getLastY();
             double pZ = player.getLastZ();
 
-            if (pX != -1) {
-                double distSq = Math.pow(pX - pos.getX(), 2) + Math.pow(pY - pos.getY(), 2) + Math.pow(pZ - pos.getZ(), 2);
+            if (pX == -1) return true;
 
-                if (distSq > 2500.0) {
-                    plugin.getActionQueue().pushKick(player.getPlayer(), "NoCom Exploit (Out of Range Block Interaction)");
-                    return false;
-                }
+            double dx = pX - pos.getX();
+            double dy = pY - pos.getY();
+            double dz = pZ - pos.getZ();
+            double distSq = (dx * dx) + (dy * dy) + (dz * dz);
+
+            System.out.println(distSq + " aa");
+
+            if (distSq > 10000.0) {
+                plugin.getActionQueue().pushKick(player.getPlayer(), "Illegal Interaction Distance (NoCom)");
+                return false;
             }
+
         } catch (Exception e) {
-            return false;
+            return true;
         }
 
         return true;

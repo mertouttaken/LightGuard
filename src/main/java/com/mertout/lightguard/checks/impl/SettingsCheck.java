@@ -5,55 +5,82 @@ import com.mertout.lightguard.checks.Check;
 import com.mertout.lightguard.data.ProtocolPlayer;
 import net.minecraft.server.v1_16_R3.PacketPlayInSettings;
 
-import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
+import java.lang.invoke.VarHandle;
 import java.lang.reflect.Field;
+import java.util.Arrays;
 
 public class SettingsCheck extends Check {
 
-    private static final MethodHandle LOCALE_GETTER;
-    private static final MethodHandle VIEW_DISTANCE_GETTER;
+    private static final VarHandle LOCALE_HANDLE;
+    private static final VarHandle VIEW_DIST_HANDLE;
 
     static {
+        VarHandle locale = null;
+        VarHandle viewDist = null;
         try {
-            MethodHandles.Lookup lookup = MethodHandles.lookup();
-            Field fLocale = PacketPlayInSettings.class.getDeclaredField("a");
-            fLocale.setAccessible(true);
-            LOCALE_GETTER = lookup.unreflectGetter(fLocale);
+            // 🛡️ CİLA: Alanları isimle değil, TİPİNE göre buluyoruz (Mapping bağımsız)
+            Field localeField = Arrays.stream(PacketPlayInSettings.class.getDeclaredFields())
+                    .filter(f -> f.getType() == String.class)
+                    .findFirst()
+                    .orElse(null);
 
-            Field fViewDistance = PacketPlayInSettings.class.getDeclaredField("b");
-            fViewDistance.setAccessible(true);
-            VIEW_DISTANCE_GETTER = lookup.unreflectGetter(fViewDistance);
+            Field viewDistField = Arrays.stream(PacketPlayInSettings.class.getDeclaredFields())
+                    .filter(f -> f.getType() == int.class)
+                    .findFirst()
+                    .orElse(null);
+
+            if (localeField != null) {
+                localeField.setAccessible(true);
+                locale = MethodHandles.lookup().unreflectVarHandle(localeField);
+            }
+
+            if (viewDistField != null) {
+                viewDistField.setAccessible(true);
+                viewDist = MethodHandles.lookup().unreflectVarHandle(viewDistField);
+            }
         } catch (Exception e) {
-            throw new ExceptionInInitializerError(e);
+            e.printStackTrace();
         }
+        LOCALE_HANDLE = locale;
+        VIEW_DIST_HANDLE = viewDist;
     }
+
+    private final int maxLength;
 
     public SettingsCheck(LightGuard plugin) {
         super(plugin);
+        this.maxLength = plugin.getConfig().getInt("checks.client-settings.max-length", 16);
     }
 
     @Override
     public boolean check(Object packet, ProtocolPlayer player) {
         if (!(packet instanceof PacketPlayInSettings)) return true;
 
+        if (LOCALE_HANDLE == null) return true; // Fail-safe
+
         try {
-            String locale = (String) LOCALE_GETTER.invoke(packet);
-            int viewDistance = (int) VIEW_DISTANCE_GETTER.invoke(packet);
+            // Dil ayarı (Locale) kontrolü
+            String locale = (String) LOCALE_HANDLE.get(packet);
 
-            if (locale != null && locale.length() > 32) {
-                plugin.getActionQueue().pushKick(player.getPlayer(), "Oversized Locale String");
+            if (locale == null || locale.length() > maxLength) {
+                plugin.getActionQueue().pushKick(player.getPlayer(), "Invalid Language Locale");
                 return false;
             }
 
-            if (viewDistance < 0 || viewDistance > 128) {
-                plugin.getActionQueue().pushKick(player.getPlayer(), "Invalid View Distance Exploit");
-                return false;
+            // Görüş mesafesi (View Distance) kontrolü
+            if (VIEW_DIST_HANDLE != null) {
+                int viewDistance = (int) VIEW_DIST_HANDLE.get(packet);
+                // 1.16.5'te view distance 0 ile 32 arasında olmalıdır.
+                if (viewDistance < 0 || viewDistance > 32) {
+                    return false; // Lag makinesi engelleme
+                }
             }
 
-        } catch (Throwable t) {
+        } catch (Exception e) {
             return false;
         }
+
         return true;
     }
 }

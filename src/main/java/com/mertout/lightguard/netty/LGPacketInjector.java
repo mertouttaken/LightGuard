@@ -5,10 +5,7 @@ import com.mertout.lightguard.data.ProtocolPlayer;
 import com.mertout.lightguard.netty.nbt.NBTStreamingScanner;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufHolder;
-import io.netty.channel.Channel;
-import io.netty.channel.ChannelDuplexHandler;
-import io.netty.channel.ChannelHandlerContext;
-import io.netty.channel.ChannelInboundHandlerAdapter;
+import io.netty.channel.*;
 import org.bukkit.craftbukkit.v1_16_R3.entity.CraftPlayer;
 import org.bukkit.entity.Player;
 
@@ -44,44 +41,34 @@ public class LGPacketInjector {
                         try {
                             int packetId = readVarInt(buf);
 
-                            // 0x28 -> Creative Slot
-                            if (packetId == 0x28) {
-                                buf.skipBytes(2); // Slot
-                                if (buf.readBoolean()) { // Present
-                                    readVarInt(buf); // Item ID
-                                    buf.readByte(); // Count
-                                    // TagID 10 = NBT Compound
-                                    if (buf.isReadable() && buf.getByte(buf.readerIndex()) == 10) {
-                                        if (!NBTStreamingScanner.scan(buf)) {
-                                            plugin.getLogger().warning("§c[LightGuard] NBT Bomb Blocked (Creative) from " + player.getName());
-                                            releaseMessage(msg);
-                                            ctx.close();
-                                            return;
-                                        }
-                                    }
-                                }
-                            }
-                            // 0x0B -> Custom Payload
-                            else if (packetId == 0x0B) {
-                                int channelLen = readVarInt(buf);
-                                if (channelLen > 0 && channelLen <= 128 && buf.readableBytes() >= channelLen) {
-                                    byte[] channelBytes = new byte[channelLen];
-                                    buf.readBytes(channelBytes);
-                                    String channelName = new String(channelBytes, StandardCharsets.UTF_8);
-
-                                    if (channelName.contains("book") || channelName.contains("bedit") || channelName.contains("bsign")) {
+                            // 0x28: Creative Slot | 0x0B: Custom Payload
+                            if (packetId == 0x28 || packetId == 0x0B) {
+                                if (packetId == 0x28) {
+                                    buf.skipBytes(2); // Slot skip
+                                    if (buf.readBoolean()) { // Presence check
+                                        readVarInt(buf); // Item ID
+                                        buf.readByte(); // Count
                                         if (buf.isReadable() && buf.getByte(buf.readerIndex()) == 10) {
                                             if (!NBTStreamingScanner.scan(buf)) {
-                                                plugin.getLogger().warning("§c[LightGuard] Malicious Book Blocked from " + player.getName());
-                                                releaseMessage(msg);
-                                                ctx.close();
-                                                return;
+                                                plugin.getLogger().warning("§c[LightGuard] NBT Bomb Blocked from " + player.getName());
+                                                releaseMessage(msg); ctx.close(); return;
+                                            }
+                                        }
+                                    }
+                                } else { // 0x0B
+                                    int channelLen = readVarInt(buf);
+                                    if (channelLen > 0 && channelLen <= 128 && buf.readableBytes() >= channelLen) {
+                                        buf.skipBytes(channelLen);
+                                        if (buf.isReadable() && buf.getByte(buf.readerIndex()) == 10) {
+                                            if (!NBTStreamingScanner.scan(buf)) {
+                                                plugin.getLogger().warning("§c[LightGuard] Malicious Payload NBT from " + player.getName());
+                                                releaseMessage(msg); ctx.close(); return;
                                             }
                                         }
                                     }
                                 }
                             }
-                        } catch (Exception ignored) {
+                        } catch (Exception e) {
                             releaseMessage(msg);
                             ctx.close();
                             return;
@@ -98,10 +85,10 @@ public class LGPacketInjector {
             channel.pipeline().addBefore("packet_handler", "lg_check", new ChannelDuplexHandler() {
                 @Override
                 public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
-
                     double weight = getPacketWeight(msg);
+
                     if (protocolPlayer.getRateLimiter().addAndCheck(weight)) {
-                        plugin.getLogger().warning("§c[LightGuard] Rate Limit Exceeded: " + player.getName());
+                        plugin.getLogger().warning("§c[LightGuard] Rate Limit: " + player.getName());
                         releaseMessage(msg);
                         ctx.close();
                         return;
@@ -129,29 +116,28 @@ public class LGPacketInjector {
         } catch (Exception ignored) { }
     }
 
-    /**
-     * 💧 CİLA: Bellek Sızıntısı Koruması (Zero-Leak)
-     * Paketi düşürdüğümüzde içindeki ByteBuf verisini Netty'ye iade eder.
-     */
     private void releaseMessage(Object msg) {
-        if (msg instanceof ByteBuf) {
-            ByteBuf b = (ByteBuf) msg;
-            if (b.refCnt() > 0) b.release();
-        } else if (msg instanceof ByteBufHolder) {
-            ((ByteBufHolder) msg).content().release();
-        } else if (msg instanceof net.minecraft.server.v1_16_R3.PacketPlayInCustomPayload) {
-            net.minecraft.server.v1_16_R3.PacketPlayInCustomPayload p = (net.minecraft.server.v1_16_R3.PacketPlayInCustomPayload) msg;
-            if (p.data != null && p.data.refCnt() > 0) p.data.release();
-        }
+        try {
+            if (msg instanceof ByteBuf) {
+                ByteBuf b = (ByteBuf) msg;
+                if (b.refCnt() > 0) b.release();
+            } else if (msg instanceof ByteBufHolder) {
+                ByteBuf b = ((ByteBufHolder) msg).content();
+                if (b.refCnt() > 0) b.release();
+            } else if (msg instanceof net.minecraft.server.v1_16_R3.PacketPlayInCustomPayload) {
+                net.minecraft.server.v1_16_R3.PacketPlayInCustomPayload p = (net.minecraft.server.v1_16_R3.PacketPlayInCustomPayload) msg;
+                if (p.data != null && p.data.refCnt() > 0) p.data.release();
+            }
+        } catch (Exception ignored) {}
     }
 
     private int readVarInt(ByteBuf buf) {
         int numRead = 0, result = 0;
         byte read;
         do {
+            if (numRead >= 5) return -1;
             read = buf.readByte();
             result |= ((read & 0b01111111) << (7 * numRead++));
-            if (numRead > 5) throw new RuntimeException("VarInt too big");
         } while ((read & 0b10000000) != 0);
         return result;
     }
@@ -159,11 +145,11 @@ public class LGPacketInjector {
     private double getPacketWeight(Object packet) {
         String name = packet.getClass().getSimpleName();
         return switch (name) {
-            case "PacketPlayInWindowClick" -> 50.0;
+            case "PacketPlayInWindowClick" -> 40.0;
             case "PacketPlayInSetCreativeSlot" -> 80.0;
-            case "PacketPlayInCustomPayload" -> 40.0;
-            case "PacketPlayInUseItem" -> 30.0;
-            case "PacketPlayInBlockDig" -> 20.0;
+            case "PacketPlayInCustomPayload" -> 50.0;
+            case "PacketPlayInUpdateSign" -> 60.0;
+            case "PacketPlayInUseItem", "PacketPlayInBlockPlace" -> 25.0;
             case "PacketPlayInFlying", "PacketPlayInPosition", "PacketPlayInPositionLook", "PacketPlayInLook" -> 1.0;
             default -> 5.0;
         };

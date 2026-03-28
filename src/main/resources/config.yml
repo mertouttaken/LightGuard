@@ -6,7 +6,7 @@ settings:
     - "&c&lLIGHTGUARD SECURITY"
     - ""
     - "&fUser: &7%player%"
-    - "&fDetection: &c%check% &7(&e%packet%&7)"
+    - "&fDetection: &c%check%"
     - "&fPing: &e%ping%ms"
     - ""
     - "&4&l⛔ ACTION BLOCKED ⛔"
