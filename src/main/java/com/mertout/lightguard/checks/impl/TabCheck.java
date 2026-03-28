@@ -1,13 +1,13 @@
 package com.mertout.lightguard.checks.impl;
 
+import com.mertout.lightguard.LightGuard;
 import com.mertout.lightguard.checks.Check;
-import com.mertout.lightguard.data.PlayerData;
+import com.mertout.lightguard.data.ProtocolPlayer;
 import net.minecraft.server.v1_16_R3.PacketPlayInTabComplete;
+
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.VarHandle;
 import java.util.List;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 
 public class TabCheck extends Check {
@@ -21,80 +21,45 @@ public class TabCheck extends Check {
     }
 
     private final int maxLength;
-    private final List<String> blockedChars;
     private final List<String> blockedSubstrings;
-    private final List<String> blacklistedCmds;
 
-    private final AtomicLong lastTabTime = new AtomicLong(0);
-    private final AtomicInteger tabBurst = new AtomicInteger(0);
-
-    public TabCheck(PlayerData data) {
-        super(data, "Tab", "tab");
+    public TabCheck(LightGuard plugin) {
+        super(plugin);
         this.maxLength = plugin.getConfig().getInt("checks.tab.max-length", 256);
-        this.blockedChars = plugin.getConfig().getStringList("checks.tab.block-chars");
-
         this.blockedSubstrings = plugin.getConfig().getStringList("checks.tab.block-contains")
-                .stream().map(String::toLowerCase).collect(Collectors.toList());
-
-        this.blacklistedCmds = plugin.getConfig().getStringList("checks.tab.blacklisted-commands")
                 .stream().map(String::toLowerCase).collect(Collectors.toList());
     }
 
     @Override
-    public boolean check(Object packet) {
-        if (!isEnabled()) return true;
+    public boolean check(Object packet, ProtocolPlayer player) {
+        if (!(packet instanceof PacketPlayInTabComplete)) return true;
 
-        if (packet instanceof PacketPlayInTabComplete) {
-
-            long now = System.currentTimeMillis();
-            long last = lastTabTime.get();
-
-            if (now - last > 1000) {
-                tabBurst.set(0);
-                lastTabTime.set(now);
-            }
-
-            if (tabBurst.incrementAndGet() > 4) {
-                return false;
-            }
-
-            String buffer = (String) BUFFER_FIELD.get(packet);
-
-            if (buffer == null) return true;
-
-            if (buffer.length() > maxLength) {
-                flag("Oversized Tab Request (" + buffer.length() + ")", "PacketPlayInTabComplete");
-                return false;
-            }
-
-            for (String s : blockedChars) {
-                if (buffer.contains(s)) {
-                    flag("Illegal Character in Tab", "PacketPlayInTabComplete");
-                    return false;
-                }
-            }
-
-            String lowerBuffer = buffer.toLowerCase();
-
-            if (lowerBuffer.startsWith("//calc") || lowerBuffer.startsWith("//eval") ||
-                    lowerBuffer.startsWith("//solve") || lowerBuffer.startsWith("//math")) {
-                flag("WorldEdit Math Exploit Attempt", packet.getClass().getSimpleName());
-                return false;
-            }
-
-            for (String s : blockedSubstrings) {
-                if (lowerBuffer.contains(s)) {
-                    flag("Malicious Syntax in Tab (" + s + ")", "PacketPlayInTabComplete");
-                    return false;
-                }
-            }
-
-            for (String cmd : blacklistedCmds) {
-                if (lowerBuffer.startsWith(cmd)) {
-                    return false;
-                }
-            }
+        // 🛡️ DÜZELTME: Sayaçlar artık ProtocolPlayer içinde (Veri Kanaması Bitti)
+        if (player.incrementAndGetTabCount(System.currentTimeMillis()) > 4) {
+            return false; // Tab spamını sessizce yut
         }
+
+        String buffer = (String) BUFFER_FIELD.get(packet);
+        if (buffer == null) return true;
+
+        if (buffer.length() > maxLength) {
+            plugin.getActionQueue().pushKick(player.getPlayer(), "Oversized Tab Request");
+            return false;
+        }
+
+        String lowerBuffer = buffer.toLowerCase();
+
+        // WorldEdit / FAWE Math Exploit Koruması
+        if (lowerBuffer.startsWith("//calc") || lowerBuffer.startsWith("//eval") ||
+                lowerBuffer.startsWith("//solve") || lowerBuffer.startsWith("//math")) {
+            plugin.getActionQueue().pushKick(player.getPlayer(), "WorldEdit Math Exploit Attempt");
+            return false;
+        }
+
+        for (String s : blockedSubstrings) {
+            if (lowerBuffer.contains(s)) return false;
+        }
+
         return true;
     }
 }

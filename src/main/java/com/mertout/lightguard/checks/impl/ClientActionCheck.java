@@ -1,7 +1,8 @@
 package com.mertout.lightguard.checks.impl;
 
+import com.mertout.lightguard.LightGuard;
 import com.mertout.lightguard.checks.Check;
-import com.mertout.lightguard.data.PlayerData;
+import com.mertout.lightguard.data.ProtocolPlayer;
 import net.minecraft.server.v1_16_R3.PacketPlayInClientCommand;
 
 import java.lang.invoke.MethodHandles;
@@ -18,40 +19,29 @@ public class ClientActionCheck extends Check {
         } catch (Exception e) { throw new ExceptionInInitializerError(e); }
     }
 
-    private long lastRespawnTime = 0;
-    private int respawnCount = 0;
-
-    public ClientActionCheck(PlayerData data) {
-        super(data, "ClientAction", "bad-packets");
+    public ClientActionCheck(LightGuard plugin) {
+        super(plugin);
     }
 
     @Override
-    public boolean check(Object packet) {
-        if (!isEnabled()) return true;
+    public boolean check(Object packet, ProtocolPlayer player) {
+        if (!(packet instanceof PacketPlayInClientCommand)) return true;
 
-        if (packet instanceof PacketPlayInClientCommand) {
-            try {
-                PacketPlayInClientCommand.EnumClientCommand action = (PacketPlayInClientCommand.EnumClientCommand) ACTION_FIELD.get(packet);
+        try {
+            PacketPlayInClientCommand.EnumClientCommand action = (PacketPlayInClientCommand.EnumClientCommand) ACTION_FIELD.get(packet);
 
-                if (action == PacketPlayInClientCommand.EnumClientCommand.PERFORM_RESPAWN) {
-                    long now = System.currentTimeMillis();
+            if (action == PacketPlayInClientCommand.EnumClientCommand.PERFORM_RESPAWN) {
+                long now = System.currentTimeMillis();
 
-                    if (now - lastRespawnTime > 1000) {
-                        respawnCount = 0;
-                        lastRespawnTime = now;
-                    }
-
-                    respawnCount++;
-
-                    if (respawnCount > 4) {
-                        flag("Respawn Packet Spam (" + respawnCount + "/s)", "PacketPlayInClientCommand");
-                        return false;
-                    }
+                if (player.incrementAndGetRespawnCount(now) > 4) {
+                    plugin.getActionQueue().pushKick(player.getPlayer(), "Respawn Packet Spam");
+                    return false;
                 }
-            } catch (Exception e) {
-                return false;
             }
+        } catch (Exception e) {
+            return false;
         }
+
         return true;
     }
 }

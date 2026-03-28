@@ -4,7 +4,6 @@ import com.mertout.lightguard.LightGuard;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.stream.Collectors;
 
 public class MetricsCollector {
     private final LightGuard plugin;

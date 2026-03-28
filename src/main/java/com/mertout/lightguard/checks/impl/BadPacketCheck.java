@@ -1,9 +1,11 @@
 package com.mertout.lightguard.checks.impl;
 
+import com.mertout.lightguard.LightGuard;
 import com.mertout.lightguard.checks.Check;
-import com.mertout.lightguard.data.PlayerData;
+import com.mertout.lightguard.data.ProtocolPlayer;
 import net.minecraft.server.v1_16_R3.PacketPlayInUseEntity;
 import net.minecraft.server.v1_16_R3.Vec3D;
+
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.VarHandle;
 
@@ -34,34 +36,33 @@ public class BadPacketCheck extends Check {
 
     private final boolean preventSelfInteract;
 
-    public BadPacketCheck(PlayerData data) {
-        super(data, "BadPacket", "bad-packets");
+    public BadPacketCheck(LightGuard plugin) {
+        super(plugin);
         this.preventSelfInteract = plugin.getConfig().getBoolean("checks.bad-packets.prevent-self-interact");
     }
 
     @Override
-    public boolean check(Object packet) {
-        if (!isEnabled()) return true;
+    public boolean check(Object packet, ProtocolPlayer player) {
+        if (!(packet instanceof PacketPlayInUseEntity)) return true;
 
-        if (packet instanceof PacketPlayInUseEntity) {
-            PacketPlayInUseEntity useEntity = (PacketPlayInUseEntity) packet;
-            int entityId = (int) ENTITY_ID.get(useEntity);
+        PacketPlayInUseEntity useEntity = (PacketPlayInUseEntity) packet;
+        int entityId = (int) ENTITY_ID.get(useEntity);
 
-            if (entityId == data.getPlayer().getEntityId() && preventSelfInteract) {
-                flag("Self Interaction", "PacketPlayInUseEntity");
+        // 🛡️ DÜZELTME: Bukkit API YASAK. entityId doğrudan ProtocolPlayer önbelleğinden okunur.
+        if (entityId == player.getEntityId() && preventSelfInteract) {
+            plugin.getActionQueue().pushKick(player.getPlayer(), "Self Interaction (Bad Packet)");
+            return false;
+        }
+
+        Vec3D target = (Vec3D) TARGET_VECTOR.get(useEntity);
+        if (target != null) {
+            if (!Double.isFinite(target.x) || !Double.isFinite(target.y) || !Double.isFinite(target.z)) {
+                plugin.getActionQueue().pushKick(player.getPlayer(), "Invalid Interaction Vector");
                 return false;
             }
-
-            Vec3D target = (Vec3D) TARGET_VECTOR.get(useEntity);
-            if (target != null) {
-                if (!Double.isFinite(target.x) || !Double.isFinite(target.y) || !Double.isFinite(target.z)) {
-                    flag("Invalid Interaction Vector", "PacketPlayInUseEntity");
-                    return false;
-                }
-                if (Math.abs(target.x) > 30 || Math.abs(target.y) > 30 || Math.abs(target.z) > 30) {
-                    flag("Interaction Vector Out of Range", "PacketPlayInUseEntity");
-                    return false;
-                }
+            if (Math.abs(target.x) > 30 || Math.abs(target.y) > 30 || Math.abs(target.z) > 30) {
+                plugin.getActionQueue().pushKick(player.getPlayer(), "Interaction Vector Out of Range");
+                return false;
             }
         }
         return true;

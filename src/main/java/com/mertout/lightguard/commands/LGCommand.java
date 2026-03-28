@@ -16,27 +16,24 @@ public class LGCommand implements CommandExecutor {
 
     @Override
     public boolean onCommand(CommandSender sender, Command cmd, String label, String[] args) {
-        // Permission Check
         if (!sender.hasPermission("lg.admin")) {
-            sender.sendMessage("§cYou do not have permission to use this command.");
+            sender.sendMessage("§cNo permission.");
             return true;
         }
 
-        // Show help if no arguments
         if (args.length == 0) {
             sendHelp(sender);
             return true;
         }
 
-        // Subcommands managed via switch
         switch (args[0].toLowerCase()) {
             case "reload":
                 plugin.getConfigManager().reload();
-                sender.sendMessage("§a[LightGuard] Configuration and caches have been reloaded.");
+                sender.sendMessage("§a[LightGuard] System reloaded successfully.");
                 break;
 
             case "tps":
-                sender.sendMessage("§a[LightGuard] §7Server TPS: §f" + String.format("%.2f", plugin.getTPS()));
+                sender.sendMessage("§a[LightGuard] §7Current TPS: §f" + String.format("%.2f", plugin.getTPS()));
                 break;
 
             case "profile":
@@ -44,43 +41,34 @@ public class LGCommand implements CommandExecutor {
                 break;
 
             case "benchmark":
-                if (args.length > 1 && args[1].equalsIgnoreCase("reset"))
-                {
+                if (args.length > 1 && args[1].equalsIgnoreCase("reset")) {
                     plugin.getPerformanceMonitor().reset();
-                    sender.sendMessage("§a[LightGuard] Benchmark data has been reset.");
-                }
-                else
-                {
-                    sender.sendMessage("§a[LightGuard] Printing benchmark statistics to console...");
+                    sender.sendMessage("§a[LightGuard] Performance data reset.");
+                } else {
                     plugin.getPerformanceMonitor().printStats();
+                    sender.sendMessage("§a[LightGuard] Stats printed to console.");
                 }
                 break;
 
             case "stats":
-                if (plugin.getMetrics() != null) {
-                    new LGStatsCommand(plugin).execute(sender, args);
-                } else {
-                    sender.sendMessage("§c[LightGuard] Statistics system is disabled.");
-                }
+                new LGStatsCommand(plugin).execute(sender, args);
                 break;
 
             default:
-                sender.sendMessage("§c[LightGuard] Unknown command.");
                 sendHelp(sender);
                 break;
         }
-
         return true;
     }
 
     private void sendHelp(CommandSender sender) {
         sender.sendMessage("");
-        sender.sendMessage("§8§m----------§r §cLightGuard Admin Help §8§m----------");
-        sender.sendMessage(" §4/lg reload §8- §cReloads the configuration.");
-        sender.sendMessage(" §4/lg stats <reset> §8- §cDisplays security statistics.");
-        sender.sendMessage(" §4/lg profile §8- §cToggles the live packet profiler.");
-        sender.sendMessage(" §4/lg tps §8- §cDisplays current server TPS.");
-        sender.sendMessage(" §4/lg benchmark <reset> §8- §cPrints performance tests to console.");
+        sender.sendMessage("§8§m----------§r §cLightGuard Command Center §8§m----------");
+        sender.sendMessage(" §4/lg reload §8» §fReload configurations");
+        sender.sendMessage(" §4/lg stats §8» §fShow security metrics");
+        sender.sendMessage(" §4/lg profile §8» §fLive packet monitoring");
+        sender.sendMessage(" §4/lg benchmark §8» §fPerformance debug (Console)");
+        sender.sendMessage(" §4/lg tps §8» §fInternal server heartbeat");
         sender.sendMessage("§8§m------------------------------------------");
     }
 }

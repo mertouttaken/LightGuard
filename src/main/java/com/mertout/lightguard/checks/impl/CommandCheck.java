@@ -1,7 +1,8 @@
 package com.mertout.lightguard.checks.impl;
 
+import com.mertout.lightguard.LightGuard;
 import com.mertout.lightguard.checks.Check;
-import com.mertout.lightguard.data.PlayerData;
+import com.mertout.lightguard.data.ProtocolPlayer;
 import net.minecraft.server.v1_16_R3.PacketPlayInChat;
 
 import java.lang.invoke.MethodHandles;
@@ -25,57 +26,56 @@ public class CommandCheck extends Check {
     private final boolean blockSyntax;
     private final List<String> blacklist;
 
-    public CommandCheck(PlayerData data) {
-        super(data, "Command", "command");
+    public CommandCheck(LightGuard plugin) {
+        super(plugin);
         this.blockSyntax = plugin.getConfig().getBoolean("checks.command.block-syntax");
         this.blacklist = plugin.getConfig().getStringList("checks.command.blacklist");
     }
 
     @Override
-    public boolean check(Object packet) {
-        if (!isEnabled()) return true;
+    public boolean check(Object packet, ProtocolPlayer player) {
+        if (!(packet instanceof PacketPlayInChat)) return true;
 
-        if (packet instanceof PacketPlayInChat) {
-            String msg = (String) MSG_FIELD.get(packet);
-            if (msg == null) return true;
+        String msg = (String) MSG_FIELD.get(packet);
+        if (msg == null) return true;
 
-            if (msg.length() > 256) {
-                flag("Oversized Chat Message", "Chat");
+        // 1. OOM / Allocation Koruması
+        if (msg.length() > 256) {
+            plugin.getActionQueue().pushKick(player.getPlayer(), "Oversized Chat Message");
+            return false;
+        }
+
+        if (msg.startsWith("/")) {
+            String rawCmd = msg.split(" ")[0].toLowerCase();
+
+            // 2. Unicode Normalizasyonu (Homoglyph Attack Koruması)
+            String normalizedCmd = Normalizer.normalize(rawCmd, Normalizer.Form.NFKC);
+            normalizedCmd = STRIP_PATTERN.matcher(normalizedCmd).replaceAll("");
+
+            String cleanCmd = normalizedCmd
+                    .replaceAll("^/+(minecraft|bukkit|spigot):", "/")
+                    .replaceAll("^//+", "/");
+
+            for (String b : blacklist) {
+                if (rawCmd.equalsIgnoreCase(b) || normalizedCmd.equalsIgnoreCase(b) || cleanCmd.equalsIgnoreCase(b)) {
+                    plugin.getActionQueue().pushKick(player.getPlayer(), "Blacklisted Command Executed");
+                    return false;
+                }
+            }
+
+            // 3. Log4Shell JNDI Exploit Koruması
+            if (containsLog4Shell(rawCmd) || containsLog4Shell(cleanCmd)) {
+                plugin.getActionQueue().pushKick(player.getPlayer(), "Invalid Command Syntax (Log4j)");
                 return false;
             }
 
-            if (msg.startsWith("/")) {
-                String rawCmd = msg.split(" ")[0].toLowerCase();
-
-                String normalizedCmd = Normalizer.normalize(rawCmd, Normalizer.Form.NFKC);
-                normalizedCmd = STRIP_PATTERN.matcher(normalizedCmd).replaceAll("");
-
-                String cleanCmd = normalizedCmd
-                        .replaceAll("^/+(minecraft|bukkit|spigot):", "/")
-                        .replaceAll("^//+", "/");
-
-                for (String b : blacklist) {
-                    if (rawCmd.equalsIgnoreCase(b) ||
-                            normalizedCmd.equalsIgnoreCase(b) ||
-                            cleanCmd.equalsIgnoreCase(b))
-                    {
-                        flag("Blacklisted Command", "Chat");
-                        return false;
-                    }
-                }
-
-                if(containsLog4Shell(rawCmd) || containsLog4Shell(cleanCmd))
-                {
-                    flag("Invalid Command Syntax (Log4j)", "Chat");
-                    return false;
-                }
-
-                if (blockSyntax && (msg.contains("::") || (msg.startsWith("//") && !msg.startsWith("//calc")))) {
-                    flag("Invalid Command Syntax", "Chat");
-                    return false;
-                }
+            // 4. WorldEdit (FAWE) Crash / Yetkisiz Syntax Koruması
+            if (blockSyntax && (msg.contains("::") || (msg.startsWith("//") && !msg.startsWith("//calc")))) {
+                plugin.getActionQueue().pushKick(player.getPlayer(), "Invalid Command Syntax");
+                return false;
             }
         }
+
         return true;
     }
 

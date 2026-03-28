@@ -1,10 +1,9 @@
 package com.mertout.lightguard.checks.impl;
 
+import com.mertout.lightguard.LightGuard;
 import com.mertout.lightguard.checks.Check;
-import com.mertout.lightguard.data.PlayerData;
+import com.mertout.lightguard.data.ProtocolPlayer;
 import net.minecraft.server.v1_16_R3.PacketPlayInItemName;
-import org.bukkit.entity.Player;
-import org.bukkit.event.inventory.InventoryType;
 
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.VarHandle;
@@ -22,74 +21,69 @@ public class AnvilCheck extends Check {
         }
     }
 
-    public AnvilCheck(PlayerData data) {
-        super(data, "Anvil", "anvil");
+    public AnvilCheck(LightGuard plugin) {
+        super(plugin);
     }
 
     @Override
-    public boolean check(Object packet) {
-        if (!isEnabled()) return true;
+    public boolean check(Object packet, ProtocolPlayer player) {
+        if (!(packet instanceof PacketPlayInItemName)) return true;
 
-        if (packet instanceof PacketPlayInItemName) {
-            try {
-                Player player = data.getPlayer();
-
-                if (player.getOpenInventory().getType() != InventoryType.ANVIL) {
-                    flag("Ghost Anvil Payload (Rename without Anvil GUI)", "PacketPlayInItemName");
-                    return false;
-                }
-
-                String newName = (String) NAME_FIELD.get(packet);
-                if (newName == null) return true;
-
-                if (newName.length() > 0 && newName.trim().isEmpty()) {
-                    flag("Blank Item Name Exploit", "PacketPlayInItemName");
-                    return false;
-                }
-
-                if (containsLog4Shell(newName)) {
-                    flag("Invalid Command Syntax (Log4j) in Anvil", "PacketPlayInItemName");
-                    return false;
-                }
-
-                int len = newName.length();
-                if (len > 60) {
-                    flag("Oversized Anvil Rename (" + len + ")", "PacketPlayInItemName");
-                    return false;
-                }
-
-                boolean hasColor = false;
-                boolean hasInvalid = false;
-
-                for (int i = 0; i < len; i++) {
-                    char c = newName.charAt(i);
-
-                    if (c == '§' || c == '&') {
-                        hasColor = true;
-                    }
-
-                    if (c < 0x20 && c != 0) {
-                        hasInvalid = true;
-                        break;
-                    }
-                }
-
-                if (hasInvalid) {
-                    flag("Invalid Characters in Anvil", "PacketPlayInItemName");
-                    return false;
-                }
-
-                if (hasColor) {
-                    if (!data.getPlayer().hasPermission("lg.admin")) {
-                        flag("Illegal Color Codes in Anvil", "PacketPlayInItemName");
-                        return false;
-                    }
-                }
-
-            } catch (Exception e) {
+        try {
+            // 🛡️ DÜZELTME: Bukkit (getOpenInventory) çağrısı YASAK! Netty Cache'e (ProtocolPlayer) soruyoruz.
+            if (!player.isAnvilOpen()) {
+                plugin.getActionQueue().pushKick(player.getPlayer(), "Ghost Anvil Payload (Desync)");
                 return false;
             }
+
+            String newName = (String) NAME_FIELD.get(packet);
+            if (newName == null) return true;
+
+            int len = newName.length();
+
+            // 1. OOM / Allocation Koruması
+            if (len > 60) {
+                plugin.getActionQueue().pushKick(player.getPlayer(), "Oversized Anvil Rename");
+                return false;
+            }
+
+            // 2. Boş İsim (Blank Exploit) Koruması
+            if (len > 0 && newName.trim().isEmpty()) {
+                plugin.getActionQueue().pushKick(player.getPlayer(), "Blank Item Name Exploit");
+                return false;
+            }
+
+            // 3. Log4Shell Koruması (Sadece <60 char olduğu için toLowerCase yapmak güvenli)
+            if (containsLog4Shell(newName)) {
+                plugin.getActionQueue().pushKick(player.getPlayer(), "Invalid Command Syntax (Log4j)");
+                return false;
+            }
+
+            boolean hasColor = false;
+
+            // 4. Allocation-Free Karakter Taraması (Crash/Unicode Koruması)
+            for (int i = 0; i < len; i++) {
+                char c = newName.charAt(i);
+
+                if (c == '§' || c == '&') {
+                    hasColor = true;
+                }
+
+                if (c < 0x20 && c != 0) {
+                    plugin.getActionQueue().pushKick(player.getPlayer(), "Invalid Characters in Anvil");
+                    return false;
+                }
+            }
+
+            // 5. Yetki Kontrolü: Bukkit (hasPermission) YASAK! Netty Cache'e sorulur.
+            if (hasColor && !player.isAdmin()) {
+                return false; // Yetkisi yoksa sadece paketi çöpe at, adamı kicklemeye gerek yok.
+            }
+
+        } catch (Exception e) {
+            return false; // Hata durumunda (Fail-safe) paketi yut.
         }
+
         return true;
     }
 

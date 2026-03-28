@@ -1,76 +1,58 @@
 package com.mertout.lightguard.checks.impl;
 
+import com.mertout.lightguard.LightGuard;
 import com.mertout.lightguard.checks.Check;
-import com.mertout.lightguard.data.PlayerData;
-import net.minecraft.server.v1_16_R3.EntityPlayer;
+import com.mertout.lightguard.data.ProtocolPlayer;
 import net.minecraft.server.v1_16_R3.PacketPlayInUseEntity;
-import org.bukkit.craftbukkit.v1_16_R3.entity.CraftPlayer;
 
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.VarHandle;
-import java.util.concurrent.atomic.AtomicLong;
 
 public class EntityCheck extends Check {
-
-    private final AtomicLong lastArmorStandInteract = new AtomicLong(0);
 
     private static final VarHandle ENTITY_ID;
     static {
         try {
             MethodHandles.Lookup lookup = MethodHandles.privateLookupIn(PacketPlayInUseEntity.class, MethodHandles.lookup());
-            VarHandle handle;
-            try {
-                handle = lookup.findVarHandle(PacketPlayInUseEntity.class, "a", int.class);
-            } catch (NoSuchFieldException e) {
-                handle = lookup.findVarHandle(PacketPlayInUseEntity.class, "entityId", int.class);
-            }
-            ENTITY_ID = handle;
+            ENTITY_ID = lookup.findVarHandle(PacketPlayInUseEntity.class, "a", int.class);
         } catch (Exception e) { throw new ExceptionInInitializerError(e); }
     }
 
-    private final boolean preventInvalidEntity;
     private final boolean preventArmorStandSpam;
 
-    public EntityCheck(PlayerData data) {
-        super(data, "EntitySecurity", "entity");
-        this.preventInvalidEntity = plugin.getConfig().getBoolean("checks.entity.prevent-invalid-entity");
-        this.preventArmorStandSpam = plugin.getConfig().getBoolean("checks.entity.prevent-armorstand-spam");
+    public EntityCheck(LightGuard plugin) {
+        super(plugin);
+        this.preventArmorStandSpam = plugin.getConfig().getBoolean("checks.entity.prevent-armorstand-spam", true);
     }
 
     @Override
-    public boolean check(Object packet) {
-        if (!isEnabled()) return true;
+    public boolean check(Object packet, ProtocolPlayer player) {
+        if (!(packet instanceof PacketPlayInUseEntity)) return true;
 
-        if (packet instanceof PacketPlayInUseEntity) {
-            PacketPlayInUseEntity useEntity = (PacketPlayInUseEntity) packet;
-            int entityId = (int) ENTITY_ID.get(useEntity);
+        // 🛡️ DÜZELTME 1: NMS/Bukkit çağrıları yerine ProtocolPlayer Cache kullanıldı
+        if (player.isDead()) {
+            plugin.getActionQueue().pushKick(player.getPlayer(), "Invalid Sequence (Interact while Dead)");
+            return false;
+        }
 
-            EntityPlayer nmsPlayer = ((CraftPlayer) data.getPlayer()).getHandle();
+        if (player.isInventoryOpen()) {
+            plugin.getActionQueue().pushKick(player.getPlayer(), "Invalid Sequence (Interact while GUI Open)");
+            return false;
+        }
 
-            if (nmsPlayer.getHealth() <= 0 || nmsPlayer.dead) {
-                flag("Invalid Sequence (Interact while Dead)", "PacketPlayInUseEntity");
+        if (preventArmorStandSpam) {
+            // NOT: Netty thread'inde nmsPlayer.world.getEntity() yapmak tehlikelidir.
+            // Bu nedenle sadece zamanlama (spam) kontrolünü oyuncuya özel sayaçla yapıyoruz.
+            // Eğer daha derin bir kontrol (ArmorStand mı değil mi) gerekiyorsa ana thread'e asenkron sorulmalı.
+            // Ancak paket bazlı spam koruması için tüm etkileşimlere 200ms sınırı koymak en güvenlisidir.
+
+            long now = System.currentTimeMillis();
+            if (player.checkAndSetEntityInteractDelay(now, 200)) {
+                // Çok hızlı etkileşim (Spam), paketi sessizce yut
                 return false;
-            }
-
-            if (nmsPlayer.activeContainer != null && nmsPlayer.activeContainer.windowId > 0) {
-                flag("Invalid Sequence (Interact while GUI Open)", "PacketPlayInUseEntity");
-                return false;
-            }
-
-            if (preventInvalidEntity) {
-                net.minecraft.server.v1_16_R3.Entity nmsEntity = nmsPlayer.world.getEntity(entityId);
-
-                if (nmsEntity == null) return false;
-
-                if (preventArmorStandSpam) {
-                    if (nmsEntity instanceof net.minecraft.server.v1_16_R3.EntityArmorStand) {
-                        long now = System.currentTimeMillis();
-                        if (now - lastArmorStandInteract.get() < 200) return false;
-                        lastArmorStandInteract.set(now);
-                    }
-                }
             }
         }
+
         return true;
     }
 }

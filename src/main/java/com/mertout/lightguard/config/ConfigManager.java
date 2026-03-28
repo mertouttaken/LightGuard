@@ -1,7 +1,7 @@
 package com.mertout.lightguard.config;
 
 import com.mertout.lightguard.LightGuard;
-import com.mertout.lightguard.data.PlayerData;
+import com.mertout.lightguard.data.ProtocolPlayer;
 import com.mertout.lightguard.utils.NBTChecker;
 import net.minecraft.server.v1_16_R3.IRegistry;
 import net.minecraft.server.v1_16_R3.Items;
@@ -16,7 +16,9 @@ import java.util.Set;
 public class ConfigManager {
 
     private final LightGuard plugin;
-    private Set<Item> cachedIllegalBlocks = null;
+
+    private volatile Set<Item> cachedIllegalBlocks = null;
+
     public ConfigManager(LightGuard plugin) {
         this.plugin = plugin;
     }
@@ -51,23 +53,23 @@ public class ConfigManager {
         }
         return localBlocks;
     }
+
     public void reload() {
         plugin.reloadConfig();
         cachedIllegalBlocks = null;
 
         NBTChecker.reload();
 
-        for (PlayerData data : plugin.getPlayerDataManager().getAllData()) {
-            if (data.getCheckManager() != null) {
-                data.getCheckManager().reloadChecks();
-            }
+
+        if (plugin.getDispatcher() != null) {
+            plugin.reloadCheckDispatcher();
         }
 
         if (plugin.getPacketLoggerManager() != null) {
             plugin.getPacketLoggerManager().getConfig().reload(plugin);
         }
 
-        plugin.getLogger().info("Configuration and caches reloaded successfully.");
+        plugin.getLogger().info("§a[LightGuard] Configuration and caches reloaded successfully.");
     }
 
     public void save() {

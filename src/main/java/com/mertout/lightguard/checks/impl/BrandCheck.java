@@ -1,7 +1,8 @@
 package com.mertout.lightguard.checks.impl;
 
+import com.mertout.lightguard.LightGuard;
 import com.mertout.lightguard.checks.Check;
-import com.mertout.lightguard.data.PlayerData;
+import com.mertout.lightguard.data.ProtocolPlayer;
 import net.minecraft.server.v1_16_R3.PacketPlayInCustomPayload;
 import net.minecraft.server.v1_16_R3.PacketDataSerializer;
 import net.minecraft.server.v1_16_R3.MinecraftKey;
@@ -46,68 +47,69 @@ public class BrandCheck extends Check {
     private final int maxBrandLength;
     private final boolean blockInvalidChars;
 
-    public BrandCheck(PlayerData data) {
-        super(data, "BrandSecurity", "client-brand");
-
+    public BrandCheck(LightGuard plugin) {
+        super(plugin);
         this.maxBrandLength = plugin.getConfig().getInt("checks.client-brand.max-length", 30);
         this.blockInvalidChars = plugin.getConfig().getBoolean("checks.client-brand.block-invalid-chars", true);
     }
 
     @Override
-    public boolean check(Object packet) {
-        if (!isEnabled()) return true;
+    public boolean check(Object packet, ProtocolPlayer player) {
+        if (!(packet instanceof PacketPlayInCustomPayload)) return true;
 
-        if (packet instanceof PacketPlayInCustomPayload) {
-            try {
-                MinecraftKey key = (MinecraftKey) CHANNEL_GETTER.invoke(packet);
+        try {
+            MinecraftKey key = (MinecraftKey) CHANNEL_GETTER.invoke(packet);
 
-                if (key != null && (key.getKey().equals("brand") || key.toString().endsWith("brand"))) {
+            if (key != null && (key.getKey().equals("brand") || key.toString().endsWith("brand"))) {
 
-                    if (data.isBrandSent()) {
-                        flag("Invalid Brand Sequence (Resent Brand)", "BrandCheck");
-                        return false;
-                    }
-
-                    PacketDataSerializer serializer = (PacketDataSerializer) DATA_GETTER.invoke(packet);
-                    if (serializer == null || serializer.readableBytes() < 1) return true;
-
-                    String brand = "";
-                    serializer.markReaderIndex();
-                    try {
-                        int len = readVarInt(serializer);
-                        if (len > 0 && len < 32767 && serializer.readableBytes() >= len) {
-                            byte[] bytes = new byte[len];
-                            serializer.readBytes(bytes);
-                            brand = new String(bytes, StandardCharsets.UTF_8);
-                        }
-                    } catch (Exception e) {
-                        flag("Malformed Brand Packet Structure", "BrandCheck");
-                        return false;
-                    } finally {
-                        serializer.resetReaderIndex();
-                    }
-
-                    if (brand == null || brand.trim().isEmpty()) {
-                        flag("Empty or Null Client Brand", "BrandCheck");
-                        return false;
-                    }
-
-                    if (brand.length() > maxBrandLength) {
-                        flag("Oversized Client Brand (" + brand.length() + " > " + maxBrandLength + ")", "BrandCheck");
-                        return false;
-                    }
-
-                    if (blockInvalidChars && !brand.matches("^[\\x20-\\x7E]+$")) {
-                        flag("Illegal Characters in Brand", "BrandCheck");
-                        return false;
-                    }
-
-                    data.setBrandSent(true);
+                // 🛡️ DÜZELTME: Veri kanaması kapatıldı, durum ProtocolPlayer'dan O(1) hızında okunur.
+                if (player.isBrandSent()) {
+                    plugin.getActionQueue().pushKick(player.getPlayer(), "Invalid Brand Sequence (Resent Brand)");
+                    return false;
                 }
-            } catch (Throwable t) {
-                return false;
+
+                PacketDataSerializer serializer = (PacketDataSerializer) DATA_GETTER.invoke(packet);
+                if (serializer == null || serializer.readableBytes() < 1) return true;
+
+                String brand = "";
+                serializer.markReaderIndex();
+                try {
+                    int len = readVarInt(serializer);
+                    // OOM (Out Of Memory) Koruması
+                    if (len > 0 && len < 32767 && serializer.readableBytes() >= len) {
+                        byte[] bytes = new byte[len];
+                        serializer.readBytes(bytes);
+                        brand = new String(bytes, StandardCharsets.UTF_8);
+                    }
+                } catch (Exception e) {
+                    plugin.getActionQueue().pushKick(player.getPlayer(), "Malformed Brand Packet Structure");
+                    return false;
+                } finally {
+                    serializer.resetReaderIndex();
+                }
+
+                if (brand == null || brand.trim().isEmpty()) {
+                    plugin.getActionQueue().pushKick(player.getPlayer(), "Empty or Null Client Brand");
+                    return false;
+                }
+
+                if (brand.length() > maxBrandLength) {
+                    plugin.getActionQueue().pushKick(player.getPlayer(), "Oversized Client Brand");
+                    return false;
+                }
+
+                // Crash/Bypass Koruması
+                if (blockInvalidChars && !brand.matches("^[\\x20-\\x7E]+$")) {
+                    plugin.getActionQueue().pushKick(player.getPlayer(), "Illegal Characters in Brand");
+                    return false;
+                }
+
+                player.setBrandSent(true); // Artık bir daha brand atamaz
             }
+        } catch (Throwable t) {
+            return false;
         }
+
         return true;
     }
 

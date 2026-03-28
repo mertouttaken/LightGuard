@@ -1,27 +1,22 @@
 package com.mertout.lightguard.logger;
 
 import com.mertout.lightguard.LightGuard;
-import org.bukkit.Bukkit;
-
-import java.io.BufferedWriter;
-import java.io.File;
-import java.io.FileWriter;
-import java.io.IOException;
-import java.text.SimpleDateFormat;
-import java.util.Date;
+import java.io.*;
+import java.time.LocalTime;
+import java.time.format.DateTimeFormatter;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 
 public class PacketLogWriter {
 
-    private final LightGuard plugin;
     private final File logFile;
     private final BlockingQueue<String> logQueue = new LinkedBlockingQueue<>(10000);
     private volatile boolean running = true;
 
+    private static final DateTimeFormatter TIME_FORMAT = DateTimeFormatter.ofPattern("HH:mm:ss");
+
     public PacketLogWriter(LightGuard plugin) {
-        this.plugin = plugin;
         this.logFile = new File(plugin.getDataFolder(), "packet_logs.txt");
         startWriterThread();
     }
@@ -29,38 +24,26 @@ public class PacketLogWriter {
     private void startWriterThread() {
         Thread writerThread = new Thread(() -> {
             try (BufferedWriter writer = new BufferedWriter(new FileWriter(logFile, true))) {
-                int writeCount = 0;
-
-                while (running && !Thread.currentThread().isInterrupted()) {
+                while (running || !logQueue.isEmpty()) {
                     try {
-                        String log = logQueue.poll(5, TimeUnit.SECONDS);
+                        String log = logQueue.poll(2, TimeUnit.SECONDS);
                         if (log != null) {
                             writer.write(log);
                             writer.newLine();
-                            writeCount++;
-
-                            if (writeCount >= 50) {
-                                writer.flush();
-                                writeCount = 0;
-                            }
-                        } else if (writeCount > 0) {
-                            writer.flush();
-                            writeCount = 0;
+                            if (logQueue.size() < 10) writer.flush();
                         }
                     } catch (InterruptedException e) {
                         Thread.currentThread().interrupt();
+                        break;
                     } catch (IOException e) {
                         e.printStackTrace();
                     }
-                }
-                if (writeCount > 0) {
-                    writer.flush();
                 }
             } catch (IOException e) {
                 e.printStackTrace();
             }
         });
-        writerThread.setName("LightGuard-LogWriter");
+        writerThread.setName("LightGuard-Log-Writer");
         writerThread.setDaemon(true);
         writerThread.start();
     }
@@ -68,12 +51,9 @@ public class PacketLogWriter {
     public void log(String message) {
         if (!running) return;
 
-        String timeStamp = new SimpleDateFormat("HH:mm:ss").format(new Date());
-        String formattedMessage = "[" + timeStamp + "] " + message;
+        String formattedMessage = "[" + LocalTime.now().format(TIME_FORMAT) + "] " + message;
 
-        if (!logQueue.offer(formattedMessage)) {
-            System.out.println("LightGuard Log Queue Full! Dropping log...");
-        }
+        logQueue.offer(formattedMessage);
     }
 
     public void shutdown() {

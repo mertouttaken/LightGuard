@@ -1,10 +1,10 @@
 package com.mertout.lightguard.checks.impl;
 
+import com.mertout.lightguard.LightGuard;
 import com.mertout.lightguard.checks.Check;
-import com.mertout.lightguard.data.PlayerData;
-import net.minecraft.server.v1_16_R3.*;
-import org.bukkit.Bukkit;
-import org.bukkit.event.inventory.InventoryType;
+import com.mertout.lightguard.data.ProtocolPlayer;
+import net.minecraft.server.v1_16_R3.PacketPlayInWindowClick;
+
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.VarHandle;
 
@@ -20,30 +20,31 @@ public class GameStateCheck extends Check {
 
     private final boolean checkInvOpen;
 
-    public GameStateCheck(PlayerData data) {
-        super(data, "GameState", "game-state");
+    public GameStateCheck(LightGuard plugin) {
+        super(plugin);
         this.checkInvOpen = plugin.getConfig().getBoolean("checks.game-state.check-inventory-open");
     }
 
     @Override
-    public boolean check(Object packet) {
-        if (!isEnabled()) return true;
-        if (packet instanceof net.minecraft.server.v1_16_R3.PacketPlayInWindowClick) {
-            if (checkInvOpen) {
-                int windowId = (int) WINDOW_ID.get(packet);
+    public boolean check(Object packet, ProtocolPlayer player) {
+        if (!(packet instanceof PacketPlayInWindowClick)) return true;
 
-                org.bukkit.Bukkit.getScheduler().runTask(plugin, () -> {
-                    if (!data.getPlayer().isOnline()) return;
+        if (checkInvOpen) {
+            int windowId = (int) WINDOW_ID.get(packet);
 
-                    org.bukkit.event.inventory.InventoryType currentType = data.getPlayer().getOpenInventory().getType();
-                    if (windowId > 0 && currentType == org.bukkit.event.inventory.InventoryType.CRAFTING) {
+            // 🛡️ MÜKEMMEL DÜZELTME: Bukkit API / RunTask YASAK!
+            // Direkt Netty thread'indeki ProtocolPlayer cache'ine soruyoruz.
+            if (windowId > 0 && !player.isInventoryOpen()) {
 
-                        data.getPlayer().updateInventory();
-                        plugin.getLogger().warning("§c[LightGuard] " + data.getPlayer().getName() + " flagged GameState (Click in Closed Inventory)");
-                        plugin.getMetrics().recordViolation(data.getPlayer().getName(), "GameState");
-                        data.getPlayer().kickPlayer("§cInvalid Game State");
-                    }
-                });
+                // Menüsü açık değilken, menüye tıklama paketi gönderiyor! (Ghost Click / Desync Dupe Exploit)
+                plugin.getActionQueue().pushKick(player.getPlayer(), "Invalid Game State (Ghost Click)");
+                return false; // PAKETİ ANINDA NETTY HATTINDA YUT, SUNUCUYA ULAŞMASIN!
+            }
+
+            // Eğer açtığı sandığın WindowID'si ile tıkladığı ID uyuşmuyorsa
+            if (windowId > 0 && player.getOpenWindowId() != windowId) {
+                plugin.getActionQueue().pushKick(player.getPlayer(), "Window ID Mismatch (Spoof)");
+                return false;
             }
         }
         return true;

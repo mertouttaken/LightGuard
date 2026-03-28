@@ -1,27 +1,25 @@
 package com.mertout.lightguard.listeners;
 
 import com.mertout.lightguard.LightGuard;
-import com.mertout.lightguard.data.PlayerData;
-import org.bukkit.Bukkit;
-import org.bukkit.Material;
-import org.bukkit.World;
+import com.mertout.lightguard.data.ProtocolPlayer;
+import org.bukkit.*;
+import org.bukkit.block.Block;
 import org.bukkit.entity.*;
 import org.bukkit.entity.minecart.StorageMinecart;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
-import org.bukkit.event.block.BlockBreakEvent;
-import org.bukkit.event.block.BlockFromToEvent;
-import org.bukkit.event.block.BlockRedstoneEvent;
-import org.bukkit.event.block.BlockDispenseEvent;
+import org.bukkit.event.block.*;
 import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.event.entity.EntityDeathEvent;
+import org.bukkit.event.entity.PlayerDeathEvent;
+import org.bukkit.event.entity.ProjectileLaunchEvent;
 import org.bukkit.event.inventory.*;
 import org.bukkit.event.player.*;
 import org.bukkit.event.world.ChunkUnloadEvent;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.InventoryHolder;
-import org.bukkit.Location;
+import org.bukkit.inventory.ItemStack;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -49,22 +47,93 @@ public class MechanicListener implements Listener {
             long now = System.currentTimeMillis();
             dispenserCooldowns.entrySet().removeIf(entry -> now - entry.getValue() > 60000);
             cooldowns.entrySet().removeIf(entry -> now - entry.getValue() > 300000);
-        }, 6000L, 6000L);
+        }, 1200L, 1200L);
     }
 
     @EventHandler
     public void onPortal(PlayerPortalEvent e) { if (plugin.getConfig().getBoolean("mechanics.nether-portal-delay") && checkCooldown(e.getPlayer().getUniqueId(), 2000)) e.setCancelled(true);    }
+    @EventHandler(priority = EventPriority.LOWEST) // En düşük öncelik: Önce veri oluşsun
 
-    @EventHandler(priority = org.bukkit.event.EventPriority.LOW)
-    public void onLaunch(org.bukkit.event.entity.ProjectileLaunchEvent event) {
-        if (event.getEntity().getShooter() instanceof org.bukkit.entity.Player) {
-            org.bukkit.util.Vector velocity = event.getEntity().getVelocity();
-            double speed = velocity.length();
-            double maxSpeed = plugin.getConfig().getDouble("mechanics.max-arrow-velocity", 15.0);
+    public void onPlayerJoinFirst(PlayerJoinEvent event) {
+        plugin.getProtocolManager().add(event.getPlayer());
+        ProtocolPlayer pp = plugin.getProtocolManager().get(event.getPlayer().getUniqueId());
+        plugin.getPacketInjector().injectPlayer(event.getPlayer(), pp);
+    }
 
-            if (speed > maxSpeed || !Double.isFinite(speed)) {
+    @EventHandler(priority = EventPriority.MONITOR)
+    public void onPlayerQuit(PlayerQuitEvent event) {
+        plugin.getPacketInjector().removePlayer(event.getPlayer());
+        plugin.getProtocolManager().remove(event.getPlayer().getUniqueId());
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR)
+    public void onPlayerJoin(PlayerJoinEvent event) {
+        Player player = event.getPlayer();
+        ProtocolPlayer pp = plugin.getProtocolManager().get(player.getUniqueId());
+        if (pp != null) {
+            pp.setAdmin(player.isOp() || player.hasPermission("lightguard.admin"));
+            pp.setCreativeOrSpectator(player.getGameMode() == GameMode.CREATIVE || player.getGameMode() == GameMode.SPECTATOR);
+            pp.setAllowedFlight(player.getAllowFlight());
+            pp.setHoldingBook(isHoldingBook(player));
+            pp.setDead(player.isDead());
+        }
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    public void onGameModeChange(PlayerGameModeChangeEvent event) {
+        ProtocolPlayer pp = plugin.getProtocolManager().get(event.getPlayer().getUniqueId());
+        if (pp != null) {
+            pp.setCreativeOrSpectator(event.getNewGameMode() == GameMode.CREATIVE || event.getNewGameMode() == GameMode.SPECTATOR);
+        }
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    public void onToggleFlight(PlayerToggleFlightEvent event) {
+        ProtocolPlayer pp = plugin.getProtocolManager().get(event.getPlayer().getUniqueId());
+        if (pp != null) {
+            pp.setAllowedFlight(event.isFlying());
+        }
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR)
+    public void onInventoryClose(InventoryCloseEvent event) {
+        ProtocolPlayer pp = plugin.getProtocolManager().get(event.getPlayer().getUniqueId());
+        if (pp != null) {
+            pp.setInventoryState(false, 0);
+            pp.setAnvilOpen(false);
+        }
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR)
+    public void onDeath(PlayerDeathEvent event) {
+        ProtocolPlayer pp = plugin.getProtocolManager().get(event.getEntity().getUniqueId());
+        if (pp != null) pp.setDead(true);
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR)
+    public void onRespawn(PlayerRespawnEvent event) {
+        ProtocolPlayer pp = plugin.getProtocolManager().get(event.getPlayer().getUniqueId());
+        if (pp != null) {
+            pp.setDead(false);
+            pp.markTeleport(); // Respawn bir teleporttur, koruma sağla
+        }
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR)
+    public void onItemHeld(PlayerItemHeldEvent event) {
+        ProtocolPlayer pp = plugin.getProtocolManager().get(event.getPlayer().getUniqueId());
+        if (pp != null) {
+            ItemStack item = event.getPlayer().getInventory().getItem(event.getNewSlot());
+            pp.setHoldingBook(item != null && item.getType().name().contains("BOOK"));
+        }
+    }
+
+    @EventHandler(priority = EventPriority.LOW, ignoreCancelled = true)
+    public void onLaunch(ProjectileLaunchEvent event) {
+        if (event.getEntity().getShooter() instanceof Player) {
+            double speed = event.getEntity().getVelocity().length();
+            if (speed > plugin.getConfig().getDouble("mechanics.max-arrow-velocity", 15.0) || !Double.isFinite(speed)) {
                 event.setCancelled(true);
-                return;
             }
         }
     }
@@ -112,26 +181,13 @@ public class MechanicListener implements Listener {
         }
     }
 
-    @EventHandler
-    public void onTeleport(org.bukkit.event.player.PlayerTeleportEvent event) {
-        plugin.getPlayerDataManager().getData(event.getPlayer().getUniqueId()).setLastTeleportTime(System.currentTimeMillis());
-        if (plugin.getConfig().getBoolean("mechanics.close-inventory-on-teleport")) {
-            event.getPlayer().closeInventory();
-        }
-    }
     @EventHandler(priority = EventPriority.MONITOR)
-    public void onRespawn(PlayerRespawnEvent event) {
-        PlayerData data = plugin.getPlayerDataManager().getData(event.getPlayer().getUniqueId());
-        if (data != null) {
-            data.setLastTeleportTime(System.currentTimeMillis() + 2000L);
-        }
-    }
+    public void onTeleport(PlayerTeleportEvent event) {
+        ProtocolPlayer pp = plugin.getProtocolManager().get(event.getPlayer().getUniqueId());
+        if (pp != null) pp.markTeleport();
 
-    @EventHandler(priority = EventPriority.MONITOR)
-    public void onWorldChange(PlayerChangedWorldEvent event) {
-        PlayerData data = plugin.getPlayerDataManager().getData(event.getPlayer().getUniqueId());
-        if (data != null) {
-            data.setLastTeleportTime(System.currentTimeMillis() + 2000L);
+        if (plugin.getConfig().getBoolean("mechanics.close-inventory-on-teleport", true)) {
+            event.getPlayer().closeInventory();
         }
     }
 
@@ -252,31 +308,28 @@ public class MechanicListener implements Listener {
         }
     }
 
-    @EventHandler
+    @EventHandler(priority = EventPriority.LOWEST)
     public void onPreLogin(AsyncPlayerPreLoginEvent event) {
         String name = event.getName();
-        if (name.length() > 16) {
-            event.disallow(AsyncPlayerPreLoginEvent.Result.KICK_OTHER, "§cInvalid Username Length");
-            return;
-        }
-        if (!name.matches("[a-zA-Z0-9_]+")) {
-            event.disallow(AsyncPlayerPreLoginEvent.Result.KICK_OTHER, "§cInvalid Characters in Username");
+        if (name.length() > 16 || !name.matches("[a-zA-Z0-9_]+")) {
+            event.disallow(AsyncPlayerPreLoginEvent.Result.KICK_OTHER, "§cInvalid Username");
             return;
         }
         if (event.getAddress() == null) {
             event.disallow(AsyncPlayerPreLoginEvent.Result.KICK_OTHER, "§cNull IP Address");
-            return;
         }
     }
 
-    @EventHandler
-    public void onMove(org.bukkit.event.player.PlayerMoveEvent event) {
-        if (plugin.getConfig().getBoolean("mechanics.null-chunk")) {
-            int x = event.getTo().getBlockX() >> 4;
-            int z = event.getTo().getBlockZ() >> 4;
-            if (!event.getTo().getWorld().isChunkLoaded(x, z)) {
-                event.setCancelled(true);
-            }
+    @EventHandler(priority = EventPriority.LOWEST)
+    public void onMove(PlayerMoveEvent event) {
+        if (!plugin.getConfig().getBoolean("mechanics.null-chunk", true)) return;
+
+        Location to = event.getTo();
+        if (to == null) return;
+
+        // Asenkron Chunk Manager üzerinden kontrol (Ana thread'i yormaz)
+        if (!plugin.getWorldChunkManager().isChunkLoadedAsynchronously(to.getWorld().getName(), to.getBlockX() >> 4, to.getBlockZ() >> 4)) {
+            event.setCancelled(true);
         }
     }
 
@@ -360,6 +413,11 @@ public class MechanicListener implements Listener {
     }
     @EventHandler
     public void onInventoryOpen(InventoryOpenEvent event) {
+        ProtocolPlayer pp = plugin.getProtocolManager().get(event.getPlayer().getUniqueId());
+        if (pp != null) {
+            pp.setInventoryState(true, event.getInventory().hashCode());
+            if (event.getInventory().getType() == InventoryType.ANVIL) pp.setAnvilOpen(true);
+        }
         if (!plugin.getConfig().getBoolean("mechanics.prevent-mule-dupe")) return;
         if (!(event.getPlayer() instanceof Player)) return;
         if (event.getInventory().getHolder() instanceof ChestedHorse) {
@@ -374,28 +432,18 @@ public class MechanicListener implements Listener {
             }
         }
     }
-    @EventHandler(priority = org.bukkit.event.EventPriority.LOWEST, ignoreCancelled = true)
-    public void onPistonExtend(org.bukkit.event.block.BlockPistonExtendEvent event) {
-        if (!plugin.getConfig().getBoolean("mechanics.prevent-piston-crash")) return;
-        for (org.bukkit.block.Block block : event.getBlocks()) {
-            switch (block.getType()) {
-                case CHEST: case TRAPPED_CHEST: case SPAWNER: case FURNACE: case BLAST_FURNACE:
-                case DISPENSER: case DROPPER: case HOPPER: case BEACON: case ENDER_CHEST: case ENCHANTING_TABLE:
-                    event.setCancelled(true);
-                    return;
-            }
+    @EventHandler(priority = EventPriority.LOWEST, ignoreCancelled = true)
+    public void onPistonExtend(BlockPistonExtendEvent event) {
+        if (!plugin.getConfig().getBoolean("mechanics.prevent-piston-crash", true)) return;
+        for (Block block : event.getBlocks()) {
+            if (isTileEntity(block.getType())) { event.setCancelled(true); return; }
         }
     }
-    @EventHandler(priority = org.bukkit.event.EventPriority.LOWEST, ignoreCancelled = true)
-    public void onPistonRetract(org.bukkit.event.block.BlockPistonRetractEvent event) {
-        if (!plugin.getConfig().getBoolean("mechanics.prevent-piston-crash")) return;
-        for (org.bukkit.block.Block block : event.getBlocks()) {
-            switch (block.getType()) {
-                case CHEST: case TRAPPED_CHEST: case SPAWNER: case FURNACE: case BLAST_FURNACE:
-                case DISPENSER: case DROPPER: case HOPPER: case BEACON: case ENDER_CHEST: case ENCHANTING_TABLE:
-                    event.setCancelled(true);
-                    return;
-            }
+    @EventHandler(priority = EventPriority.LOWEST, ignoreCancelled = true)
+    public void onPistonRetract(BlockPistonRetractEvent event) {
+        if (!plugin.getConfig().getBoolean("mechanics.prevent-piston-crash", true)) return;
+        for (Block block : event.getBlocks()) {
+            if (isTileEntity(block.getType())) { event.setCancelled(true); return; }
         }
     }
     @EventHandler(priority = EventPriority.LOWEST, ignoreCancelled = true)
@@ -448,13 +496,6 @@ public class MechanicListener implements Listener {
             }
         }
     }
-    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
-    public void onGameModeChange(PlayerGameModeChangeEvent event) {
-        PlayerData data = plugin.getPlayerDataManager().getData(event.getPlayer().getUniqueId());
-        if (data != null) {
-            data.setGameMode(event.getNewGameMode());
-        }
-    }
     @EventHandler
     public void onQuit(PlayerQuitEvent event) {
         cooldowns.remove(event.getPlayer().getUniqueId());
@@ -477,6 +518,20 @@ public class MechanicListener implements Listener {
         }
     }
 
+    private boolean isHoldingBook(Player player) {
+        ItemStack main = player.getInventory().getItemInMainHand();
+        ItemStack off = player.getInventory().getItemInOffHand();
+        return (main != null && main.getType().name().contains("BOOK")) ||
+                (off != null && off.getType().name().contains("BOOK"));
+    }
+
+    private boolean isTileEntity(Material type) {
+        String n = type.name();
+        return n.contains("CHEST") || n.contains("FURNACE") || n.contains("DROPPER") ||
+                n.contains("DISPENSER") || n.contains("HOPPER") || type == Material.BEACON ||
+                type == Material.SPAWNER;
+    }
+
     private boolean checkCooldown(UUID uuid, long ms) {
         long now = System.currentTimeMillis();
         if (now - cooldowns.getOrDefault(uuid, 0L) < ms) return true;
@@ -488,9 +543,6 @@ public class MechanicListener implements Listener {
         long now = System.currentTimeMillis();
         if (now - dispenserCooldowns.getOrDefault(loc, 0L) < ms) return true;
         dispenserCooldowns.put(loc, now);
-        if (dispenserCooldowns.size() > 10000) {
-            dispenserCooldowns.clear();
-        }
         return false;
     }
 

@@ -1,10 +1,10 @@
 package com.mertout.lightguard.checks.impl;
 
+import com.mertout.lightguard.LightGuard;
 import com.mertout.lightguard.checks.Check;
-import com.mertout.lightguard.data.PlayerData;
+import com.mertout.lightguard.data.ProtocolPlayer;
 import net.minecraft.server.v1_16_R3.BlockPosition;
 import net.minecraft.server.v1_16_R3.PacketPlayInBlockDig;
-import org.bukkit.Location;
 
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.VarHandle;
@@ -20,33 +20,38 @@ public class NoComCheck extends Check {
         } catch (Exception e) { throw new ExceptionInInitializerError(e); }
     }
 
-    public NoComCheck(PlayerData data) {
-        super(data, "NoCom", "bad-packets");
+    public NoComCheck(LightGuard plugin) {
+        super(plugin);
     }
 
     @Override
-    public boolean check(Object packet) {
-        if (!isEnabled()) return true;
+    public boolean check(Object packet, ProtocolPlayer player) {
+        if (!(packet instanceof PacketPlayInBlockDig)) return true;
 
-        if (packet instanceof PacketPlayInBlockDig) {
-            try {
-                BlockPosition pos = (BlockPosition) POS_FIELD.get(packet);
-                if (pos == null) return true;
+        try {
+            BlockPosition pos = (BlockPosition) POS_FIELD.get(packet);
+            if (pos == null) return true;
 
-                Location pLoc = data.getPlayer().getLocation();
+            // 🛡️ DÜZELTME: Bukkit API YASAK! Oyuncunun rotasını Netty'deki PositionCheck kaydediyordu, biz de oradan okuyoruz!
+            double pX = player.getLastX();
+            double pY = player.getLastY();
+            double pZ = player.getLastZ();
 
-                double distSq = Math.pow(pLoc.getX() - pos.getX(), 2) +
-                        Math.pow(pLoc.getY() - pos.getY(), 2) +
-                        Math.pow(pLoc.getZ() - pos.getZ(), 2);
+            // Eğer adam daha önce hiç yürümediyse (-1 ise) geç
+            if (pX != -1) {
+                // Hızlı Mesafe Matematiği (Karekök almamak CPU'yu rahatlatır)
+                double distSq = Math.pow(pX - pos.getX(), 2) + Math.pow(pY - pos.getY(), 2) + Math.pow(pZ - pos.getZ(), 2);
 
+                // Normalde erişim mesafesi 6 blok (36.0 distSq). Tolerans payı ile 2500 limitinde tutmuşsun (NoCom için mantıklı).
                 if (distSq > 2500.0) {
-                    flag("NoCom Exploit (Out of Range Block Interaction)", "PacketPlayInBlockDig");
+                    plugin.getActionQueue().pushKick(player.getPlayer(), "NoCom Exploit (Out of Range Block Interaction)");
                     return false;
                 }
-            } catch (Exception e) {
-                return false;
             }
+        } catch (Exception e) {
+            return false;
         }
+
         return true;
     }
 }

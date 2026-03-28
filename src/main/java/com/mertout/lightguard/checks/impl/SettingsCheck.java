@@ -1,7 +1,8 @@
 package com.mertout.lightguard.checks.impl;
 
+import com.mertout.lightguard.LightGuard;
 import com.mertout.lightguard.checks.Check;
-import com.mertout.lightguard.data.PlayerData;
+import com.mertout.lightguard.data.ProtocolPlayer;
 import net.minecraft.server.v1_16_R3.PacketPlayInSettings;
 
 import java.lang.invoke.MethodHandle;
@@ -16,56 +17,44 @@ public class SettingsCheck extends Check {
     static {
         try {
             MethodHandles.Lookup lookup = MethodHandles.lookup();
-
-            Field fLocale;
-            try {
-                fLocale = PacketPlayInSettings.class.getDeclaredField("locale");
-            } catch (NoSuchFieldException e) {
-                fLocale = PacketPlayInSettings.class.getDeclaredField("a");
-            }
+            Field fLocale = PacketPlayInSettings.class.getDeclaredField("a"); // 1.16.5 'a' field
             fLocale.setAccessible(true);
             LOCALE_GETTER = lookup.unreflectGetter(fLocale);
 
-            Field fViewDistance;
-            try {
-                fViewDistance = PacketPlayInSettings.class.getDeclaredField("viewDistance");
-            } catch (NoSuchFieldException e) {
-                fViewDistance = PacketPlayInSettings.class.getDeclaredField("b");
-            }
+            Field fViewDistance = PacketPlayInSettings.class.getDeclaredField("b"); // 1.16.5 'b' field
             fViewDistance.setAccessible(true);
             VIEW_DISTANCE_GETTER = lookup.unreflectGetter(fViewDistance);
-
         } catch (Exception e) {
             throw new ExceptionInInitializerError(e);
         }
     }
 
-    public SettingsCheck(PlayerData data) {
-        super(data, "ClientSettings", "client-settings");
+    public SettingsCheck(LightGuard plugin) {
+        super(plugin);
     }
 
     @Override
-    public boolean check(Object packet) {
-        if (!isEnabled()) return true;
+    public boolean check(Object packet, ProtocolPlayer player) {
+        if (!(packet instanceof PacketPlayInSettings)) return true;
 
-        if (packet instanceof PacketPlayInSettings) {
-            try {
-                String locale = (String) LOCALE_GETTER.invoke(packet);
-                int viewDistance = (int) VIEW_DISTANCE_GETTER.invoke(packet);
+        try {
+            String locale = (String) LOCALE_GETTER.invoke(packet);
+            int viewDistance = (int) VIEW_DISTANCE_GETTER.invoke(packet);
 
-                if (locale != null && locale.length() > 32) {
-                    flag("Oversized Locale String (" + locale.length() + " chars)", "PacketPlayInSettings");
-                    return false;
-                }
-
-                if (viewDistance < 0 || viewDistance > 128) {
-                    flag("Invalid View Distance Exploit (" + viewDistance + ")", "PacketPlayInSettings");
-                    return false;
-                }
-
-            } catch (Throwable t) {
+            // 1. Locale Boyut Kontrolü (OOM Protection)
+            if (locale != null && locale.length() > 32) {
+                plugin.getActionQueue().pushKick(player.getPlayer(), "Oversized Locale String");
                 return false;
             }
+
+            // 2. Görüş Mesafesi Sınırı (Crasher Protection)
+            if (viewDistance < 0 || viewDistance > 128) {
+                plugin.getActionQueue().pushKick(player.getPlayer(), "Invalid View Distance Exploit");
+                return false;
+            }
+
+        } catch (Throwable t) {
+            return false;
         }
         return true;
     }

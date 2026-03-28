@@ -1,13 +1,10 @@
 package com.mertout.lightguard.checks.impl;
 
+import com.mertout.lightguard.LightGuard;
 import com.mertout.lightguard.checks.Check;
-import com.mertout.lightguard.data.PlayerData;
-import com.mertout.lightguard.utils.GeyserUtil;
+import com.mertout.lightguard.data.ProtocolPlayer;
 import net.minecraft.server.v1_16_R3.BlockPosition;
 import net.minecraft.server.v1_16_R3.PacketPlayInUpdateSign;
-import org.bukkit.Bukkit;
-import org.bukkit.Location;
-import org.bukkit.block.Block;
 
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.VarHandle;
@@ -27,98 +24,76 @@ public class SignCheck extends Check {
     }
 
     private static final Pattern ILLEGAL_CHARS = Pattern.compile("[\\x00-\\x1F]");
-
-    private static final Pattern JSON_EXPLIOT_PATTERN = Pattern.compile("[\"'](text|score|selector|extra|translate|clickEvent|hoverEvent|run_command|nbt)[\"']\\s*:");
+    private static final Pattern JSON_EXPLOIT_PATTERN = Pattern.compile("[\"'](text|score|selector|extra|translate|clickEvent|hoverEvent|run_command|nbt)[\"']\\s*:");
 
     private final int maxLineLength;
     private final boolean blockJson;
 
-    public SignCheck(PlayerData data) {
-        super(data, "Sign", "sign");
+    public SignCheck(LightGuard plugin) {
+        super(plugin);
         this.maxLineLength = plugin.getConfig().getInt("checks.sign.max-line-length", 45);
         this.blockJson = plugin.getConfig().getBoolean("checks.sign.block-json-syntax");
     }
 
     @Override
-    public boolean check(Object packet) {
-        if (!isEnabled()) return true;
+    public boolean check(Object packet, ProtocolPlayer player) {
+        if (!(packet instanceof PacketPlayInUpdateSign)) return true;
 
-        if (packet instanceof PacketPlayInUpdateSign) {
-            try {
-                BlockPosition pos = (BlockPosition) POS_FIELD.get(packet);
+        try {
+            BlockPosition pos = (BlockPosition) POS_FIELD.get(packet);
+            if (pos == null) return true;
 
-                double pX = data.getLastKnownX();
-                double pY = data.getLastKnownY();
-                double pZ = data.getLastKnownZ();
+            // 🛡️ DÜZELTME 1: Bukkit API (getLocation) YASAK. ProtocolPlayer O(1) Cache kullanıldı.
+            double pX = player.getLastX();
+            double pY = player.getLastY();
+            double pZ = player.getLastZ();
 
-                if (pX == 0 && pZ == 0) {
-                    Location temp = data.getPlayer().getLocation();
-                    pX = temp.getX(); pY = temp.getY(); pZ = temp.getZ();
-                }
-
+            if (pX != -1) {
                 double distX = pos.getX() - pX;
                 double distY = pos.getY() - pY;
                 double distZ = pos.getZ() - pZ;
                 double distanceSq = (distX * distX) + (distY * distY) + (distZ * distZ);
 
-                boolean isBedrock = GeyserUtil.isBedrockPlayer(data.getPlayer());
-                double maxDist = isBedrock ? 225.0 : 100.0;
+                // Bedrock desteği cache üzerinden (isAdmin/isBedrock flagleri ProtocolPlayer'a eklenmeli)
+                double maxDist = player.isBedrock() ? 225.0 : 100.0;
 
                 if (distanceSq > maxDist) {
-                    flag("Sign Edit too far", "PacketPlayInUpdateSign");
+                    plugin.getActionQueue().pushKick(player.getPlayer(), "Sign Edit too far");
+                    return false;
+                }
+            }
+
+            // 🛡️ DÜZELTME 2: Asenkron Chunk Kontrolü (Ana Thread'i kitlemeden!)
+            String worldName = player.getPlayer().getWorld().getName();
+            if (!plugin.getWorldChunkManager().isChunkLoadedAsynchronously(worldName, pos.getX() >> 4, pos.getZ() >> 4)) {
+                return false; // Yüklenmemiş chunk'ta tabela düzenlenemez.
+            }
+
+            // 🛡️ DÜZELTME 3: İçerik Taraması (Allocation-Free)
+            String[] lines = (String[]) LINES_FIELD.get(packet);
+            if (lines == null) return true;
+
+            for (String line : lines) {
+                if (line == null) continue;
+
+                if (line.length() > maxLineLength) {
+                    plugin.getActionQueue().pushKick(player.getPlayer(), "Oversized Sign Line");
                     return false;
                 }
 
-                Bukkit.getScheduler().runTask(plugin, () -> {
-                    if (!data.getPlayer().isOnline()) return;
-
-                    Location blockLoc = new Location(data.getPlayer().getWorld(), pos.getX(), pos.getY(), pos.getZ());
-
-                    if (!blockLoc.getWorld().isChunkLoaded(blockLoc.getBlockX() >> 4, blockLoc.getBlockZ() >> 4)) {
-                        return;
-                    }
-
-                    Block block = blockLoc.getBlock();
-                    if (!block.getType().name().contains("SIGN")) {
-                        flag("Sign Edit on Non-Sign Block", "PacketPlayInUpdateSign");
-                        data.getPlayer().sendBlockChange(blockLoc, block.getBlockData());
-                    }
-                });
-
-                String[] lines = (String[]) LINES_FIELD.get(packet);
-                if (lines == null) return true;
-
-                for (String line : lines) {
-                    if (line == null) continue;
-
-                    if (line.length() > maxLineLength) {
-                        flag("Oversized Sign Line", "PacketPlayInUpdateSign");
-                        return false;
-                    }
-
-                    if (ILLEGAL_CHARS.matcher(line).find()) {
-                        flag("Illegal Chars", "PacketPlayInUpdateSign");
-                        return false;
-                    }
-
-                    if (blockJson) {
-                        String trimmed = line.trim();
-
-                        if (JSON_EXPLIOT_PATTERN.matcher(line).find()) {
-                            flag("Dangerous JSON Component", "PacketPlayInUpdateSign");
-                            return false;
-                        }
-
-                        if (trimmed.startsWith("{") && (trimmed.contains("\":") || trimmed.contains("':"))) {
-                            flag("JSON Syntax Detected", "PacketPlayInUpdateSign");
-                            return false;
-                        }
-                    }
+                if (ILLEGAL_CHARS.matcher(line).find()) {
+                    plugin.getActionQueue().pushKick(player.getPlayer(), "Illegal Chars in Sign");
+                    return false;
                 }
 
-            } catch (Exception e) {
-                return false;
+                if (blockJson && JSON_EXPLOIT_PATTERN.matcher(line).find()) {
+                    plugin.getActionQueue().pushKick(player.getPlayer(), "Dangerous JSON in Sign");
+                    return false;
+                }
             }
+
+        } catch (Exception e) {
+            return false;
         }
         return true;
     }

@@ -1,7 +1,8 @@
 package com.mertout.lightguard.checks.impl;
 
+import com.mertout.lightguard.LightGuard;
 import com.mertout.lightguard.checks.Check;
-import com.mertout.lightguard.data.PlayerData;
+import com.mertout.lightguard.data.ProtocolPlayer;
 import net.minecraft.server.v1_16_R3.PacketPlayInHeldItemSlot;
 
 import java.lang.invoke.MethodHandle;
@@ -34,27 +35,29 @@ public class HeldItemSlotCheck extends Check {
         }
     }
 
-    public HeldItemSlotCheck(PlayerData data) {
-        super(data, "HeldItemSlot", "bad-packets");
+    public HeldItemSlotCheck(LightGuard plugin) {
+        super(plugin);
     }
 
     @Override
-    public boolean check(Object packet) {
-        if (!isEnabled()) return true;
+    public boolean check(Object packet, ProtocolPlayer player) {
+        if (!(packet instanceof PacketPlayInHeldItemSlot)) return true;
 
-        if (packet instanceof PacketPlayInHeldItemSlot) {
-            try {
-                int slot = (int) SLOT_GETTER.invoke(packet);
+        try {
+            int slot = (int) SLOT_GETTER.invoke(packet);
 
-                if (slot < 0 || slot >= 36) {
-                    flag("Invalid Held Item Slot Exploit (" + slot + ")", "PacketPlayInHeldItemSlot");
-                    return false;
-                }
-
-            } catch (Throwable t) {
+            // Adamın Hotbar'da 0 ile 8 arası slotları vardır.
+            // 36. slota (Örn: kafalığa) elindeki eşya gibi geçmeye çalışırsa sunucuyu crashletebilir.
+            if (slot < 0 || slot >= 36) {
+                // 🛡️ DÜZELTME: MPSC Action Queue kullanıldı.
+                plugin.getActionQueue().pushKick(player.getPlayer(), "Invalid Held Item Slot Exploit (" + slot + ")");
                 return false;
             }
+
+        } catch (Throwable t) {
+            return false; // Hata durumunda paketi yut
         }
+
         return true;
     }
 }

@@ -1,8 +1,10 @@
 package com.mertout.lightguard.checks.impl;
 
+import com.mertout.lightguard.LightGuard;
 import com.mertout.lightguard.checks.Check;
-import com.mertout.lightguard.data.PlayerData;
+import com.mertout.lightguard.data.ProtocolPlayer;
 import net.minecraft.server.v1_16_R3.PacketPlayInChat;
+
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.VarHandle;
 import java.util.regex.Pattern;
@@ -21,34 +23,34 @@ public class ChatSecurityCheck extends Check {
     private static final Pattern CONTROL_CHARS = Pattern.compile("[\\x00-\\x08\\x0B\\x0C\\x0E-\\x1F]");
     private final boolean blockZalgo;
 
-    public ChatSecurityCheck(PlayerData data) {
-        super(data, "ChatSecurity", "chat-unicode");
+    public ChatSecurityCheck(LightGuard plugin) {
+        super(plugin);
         this.blockZalgo = plugin.getConfig().getBoolean("checks.chat-unicode.block-zalgo", true);
     }
 
     @Override
-    public boolean check(Object packet) {
-        if (!isEnabled()) return true;
+    public boolean check(Object packet, ProtocolPlayer player) {
+        if (!(packet instanceof PacketPlayInChat)) return true;
 
-        if (packet instanceof PacketPlayInChat) {
-            String message = (String) MSG_FIELD.get(packet);
-            if (message == null || message.isEmpty()) return true;
+        String message = (String) MSG_FIELD.get(packet);
+        if (message == null || message.isEmpty()) return true;
 
-            if (CONTROL_CHARS.matcher(message).find()) {
-                flag("Illegal Control Characters", "PacketPlayInChat");
-                return false;
-            }
-
-            if (blockZalgo && ZALGO_PATTERN.matcher(message).find()) {
-                flag("Zalgo/Glitch Text Detected", "PacketPlayInChat");
-                return false;
-            }
-
-            if (containsBlockedUnicode(message)) {
-                flag("Illegal Unicode Character", "PacketPlayInChat");
-                return false;
-            }
+        if (CONTROL_CHARS.matcher(message).find()) {
+            plugin.getActionQueue().pushKick(player.getPlayer(), "Illegal Control Characters in Chat");
+            return false;
         }
+
+        if (blockZalgo && ZALGO_PATTERN.matcher(message).find()) {
+            plugin.getActionQueue().pushKick(player.getPlayer(), "Zalgo/Glitch Text Detected");
+            return false;
+        }
+
+        // Allocation-Free Unicode Taraması
+        if (containsBlockedUnicode(message)) {
+            plugin.getActionQueue().pushKick(player.getPlayer(), "Illegal Unicode Character in Chat");
+            return false;
+        }
+
         return true;
     }
 

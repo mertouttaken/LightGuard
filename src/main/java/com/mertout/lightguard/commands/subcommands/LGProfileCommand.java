@@ -1,16 +1,12 @@
 package com.mertout.lightguard.commands.subcommands;
 
 import com.mertout.lightguard.LightGuard;
-import com.mertout.lightguard.data.PlayerData;
-import org.bukkit.Bukkit;
+import com.mertout.lightguard.data.ProtocolPlayer;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.bukkit.scheduler.BukkitRunnable;
 
-import java.util.Comparator;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
@@ -41,10 +37,8 @@ public class LGProfileCommand {
                     return;
                 }
 
-                List<PlayerData> topPlayers = Bukkit.getOnlinePlayers().stream()
-                        .map(p -> LightGuard.getInstance().getPlayerDataManager().getData(p.getUniqueId()))
-                        .filter(data -> data != null)
-                        .sorted(Comparator.comparingInt(PlayerData::getPPS).reversed())
+                List<ProtocolPlayer> topPlayers = LightGuard.getInstance().getProtocolManager().getPlayers().values().stream()
+                        .sorted(Comparator.comparingInt(ProtocolPlayer::getPPS).reversed())
                         .limit(10)
                         .collect(Collectors.toList());
 
@@ -52,28 +46,27 @@ public class LGProfileCommand {
                 sender.sendMessage("§7(Server TPS: §f" + String.format("%.2f", LightGuard.getInstance().getTPS()) + "§7)");
 
                 if (topPlayers.isEmpty()) {
-                    sender.sendMessage("§7No data or no player.");
+                    sender.sendMessage("§7No active packet data.");
                 } else {
-                    for (PlayerData data : topPlayers) {
-                        int pps = data.getPPS();
+                    for (ProtocolPlayer pp : topPlayers) {
+                        int pps = pp.getPPS();
                         String color = "§a";
-                        if (pps > 50) color = "§e";
-                        if (pps > 100) color = "§c";
-                        if (pps > 300) color = "§4§l";
+                        if (pps > 80) color = "§e";
+                        if (pps > 150) color = "§c";
+                        if (pps > 400) color = "§4§l";
 
-                        sender.sendMessage("§7- " + data.getPlayer().getName() + ": " + color + pps + " PPS");
+                        sender.sendMessage("§7- " + pp.getPlayer().getName() + ": " + color + pps + " PPS");
                     }
                 }
             }
         };
 
-        newTask.runTaskTimer(LightGuard.getInstance(), 0L, 40L);
+        newTask.runTaskTimer(LightGuard.getInstance(), 0L, 20L);
         activeTasks.put(senderId, newTask);
     }
+
     public static void cancelAll() {
-        for (BukkitRunnable task : activeTasks.values()) {
-            if (!task.isCancelled()) task.cancel();
-        }
+        activeTasks.values().forEach(task -> { if (!task.isCancelled()) task.cancel(); });
         activeTasks.clear();
     }
 }

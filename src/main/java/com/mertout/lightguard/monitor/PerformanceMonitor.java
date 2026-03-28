@@ -21,16 +21,16 @@ public class PerformanceMonitor {
     }
 
     public void printStats() {
-        plugin.getLogger().info("§e=== LightGuard Performance Benchmark ===");
+        plugin.getLogger().info("§e[LightGuard] === Performance Benchmark ===");
 
         if (checkDurations.isEmpty()) {
-            plugin.getLogger().info("§4[!] §cNo data has been collected yet. Please wait for some processing from the players.");
+            plugin.getLogger().info("§cNo data collected yet.");
             return;
         }
 
         checkDurations.entrySet().stream()
-                .sorted((a, b) -> Long.compare(b.getValue().sum(), a.getValue().sum())) // En yavaştan hızlıya
-                .limit(15) // İlk 15 check
+                .sorted((a, b) -> Long.compare(b.getValue().sum(), a.getValue().sum()))
+                .limit(10)
                 .forEach(entry -> {
                     String name = entry.getKey();
                     long totalNs = entry.getValue().sum();
@@ -38,12 +38,10 @@ public class PerformanceMonitor {
                     long avgNs = count > 0 ? totalNs / count : 0;
 
                     plugin.getLogger().info(String.format(
-                            "Check: %-20s | Avg: %-8dns | Total: %-6dms | Calls: %d",
-                            name, avgNs, totalNs / 1_000_000, count
+                            "§7- §f%-18s §8| §eAvg: %-6dns §8| §7Calls: %d",
+                            name, avgNs, count
                     ));
                 });
-
-        plugin.getLogger().info("§e========================================");
     }
 
     public void reset() {
