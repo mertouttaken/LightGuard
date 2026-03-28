@@ -1,5 +1,7 @@
 package com.mertout.lightguard.checks;
 
+import com.mertout.lightguard.LightGuard;
+
 public class HybridRateLimiter {
 
     private volatile double threatScore = 0.0;
@@ -8,11 +10,12 @@ public class HybridRateLimiter {
     private final long[] packetTimestamps = new long[20];
     private int index = 0;
 
-    private static final double MAX_THRESHOLD = 500.0;
-    private static final double DECAY_PER_SECOND = 150.0;
+    private final double maxThreshold;
+    private final double decayPerSecond;
 
-    public HybridRateLimiter() {
-        this.lastDecayTime = System.currentTimeMillis();
+    public HybridRateLimiter(LightGuard plugin) {
+        this.maxThreshold = plugin.getConfig().getDouble("checks.flood.max-threshold", 500.0);
+        this.decayPerSecond = plugin.getConfig().getDouble("checks.flood.decay-per-second", 150.0);
     }
 
     public boolean addAndCheck(double baseWeight) {
@@ -20,7 +23,7 @@ public class HybridRateLimiter {
 
         long timePassed = now - lastDecayTime;
         if (timePassed > 1000) {
-            double decayAmount = (timePassed / 1000.0) * DECAY_PER_SECOND;
+            double decayAmount = (timePassed / 1000.0) * decayPerSecond;
             this.threatScore = Math.max(0.0, this.threatScore - decayAmount);
             this.lastDecayTime = now;
         }
@@ -38,7 +41,7 @@ public class HybridRateLimiter {
 
         this.threatScore += finalWeight;
 
-        return this.threatScore > MAX_THRESHOLD;
+        return this.threatScore > maxThreshold;
     }
 
     public double getThreatScore() {

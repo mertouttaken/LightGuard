@@ -15,7 +15,8 @@ import java.lang.invoke.VarHandle;
 public class LGPacketInjector {
 
     private final LightGuard plugin;
-    private static final int MAX_RAW_CAPACITY = 40960;
+
+    private final int maxRawCapacity;
 
     private static final VarHandle KEEPALIVE_ID_FIELD;
 
@@ -30,6 +31,7 @@ public class LGPacketInjector {
 
     public LGPacketInjector(LightGuard plugin) {
         this.plugin = plugin;
+        this.maxRawCapacity = plugin.getConfig().getInt("checks.raw-packet.max-raw-size", 40960);
     }
 
     public void injectPlayer(Player player, final ProtocolPlayer protocolPlayer) {
@@ -42,7 +44,7 @@ public class LGPacketInjector {
                     if (msg instanceof ByteBuf) {
                         ByteBuf buf = (ByteBuf) msg;
 
-                        if (buf.readableBytes() > MAX_RAW_CAPACITY) {
+                        if (buf.readableBytes() > maxRawCapacity) {
                             plugin.getLogger().warning("§c[LightGuard] Dropped oversized raw packet from " + player.getName());
                             releaseMessage(msg);
                             ctx.close();

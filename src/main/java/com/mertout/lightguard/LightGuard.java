@@ -45,7 +45,7 @@ public class LightGuard extends JavaPlugin {
 
         this.configManager = new ConfigManager(this);
         this.actionQueue = new ActionQueue(this);
-        this.protocolManager = new ProtocolManager();
+        this.protocolManager = new ProtocolManager(this);
         this.worldChunkManager = new WorldChunkManager();
         this.checkDispatcher = new Dispatcher(this);
 

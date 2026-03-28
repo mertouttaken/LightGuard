@@ -22,11 +22,16 @@ public class TabCheck extends Check {
 
     private final int maxLength;
     private final List<String> blockedSubstrings;
+    private final List<String> blockedChars;
 
     public TabCheck(LightGuard plugin) {
         super(plugin);
         this.maxLength = plugin.getConfig().getInt("checks.tab.max-length", 256);
+
         this.blockedSubstrings = plugin.getConfig().getStringList("checks.tab.block-contains")
+                .stream().map(String::toLowerCase).collect(Collectors.toList());
+
+        this.blockedChars = plugin.getConfig().getStringList("checks.tab.block-chars")
                 .stream().map(String::toLowerCase).collect(Collectors.toList());
     }
 
@@ -54,8 +59,18 @@ public class TabCheck extends Check {
             return false;
         }
 
+        for (String c : blockedChars) {
+            if (lowerBuffer.contains(c)) {
+                plugin.getActionQueue().pushKick(player.getPlayer(), "Illegal Character in Tab Complete");
+                return false;
+            }
+        }
+
         for (String s : blockedSubstrings) {
-            if (lowerBuffer.contains(s)) return false;
+            if (lowerBuffer.contains(s)) {
+                plugin.getActionQueue().pushKick(player.getPlayer(), "Blocked Command/Argument in Tab");
+                return false;
+            }
         }
 
         return true;

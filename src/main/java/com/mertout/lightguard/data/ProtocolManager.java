@@ -1,5 +1,6 @@
 package com.mertout.lightguard.data;
 
+import com.mertout.lightguard.LightGuard; // Import ekle
 import org.bukkit.entity.Player;
 import java.util.Map;
 import java.util.UUID;
@@ -7,10 +8,15 @@ import java.util.concurrent.ConcurrentHashMap;
 
 public class ProtocolManager {
 
+    private final LightGuard plugin; // Plugin referansını ekle
     private final Map<UUID, ProtocolPlayer> players = new ConcurrentHashMap<>();
 
+    public ProtocolManager(LightGuard plugin) {
+        this.plugin = plugin;
+    }
+
     public void add(Player player) {
-        players.put(player.getUniqueId(), new ProtocolPlayer(player));
+        players.put(player.getUniqueId(), new ProtocolPlayer(player, plugin));
     }
 
     public void remove(UUID uuid) {

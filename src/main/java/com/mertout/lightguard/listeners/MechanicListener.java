@@ -10,10 +10,7 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.block.*;
-import org.bukkit.event.entity.EntityDamageEvent;
-import org.bukkit.event.entity.EntityDeathEvent;
-import org.bukkit.event.entity.PlayerDeathEvent;
-import org.bukkit.event.entity.ProjectileLaunchEvent;
+import org.bukkit.event.entity.*;
 import org.bukkit.event.inventory.*;
 import org.bukkit.event.player.*;
 import org.bukkit.event.world.ChunkUnloadEvent;
@@ -71,7 +68,14 @@ public class MechanicListener implements Listener {
         plugin.getProtocolManager().remove(uuid);
         plugin.getPacketInjector().removePlayer(event.getPlayer());
     }
-
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    public void onToggleGlide(EntityToggleGlideEvent event) {
+        if (!(event.getEntity() instanceof Player)) return;
+        ProtocolPlayer pp = plugin.getProtocolManager().get(event.getEntity().getUniqueId());
+        if (pp != null) {
+            pp.setGliding(event.isGliding());
+        }
+    }
     @EventHandler(priority = EventPriority.MONITOR)
     public void onPlayerJoin(PlayerJoinEvent event) {
         Player player = event.getPlayer();
@@ -284,7 +288,7 @@ public class MechanicListener implements Listener {
         UUID uuid = e.getPlayer().getUniqueId();
 
         if (type == Material.CHEST || type == Material.TRAPPED_CHEST || type == Material.ENDER_CHEST) {
-            long delay = plugin.getConfig().getLong("mechanics.interact-container-delay", 200);
+            long delay = plugin.getConfig().getLong("mechanics.interact-container-delay", 300);
             if (checkCooldown(uuid, delay)) {
                 e.setCancelled(true);
                 return;

@@ -1,5 +1,6 @@
 package com.mertout.lightguard.data;
 
+import com.mertout.lightguard.LightGuard;
 import com.mertout.lightguard.checks.HybridRateLimiter;
 import org.bukkit.entity.Player;
 import java.util.UUID;
@@ -11,7 +12,7 @@ public class ProtocolPlayer {
     private final int entityId;
 
     private final ProtocolStateMachine stateMachine = new ProtocolStateMachine();
-    private final HybridRateLimiter rateLimiter = new HybridRateLimiter();
+    private final HybridRateLimiter rateLimiter;
     private final KeepAliveTracker keepAliveTracker = new KeepAliveTracker();
 
     private volatile int pps = 0;
@@ -61,10 +62,12 @@ public class ProtocolPlayer {
 
     private volatile long lastEntityInteractTime = 0;
 
-    public ProtocolPlayer(Player player) {
+    public ProtocolPlayer(Player player, LightGuard plugin) {
         this.player = player;
         this.uuid = player.getUniqueId();
         this.entityId = player.getEntityId();
+
+        this.rateLimiter = new HybridRateLimiter(plugin);
     }
 
     public void incrementPacketCount() { packetCounter.incrementAndGet(); }

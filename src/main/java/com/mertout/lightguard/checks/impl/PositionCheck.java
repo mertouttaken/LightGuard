@@ -26,8 +26,22 @@ public class PositionCheck extends Check {
         } catch (Exception e) { throw new ExceptionInInitializerError(e); }
     }
 
+    private final double maxOffsetSq;
+    private final double maxElytraOffsetSq;
+    private final double maxVerticalDist;
+    private final double outOfWorldLimit;
+
     public PositionCheck(LightGuard plugin) {
         super(plugin);
+
+        double offset = plugin.getConfig().getDouble("checks.position.max-offset", 25.0);
+        this.maxOffsetSq = offset * offset;
+
+        double elytraOffset = plugin.getConfig().getDouble("checks.position.elytra-max-distance", 50.0);
+        this.maxElytraOffsetSq = elytraOffset * elytraOffset;
+
+        this.maxVerticalDist = plugin.getConfig().getDouble("checks.position.max-vertical-distance", 50.0);
+        this.outOfWorldLimit = plugin.getConfig().getDouble("checks.position.out-of-world-limit", 29999984.0);
     }
 
     @Override
@@ -72,7 +86,7 @@ public class PositionCheck extends Check {
                 return false;
             }
 
-            if (Math.abs(x) > 29999984 || Math.abs(z) > 29999984 || Math.abs(y) > 1000000) {
+            if (Math.abs(x) > outOfWorldLimit || Math.abs(z) > outOfWorldLimit || Math.abs(y) > 1000000) {
                 plugin.getActionQueue().pushKick(player.getPlayer(), "Illegal Position (Border/Overflow)");
                 return false;
             }
@@ -111,18 +125,23 @@ public class PositionCheck extends Check {
                 double horizontalDistSq = (diffX * diffX) + (diffZ * diffZ);
                 double verticalDist = Math.abs(diffY);
 
-                if (horizontalDistSq > 625.0) {
-                    plugin.getActionQueue().pushKick(player.getPlayer(), "Excessive Horizontal Movement");
-                    return false;
+                if (horizontalDistSq > maxOffsetSq) {
+                    if (!player.isGliding()) {
+                        plugin.getActionQueue().pushKick(player.getPlayer(), "Excessive Horizontal Movement");
+                        return false;
+                    } else if (horizontalDistSq > maxElytraOffsetSq) {
+                        plugin.getActionQueue().pushKick(player.getPlayer(), "Extreme Elytra Speed Exploit");
+                        return false;
+                    }
                 }
 
-                if (verticalDist > 50.0) {
+                if (verticalDist > maxVerticalDist) {
                     plugin.getActionQueue().pushKick(player.getPlayer(), "Excessive Vertical Movement");
                     return false;
                 }
 
                 double totalDistSq = horizontalDistSq + (diffY * diffY);
-                if (totalDistSq > 2500.0) {
+                if (totalDistSq > maxElytraOffsetSq) {
                     plugin.getActionQueue().pushKick(player.getPlayer(), "Instant Teleport Exploit");
                     return false;
                 }

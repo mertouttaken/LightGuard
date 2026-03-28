@@ -17,10 +17,15 @@ public class ProtocolStateMachine {
         if (!pp.isInventoryOpen()) {
             if (packetName.equals("PacketPlayInWindowClick")) {
                 ghostWindowClicks++;
+                if (ghostWindowClicks > 10000) ghostWindowClicks = 10000;
+
                 if (ghostWindowClicks > 5) return false;
             }
             else if (packetName.equals("PacketPlayInHeldItemSlot")) {
                 ghostHotbarSwaps++;
+                // 🛡️ ELİTE TİER FİX: Int Overflow Koruması
+                if (ghostHotbarSwaps > 10000) ghostHotbarSwaps = 10000;
+
                 if (ghostHotbarSwaps > 8) return false;
             }
         } else {
@@ -44,7 +49,7 @@ public class ProtocolStateMachine {
             comboSpamCount++;
             if (comboSpamCount > 10) return false;
         } else {
-            comboSpamCount = Math.max(0, comboSpamCount - 1);
+            comboSpamCount = Math.max(0, comboSpamCount - 3);
         }
 
         return true;

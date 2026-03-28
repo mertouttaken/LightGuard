@@ -2,6 +2,7 @@ package com.mertout.lightguard.utils;
 
 import com.mertout.lightguard.LightGuard;
 import net.minecraft.server.v1_16_R3.*;
+
 import java.util.Collections;
 import java.util.IdentityHashMap;
 import java.util.Set;
@@ -11,6 +12,11 @@ public class NBTChecker {
     private static volatile int maxListSize = 500;
     private static volatile int maxArraySize = 1024;
     private static volatile int maxTotalNodes = 2000;
+
+    private static final ThreadLocal<Set<NBTBase>> VISITED_SET = ThreadLocal.withInitial(() ->
+            Collections.newSetFromMap(new IdentityHashMap<>())
+    );
+    private static final ThreadLocal<int[]> NODE_COUNTER = ThreadLocal.withInitial(() -> new int[1]);
 
     public static void reload() {
         var config = LightGuard.getInstance().getConfig();
@@ -22,8 +28,11 @@ public class NBTChecker {
     public static boolean isNBTDangerous(NBTTagCompound rootTag, int maxDepth) {
         if (rootTag == null) return false;
 
-        Set<NBTBase> visited = Collections.newSetFromMap(new IdentityHashMap<>());
-        int[] nodeCounter = {0};
+        Set<NBTBase> visited = VISITED_SET.get();
+        int[] nodeCounter = NODE_COUNTER.get();
+
+        visited.clear();
+        nodeCounter[0] = 0;
 
         try {
             return checkRecursively(rootTag, visited, 0, maxDepth, nodeCounter);
@@ -34,6 +43,7 @@ public class NBTChecker {
 
     private static boolean checkRecursively(NBTBase current, Set<NBTBase> visited, int depth, int maxDepth, int[] nodeCounter) {
         if (depth > maxDepth || ++nodeCounter[0] > maxTotalNodes) return true;
+
         if (!visited.add(current)) return true;
 
         if (current instanceof NBTTagList) {
