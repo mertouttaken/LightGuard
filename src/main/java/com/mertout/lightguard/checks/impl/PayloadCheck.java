@@ -5,11 +5,13 @@ import com.mertout.lightguard.checks.Check;
 import com.mertout.lightguard.data.ProtocolPlayer;
 import net.minecraft.server.v1_16_R3.PacketPlayInCustomPayload;
 import io.netty.buffer.ByteBuf;
-import java.util.*;
+import java.util.List;
+import java.util.regex.Pattern;
 
 public class PayloadCheck extends Check {
 
-    private static final int MAX_CHANNELS_PER_PLAYER = 124;
+    private static final Pattern NAMESPACE_PATTERN = Pattern.compile("[a-z0-9_\\-]+:[a-z0-9_\\-.]+");
+
     private final List<String> blockedChannels;
     private final int maxPayloadSize;
 
@@ -26,8 +28,8 @@ public class PayloadCheck extends Check {
         PacketPlayInCustomPayload p = (PacketPlayInCustomPayload) packet;
         String channel = p.tag.toString();
 
-        if (channel.length() > 128) {
-            plugin.getActionQueue().pushKick(player.getPlayer(), "Oversized Channel Name");
+        if (!isValidChannel(channel)) {
+            plugin.getActionQueue().pushKick(player.getPlayer(), "Invalid Payload Channel Format");
             return false;
         }
 
@@ -47,7 +49,7 @@ public class PayloadCheck extends Check {
             }
 
             ByteBuf dataBuffer = p.data;
-            if (dataBuffer.readableBytes() > 0) {
+            if (dataBuffer != null && dataBuffer.readableBytes() > 0) {
                 ByteBuf copy = null;
                 try {
                     copy = dataBuffer.copy();
@@ -68,32 +70,47 @@ public class PayloadCheck extends Check {
 
         if (channel.equalsIgnoreCase("minecraft:register") || channel.equalsIgnoreCase("REGISTER")) {
             ByteBuf data = p.data;
-            int readableBytes = data.readableBytes();
-            int channelCount = 0;
+            if (data != null) {
+                int readableBytes = data.readableBytes();
+                int channelCount = 0;
 
-            for (int i = 0; i < readableBytes; i++) {
-                if (data.getByte(data.readerIndex() + i) == 0) channelCount++;
-            }
-            if (readableBytes > 0) channelCount++;
+                for (int i = 0; i < readableBytes; i++) {
+                    if (data.getByte(data.readerIndex() + i) == 0) channelCount++;
+                }
+                if (readableBytes > 0) channelCount++;
 
-            if (channelCount > 20) {
-                plugin.getActionQueue().pushKick(player.getPlayer(), "Channel Register Flood");
-                return false;
-            }
+                if (channelCount > 20) {
+                    plugin.getActionQueue().pushKick(player.getPlayer(), "Channel Register Flood");
+                    return false;
+                }
 
-            if (player.incrementAndGetChannelRegisterCount(channelCount, System.currentTimeMillis()) > 100) {
-                plugin.getActionQueue().pushKick(player.getPlayer(), "Channel Register Flood (Rate Limit)");
-                return false;
+                if (player.incrementAndGetChannelRegisterCount(channelCount, System.currentTimeMillis()) > 100) {
+                    plugin.getActionQueue().pushKick(player.getPlayer(), "Channel Register Flood (Rate Limit)");
+                    return false;
+                }
             }
         }
 
         try {
-            if (p.data.readableBytes() > maxPayloadSize && !channel.equalsIgnoreCase("WDL|INIT")) {
+            if (p.data != null && p.data.readableBytes() > maxPayloadSize && !channel.equalsIgnoreCase("WDL|INIT")) {
                 plugin.getActionQueue().pushKick(player.getPlayer(), "Oversized Payload (" + p.data.readableBytes() + " bytes)");
                 return false;
             }
         } catch (Exception ignored) { return false; }
 
         return true;
+    }
+
+    private boolean isValidChannel(String channel) {
+        if (channel == null || channel.isEmpty() || channel.length() > 128) return false;
+
+        for (int i = 0; i < channel.length(); i++) {
+            if (Character.isISOControl(channel.charAt(i))) return false;
+        }
+
+        if (channel.equals("REGISTER") || channel.equals("UNREGISTER") || channel.equals("BungeeCord")) return true;
+        if (channel.startsWith("MC|") || channel.startsWith("FML|")) return true;
+
+        return NAMESPACE_PATTERN.matcher(channel).matches();
     }
 }

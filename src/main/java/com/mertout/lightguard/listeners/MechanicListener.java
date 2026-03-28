@@ -60,10 +60,16 @@ public class MechanicListener implements Listener {
         plugin.getPacketInjector().injectPlayer(event.getPlayer(), pp);
     }
 
-    @EventHandler(priority = EventPriority.MONITOR)
-    public void onPlayerQuit(PlayerQuitEvent event) {
+    @EventHandler(priority = EventPriority.HIGHEST)
+    public void onQuit(PlayerQuitEvent event) {
+        UUID uuid = event.getPlayer().getUniqueId();
+        cooldowns.remove(uuid);
+        ProtocolPlayer pp = plugin.getProtocolManager().get(uuid);
+        if (pp != null) {
+            pp.getKeepAliveTracker().clear();
+        }
+        plugin.getProtocolManager().remove(uuid);
         plugin.getPacketInjector().removePlayer(event.getPlayer());
-        plugin.getProtocolManager().remove(event.getPlayer().getUniqueId());
     }
 
     @EventHandler(priority = EventPriority.MONITOR)
@@ -99,7 +105,7 @@ public class MechanicListener implements Listener {
     public void onInventoryClose(InventoryCloseEvent event) {
         ProtocolPlayer pp = plugin.getProtocolManager().get(event.getPlayer().getUniqueId());
         if (pp != null) {
-            pp.setInventoryState(false, 0);
+            pp.setInventoryState(false, -1);
             pp.setAnvilOpen(false);
         }
     }
@@ -410,25 +416,36 @@ public class MechanicListener implements Listener {
             }
         }
     }
-    @EventHandler
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     public void onInventoryOpen(InventoryOpenEvent event) {
-        ProtocolPlayer pp = plugin.getProtocolManager().get(event.getPlayer().getUniqueId());
-        if (pp != null) {
-            pp.setInventoryState(true, event.getInventory().hashCode());
-            if (event.getInventory().getType() == InventoryType.ANVIL) pp.setAnvilOpen(true);
-        }
-        if (!plugin.getConfig().getBoolean("mechanics.prevent-mule-dupe")) return;
         if (!(event.getPlayer() instanceof Player)) return;
-        if (event.getInventory().getHolder() instanceof ChestedHorse) {
-            ChestedHorse mule = (ChestedHorse) event.getInventory().getHolder();
-            Player player = (Player) event.getPlayer();
-            if (!mule.getWorld().equals(player.getWorld()) || mule.getLocation().distanceSquared(player.getLocation()) > 64) {
-                event.setCancelled(true);
-                return;
+        Player player = (Player) event.getPlayer();
+
+        if (plugin.getConfig().getBoolean("mechanics.prevent-mule-dupe")) {
+            if (event.getInventory().getHolder() instanceof ChestedHorse) {
+                ChestedHorse mule = (ChestedHorse) event.getInventory().getHolder();
+
+                if (!mule.getWorld().equals(player.getWorld()) || mule.getLocation().distanceSquared(player.getLocation()) > 64) {
+                    event.setCancelled(true);
+                    return;
+                }
+                if (!mule.getLocation().getChunk().isLoaded()) {
+                    event.setCancelled(true);
+                    return;
+                }
             }
-            if (!mule.getLocation().getChunk().isLoaded()) {
-                event.setCancelled(true);
+        }
+        ProtocolPlayer pp = plugin.getProtocolManager().get(player.getUniqueId());
+        if (pp != null) {
+            if (event.getInventory().getType() == InventoryType.ANVIL) {
+                pp.setAnvilOpen(true);
             }
+            plugin.getServer().getScheduler().runTask(plugin, () -> {
+                if (player.isOnline()) {
+                    int realWindowId = ((org.bukkit.craftbukkit.v1_16_R3.entity.CraftPlayer) player).getHandle().activeContainer.windowId;
+                    pp.setInventoryState(true, realWindowId);
+                }
+            });
         }
     }
     @EventHandler(priority = EventPriority.LOWEST, ignoreCancelled = true)
@@ -495,11 +512,6 @@ public class MechanicListener implements Listener {
             }
         }
     }
-    @EventHandler
-    public void onQuit(PlayerQuitEvent event) {
-        cooldowns.remove(event.getPlayer().getUniqueId());
-    }
-
     @EventHandler(priority = EventPriority.LOWEST, ignoreCancelled = true)
     public void onInventoryMoveItem(InventoryMoveItemEvent event) {
         if (!plugin.getConfig().getBoolean("mechanics.prevent-hopper-dupe", true)) return;

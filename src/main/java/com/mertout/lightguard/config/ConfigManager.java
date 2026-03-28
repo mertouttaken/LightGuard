@@ -60,6 +60,8 @@ public class ConfigManager {
 
         NBTChecker.reload();
 
+        plugin.getActionQueue().loadConfig();
+
 
         if (plugin.getDispatcher() != null) {
             plugin.reloadCheckDispatcher();

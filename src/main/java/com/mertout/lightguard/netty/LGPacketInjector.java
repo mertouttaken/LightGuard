@@ -9,12 +9,24 @@ import io.netty.channel.*;
 import org.bukkit.craftbukkit.v1_16_R3.entity.CraftPlayer;
 import org.bukkit.entity.Player;
 
-import java.nio.charset.StandardCharsets;
+import java.lang.invoke.MethodHandles;
+import java.lang.invoke.VarHandle;
 
 public class LGPacketInjector {
 
     private final LightGuard plugin;
     private static final int MAX_RAW_CAPACITY = 40960;
+
+    private static final VarHandle KEEPALIVE_ID_FIELD;
+
+    static {
+        try {
+            KEEPALIVE_ID_FIELD = MethodHandles.privateLookupIn(net.minecraft.server.v1_16_R3.PacketPlayOutKeepAlive.class, MethodHandles.lookup())
+                    .findVarHandle(net.minecraft.server.v1_16_R3.PacketPlayOutKeepAlive.class, "a", long.class);
+        } catch (Exception e) {
+            throw new ExceptionInInitializerError(e);
+        }
+    }
 
     public LGPacketInjector(LightGuard plugin) {
         this.plugin = plugin;
@@ -41,34 +53,32 @@ public class LGPacketInjector {
                         try {
                             int packetId = readVarInt(buf);
 
-                            // 0x28: Creative Slot | 0x0B: Custom Payload
                             if (packetId == 0x28 || packetId == 0x0B) {
-                                if (packetId == 0x28) {
-                                    buf.skipBytes(2); // Slot skip
-                                    if (buf.readBoolean()) { // Presence check
-                                        readVarInt(buf); // Item ID
-                                        buf.readByte(); // Count
-                                        if (buf.isReadable() && buf.getByte(buf.readerIndex()) == 10) {
+                                while (buf.isReadable()) {
+                                    int readerIdx = buf.readerIndex();
+                                    byte b = buf.readByte();
+
+                                    if (b == 10) {
+                                        buf.readerIndex(readerIdx);
+
+                                        buf.markReaderIndex();
+                                        try {
                                             if (!NBTStreamingScanner.scan(buf)) {
-                                                plugin.getLogger().warning("§c[LightGuard] NBT Bomb Blocked from " + player.getName());
-                                                releaseMessage(msg); ctx.close(); return;
+                                                plugin.getLogger().warning("§c[LightGuard] NBT Bomb Blocked (Raw Pre-scan) from " + player.getName());
+                                                releaseMessage(msg);
+                                                ctx.close();
+                                                return;
                                             }
-                                        }
-                                    }
-                                } else { // 0x0B
-                                    int channelLen = readVarInt(buf);
-                                    if (channelLen > 0 && channelLen <= 128 && buf.readableBytes() >= channelLen) {
-                                        buf.skipBytes(channelLen);
-                                        if (buf.isReadable() && buf.getByte(buf.readerIndex()) == 10) {
-                                            if (!NBTStreamingScanner.scan(buf)) {
-                                                plugin.getLogger().warning("§c[LightGuard] Malicious Payload NBT from " + player.getName());
-                                                releaseMessage(msg); ctx.close(); return;
-                                            }
+                                            break;
+                                        } catch (Exception e) {
+                                            buf.resetReaderIndex();
+                                            buf.readByte();
                                         }
                                     }
                                 }
                             }
                         } catch (Exception e) {
+                            plugin.getLogger().warning("§c[LightGuard] Malformed Packet Header Blocked from " + player.getName());
                             releaseMessage(msg);
                             ctx.close();
                             return;
@@ -101,6 +111,17 @@ public class LGPacketInjector {
                     }
 
                     super.channelRead(ctx, msg);
+                }
+
+                @Override
+                public void write(ChannelHandlerContext ctx, Object msg, ChannelPromise promise) throws Exception {
+                    if (msg instanceof net.minecraft.server.v1_16_R3.PacketPlayOutKeepAlive) {
+                        try {
+                            long id = (long) KEEPALIVE_ID_FIELD.get(msg);
+                            protocolPlayer.getKeepAliveTracker().onKeepAliveSent(id);
+                        } catch (Exception ignored) {}
+                    }
+                    super.write(ctx, msg, promise);
                 }
             });
         }

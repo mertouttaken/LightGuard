@@ -49,8 +49,6 @@ public class NoComCheck extends Check {
             double dz = pZ - pos.getZ();
             double distSq = (dx * dx) + (dy * dy) + (dz * dz);
 
-            System.out.println(distSq + " aa");
-
             if (distSq > 10000.0) {
                 plugin.getActionQueue().pushKick(player.getPlayer(), "Illegal Interaction Distance (NoCom)");
                 return false;

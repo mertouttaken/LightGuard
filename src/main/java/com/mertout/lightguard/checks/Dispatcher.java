@@ -38,6 +38,7 @@ public class Dispatcher {
         register(PacketPlayInFlying.PacketPlayInPosition.class, posCheck);
         register(PacketPlayInFlying.PacketPlayInLook.class, posCheck);
         register(PacketPlayInFlying.PacketPlayInPositionLook.class, posCheck);
+        register(PacketPlayInKeepAlive.class, new KeepAliveCheck(plugin));
 
         VehicleCheck vehicleCheck = new VehicleCheck(plugin);
         register(PacketPlayInSteerVehicle.class, vehicleCheck);

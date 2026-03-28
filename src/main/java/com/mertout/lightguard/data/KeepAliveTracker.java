@@ -1,6 +1,5 @@
 package com.mertout.lightguard.data;
 
-
 import org.bukkit.craftbukkit.libs.it.unimi.dsi.fastutil.longs.Long2LongOpenHashMap;
 
 public class KeepAliveTracker {
@@ -16,18 +15,22 @@ public class KeepAliveTracker {
         pendingKeepAlives.put(id, System.currentTimeMillis());
     }
 
-    public long onKeepAliveReceived(long id) {
+    public boolean onKeepAliveReceived(long id) {
         long sentTime = pendingKeepAlives.remove(id);
 
         if (sentTime == -1L) {
-            return -1L;
+            return false;
         }
 
         this.ping = (int) (System.currentTimeMillis() - sentTime);
-        return this.ping;
+        return true;
     }
 
     public int getPing() {
         return ping;
+    }
+
+    public void clear() {
+        pendingKeepAlives.clear();
     }
 }
