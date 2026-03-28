@@ -7,16 +7,16 @@ import net.minecraft.server.v1_16_R3.*;
 
 import java.util.*;
 
-public class LightGuardDispatcher {
+public class Dispatcher {
 
     private final LightGuard plugin;
-
     private final Map<Class<?>, List<Check>> packetMap = new HashMap<>();
-
     private final List<Check> globalChecks = new ArrayList<>();
+    private final SafeModeManager safeModeManager;
 
-    public LightGuardDispatcher(LightGuard plugin) {
+    public Dispatcher(LightGuard plugin) {
         this.plugin = plugin;
+        this.safeModeManager = new SafeModeManager(plugin);
         loadChecks();
     }
 
@@ -51,7 +51,6 @@ public class LightGuardDispatcher {
 
         register(PacketPlayInCustomPayload.class, new PayloadCheck(plugin), new BrandCheck(plugin));
         register(PacketPlayInSettings.class, new SettingsCheck(plugin));
-
         register(PacketPlayInResourcePackStatus.class, new ResourcePackCheck(plugin));
         register(PacketPlayInAutoRecipe.class, new RecipeCheck(plugin));
         register(PacketPlayInRecipeDisplayed.class, new RecipeCheck(plugin));
@@ -85,13 +84,35 @@ public class LightGuardDispatcher {
     }
 
     private boolean runCheck(Check check, Object packet, ProtocolPlayer player) {
-        if (player.isBedrock() && !check.isBedrockCompatible()) return true;
+        String checkName = check.getClass().getSimpleName();
+
+        if (!safeModeManager.isCheckEnabled(checkName)) return true;
+
+        boolean geyserSupport = plugin.getConfig().getBoolean("settings.sentinel.geyser-support", true);
+        if (geyserSupport && player.isBedrock() && !check.isBedrockCompatible()) {
+            return true;
+        }
 
         try {
             return check.check(packet, player);
-        } catch (Exception e) {
-            plugin.getLogger().severe("§c[LightGuard] Error in " + check.getClass().getSimpleName() + ": " + e.getMessage());
+        } catch (Throwable t) {
+            safeModeManager.recordException(checkName, t);
+
+            boolean silent = plugin.getConfig().getBoolean("settings.sentinel.silent-failures", false);
+            if (!silent) {
+                plugin.getLogger().warning("§c[LightGuard] Error in " + checkName + ": " + t.getMessage());
+            }
+
+            boolean sentinelEnabled = plugin.getConfig().getBoolean("settings.sentinel.enabled", true);
+            if (sentinelEnabled && safeModeManager.isCritical(checkName)) {
+                return false;
+            }
+
             return true;
         }
+    }
+
+    public SafeModeManager getSafeModeManager() {
+        return safeModeManager;
     }
 }

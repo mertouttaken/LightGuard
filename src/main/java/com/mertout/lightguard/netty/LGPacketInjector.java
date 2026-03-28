@@ -15,7 +15,7 @@ import java.nio.charset.StandardCharsets;
 public class LGPacketInjector {
 
     private final LightGuard plugin;
-    private static final int MAX_RAW_CAPACITY = 40960; // 40KB Sınırı
+    private static final int MAX_RAW_CAPACITY = 40960;
 
     public LGPacketInjector(LightGuard plugin) {
         this.plugin = plugin;
@@ -24,7 +24,6 @@ public class LGPacketInjector {
     public void injectPlayer(Player player, final ProtocolPlayer protocolPlayer) {
         Channel channel = ((CraftPlayer) player).getHandle().playerConnection.networkManager.channel;
 
-        // 🛡️ STAGE 1 & 2: RAW FİLTRE VE DECODE-TIME NBT TARAMASI
         if (channel.pipeline().get("lg_raw") == null) {
             channel.pipeline().addBefore("decoder", "lg_raw", new ChannelDuplexHandler() {
                 @Override
@@ -43,12 +42,11 @@ public class LGPacketInjector {
                         try {
                             int packetId = readVarInt(buf);
 
-                            // 0x28 -> PacketPlayInSetCreativeSlot
                             if (packetId == 0x28) {
-                                buf.skipBytes(2); // Slot atla
-                                if (buf.readBoolean()) { // Present?
-                                    readVarInt(buf); // Item ID
-                                    buf.readByte(); // Count
+                                buf.skipBytes(2);
+                                if (buf.readBoolean()) {
+                                    readVarInt(buf);
+                                    buf.readByte();
                                     if (buf.isReadable() && buf.getByte(buf.readerIndex()) == 10) {
                                         if (!NBTStreamingScanner.scan(buf)) {
                                             plugin.getLogger().warning("§c[LightGuard] NBT Bomb Blocked (Creative) from " + player.getName());
@@ -58,7 +56,6 @@ public class LGPacketInjector {
                                     }
                                 }
                             }
-                            // 0x0B -> PacketPlayInCustomPayload
                             else if (packetId == 0x0B) {
                                 int channelLen = readVarInt(buf);
                                 if (channelLen > 0 && channelLen <= 128 && buf.readableBytes() >= channelLen) {
@@ -89,13 +86,11 @@ public class LGPacketInjector {
             });
         }
 
-        // 🛡️ STAGE 3: MANTIKSAL KONTROLLER VE AĞIRLIK SİSTEMİ
         if (channel.pipeline().get("lg_check") == null) {
             channel.pipeline().addBefore("packet_handler", "lg_check", new ChannelDuplexHandler() {
                 @Override
                 public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
 
-                    // 1. Hibrit Rate Limit
                     double weight = getPacketWeight(msg);
                     if (protocolPlayer.getRateLimiter().addAndCheck(weight)) {
                         plugin.getLogger().warning("§c[LightGuard] Rate Limit: " + player.getName());
@@ -103,10 +98,8 @@ public class LGPacketInjector {
                         return;
                     }
 
-                    // 2. Dispatcher Kontrolü (Hata düzeltildi: getCheckDispatcher().dispatch)
                     protocolPlayer.incrementPacketCount();
                     if (!plugin.getDispatcher().dispatch(msg, protocolPlayer)) {
-                        // 🚨 BELLEK SIZINTISI KORUMASI: Paketi iptal edersek içindeki buffer'ı salmalıyız!
                         if (msg instanceof net.minecraft.server.v1_16_R3.PacketPlayInCustomPayload) {
                             net.minecraft.server.v1_16_R3.PacketPlayInCustomPayload p = (net.minecraft.server.v1_16_R3.PacketPlayInCustomPayload) msg;
                             if (p.data != null && p.data.refCnt() > 0) p.data.release();

@@ -52,7 +52,7 @@ public class MechanicListener implements Listener {
 
     @EventHandler
     public void onPortal(PlayerPortalEvent e) { if (plugin.getConfig().getBoolean("mechanics.nether-portal-delay") && checkCooldown(e.getPlayer().getUniqueId(), 2000)) e.setCancelled(true);    }
-    @EventHandler(priority = EventPriority.LOWEST) // En düşük öncelik: Önce veri oluşsun
+    @EventHandler(priority = EventPriority.LOWEST)
 
     public void onPlayerJoinFirst(PlayerJoinEvent event) {
         plugin.getProtocolManager().add(event.getPlayer());
@@ -115,7 +115,7 @@ public class MechanicListener implements Listener {
         ProtocolPlayer pp = plugin.getProtocolManager().get(event.getPlayer().getUniqueId());
         if (pp != null) {
             pp.setDead(false);
-            pp.markTeleport(); // Respawn bir teleporttur, koruma sağla
+            pp.markTeleport();
         }
     }
 
@@ -327,7 +327,6 @@ public class MechanicListener implements Listener {
         Location to = event.getTo();
         if (to == null) return;
 
-        // Asenkron Chunk Manager üzerinden kontrol (Ana thread'i yormaz)
         if (!plugin.getWorldChunkManager().isChunkLoadedAsynchronously(to.getWorld().getName(), to.getBlockX() >> 4, to.getBlockZ() >> 4)) {
             event.setCancelled(true);
         }

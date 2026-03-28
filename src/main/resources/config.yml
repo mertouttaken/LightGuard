@@ -1,17 +1,5 @@
 settings:
-  prefix: "&8[&bLightGuard&8] &7"
-
-  kick-layout:
-    - "&4&m-----------------------------------------"
-    - "&c&lLIGHTGUARD SECURITY"
-    - ""
-    - "&fUser: &7%player%"
-    - "&fDetection: &c%check% &7(&e%packet%&7)"
-    - "&fPing: &e%ping%ms"
-    - ""
-    - "&4&l⛔ ACTION BLOCKED ⛔"
-    - "&7You have violated server security."
-    - "&4&m-----------------------------------------"
+  prefix: "&8[&cLightGuard&8] &7"
 
   sentinel:
     enabled: true

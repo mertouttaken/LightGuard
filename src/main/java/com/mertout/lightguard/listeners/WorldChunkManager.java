@@ -11,10 +11,8 @@ import java.util.concurrent.ConcurrentHashMap;
 
 public class WorldChunkManager implements Listener {
 
-    // Dünya Adı -> Yüklü Chunk'ların (Long formatında) Kilit-siz (Lock-Free) Set'i
     private final Map<String, Set<Long>> loadedChunks = new ConcurrentHashMap<>();
 
-    // X ve Z koordinatlarını tek bir Long primitive'e sıkıştırır (Sıfır obje alokasyonu)
     public static long getChunkKey(int x, int z) {
         return ((long) x << 32) | (z & 0xFFFFFFFFL);
     }
@@ -38,9 +36,6 @@ public class WorldChunkManager implements Listener {
         }
     }
 
-    /**
-     * Netty Thread'i tarafından GÜVENLE çağrılabilir. (Lock-Free O(1) sorgu)
-     */
     public boolean isChunkLoadedAsynchronously(String worldName, int chunkX, int chunkZ) {
         Set<Long> chunks = loadedChunks.get(worldName);
         if (chunks == null) return false;

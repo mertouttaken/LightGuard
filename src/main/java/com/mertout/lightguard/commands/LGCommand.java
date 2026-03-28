@@ -7,6 +7,8 @@ import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
 
+import java.util.Set;
+
 public class LGCommand implements CommandExecutor {
     private final LightGuard plugin;
 
@@ -54,6 +56,23 @@ public class LGCommand implements CommandExecutor {
                 new LGStatsCommand(plugin).execute(sender, args);
                 break;
 
+            case "safemode":
+                if (args.length > 1 && args[1].equalsIgnoreCase("reset")) {
+                    plugin.getDispatcher().getSafeModeManager().reset();
+                    sender.sendMessage("§a[LightGuard] Safe Mode data reset. All checks re-enabled.");
+                } else {
+                    Set<String> disabled = plugin.getDispatcher().getSafeModeManager().getDisabledChecks();
+                    sender.sendMessage("§8§m----------§r §cSafe Mode Status §8§m----------");
+                    if (disabled.isEmpty()) {
+                        sender.sendMessage("§aAll checks are running normally.");
+                    } else {
+                        sender.sendMessage("§eDisabled Checks (Due to Errors):");
+                        disabled.forEach(name -> sender.sendMessage(" §7- §c" + name));
+                        sender.sendMessage("");
+                        sender.sendMessage("§7Use §f/lg safemode reset §7to re-enable.");
+                    }
+                }
+                break;
             default:
                 sendHelp(sender);
                 break;

@@ -1,6 +1,6 @@
 package com.mertout.lightguard;
 
-import com.mertout.lightguard.checks.LightGuardDispatcher;
+import com.mertout.lightguard.checks.Dispatcher;
 import com.mertout.lightguard.commands.LGCommand;
 import com.mertout.lightguard.commands.subcommands.LGProfileCommand;
 import com.mertout.lightguard.config.ConfigManager;
@@ -28,7 +28,7 @@ public class LightGuard extends JavaPlugin {
     private ActionQueue actionQueue;
     private WorldChunkManager worldChunkManager;
     private ProtocolManager protocolManager;
-    private LightGuardDispatcher checkDispatcher; // İsim Dispatcher olarak güncellendi
+    private Dispatcher checkDispatcher;
 
     private double currentTps = 20.0;
 
@@ -47,7 +47,7 @@ public class LightGuard extends JavaPlugin {
         this.actionQueue = new ActionQueue(this);
         this.protocolManager = new ProtocolManager();
         this.worldChunkManager = new WorldChunkManager();
-        this.checkDispatcher = new LightGuardDispatcher(this);
+        this.checkDispatcher = new Dispatcher(this);
 
         this.packetInjector = new LGPacketInjector(this);
 
@@ -56,6 +56,8 @@ public class LightGuard extends JavaPlugin {
         this.metrics = new MetricsCollector(this);
 
         getServer().getPluginManager().registerEvents(new MechanicListener(this), this);
+        getServer().getPluginManager().registerEvents(worldChunkManager, this);
+
         getCommand("lg").setExecutor(new LGCommand(this));
 
         getServer().getScheduler().runTaskTimer(this, () -> {
@@ -92,7 +94,7 @@ public class LightGuard extends JavaPlugin {
     }
 
     public void reloadCheckDispatcher() {
-        this.checkDispatcher = new LightGuardDispatcher(this);
+        this.checkDispatcher = new Dispatcher(this);
     }
 
     public static LightGuard getInstance() { return instance; }
@@ -104,7 +106,7 @@ public class LightGuard extends JavaPlugin {
     public WorldChunkManager getWorldChunkManager() { return worldChunkManager; }
     public ProtocolManager getProtocolManager() { return protocolManager; }
     public LGPacketInjector getPacketInjector() { return packetInjector; }
-    public LightGuardDispatcher getDispatcher() { return checkDispatcher; }
+    public Dispatcher getDispatcher() { return checkDispatcher; }
 
     public double getTPS() { return currentTps; }
 }
