@@ -3,7 +3,8 @@ package com.mertout.lightguard.checks.impl;
 import com.mertout.lightguard.LightGuard;
 import com.mertout.lightguard.checks.Check;
 import com.mertout.lightguard.data.ProtocolPlayer;
-import net.minecraft.server.v1_16_R3.PacketPlayInWindowClick;
+import net.minecraft.server.v1_16_R3.*;
+import org.bukkit.craftbukkit.v1_16_R3.entity.CraftPlayer;
 
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
@@ -44,6 +45,34 @@ public class WindowCheck extends Check {
 
             if (button < 0 || button > 99 || slot > 127) return false;
 
+            if (player.isInventoryOpen()) {
+                EntityPlayer nmsPlayer = ((CraftPlayer) player.getPlayer()).getHandle();
+                Container container = nmsPlayer.activeContainer;
+
+                if (container instanceof ContainerLectern) {
+                    ContainerLectern lectern = (ContainerLectern) container;
+
+                    ItemStack book = lectern.getSlot(0).getItem();
+
+                    if (book != null && book.hasTag()) {
+                        NBTTagCompound tag = book.getTag();
+
+                        if (tag.hasKeyOfType("pages", 9)) { // 9 = TAG_List
+                            int totalPages = tag.getList("pages", 8).size(); // 8 = TAG_String
+
+                            if (button > totalPages && button > 3) {
+                                plugin.getActionQueue().pushKick(player.getPlayer(), "Invalid Lectern Page (" + button + ")");
+                                return false;
+                            }
+                        }
+                    }
+
+                    if (player.incrementAndGetQuickMoveCount(System.currentTimeMillis()) > 10) {
+                        return false;
+                    }
+                }
+            }
+
             if (typeName.equals("QUICK_MOVE") && player.incrementAndGetQuickMoveCount(System.currentTimeMillis()) > 50) {
                 return false;
             }
@@ -57,7 +86,9 @@ public class WindowCheck extends Check {
                 return false;
             }
 
-        } catch (Throwable t) { return false; }
+        } catch (Throwable t) {
+            return false;
+        }
         return true;
     }
 }

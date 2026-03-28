@@ -189,10 +189,9 @@ checks:
       - "run_command"
       - "clickEvent"
       - "hoverEvent"
-      - "Score" # Scoreboard exploit
-      - "Selector" # Selector exploit
+      - "Score"
+      - "Selector"
       - "translation.test.invalid"
-      - "BlockEntityTag" # Prevents hiding massive data inside block entities (Shulker crashes).
 
     nbt-occurrences:
       - "extra:15"      # Blocks JSON bombs (massive text rendering).
