@@ -81,11 +81,6 @@ public class WindowCheck extends Check {
                 return false;
             }
 
-            if (windowId > 0 && typeName.equals("SWAP")) {
-                plugin.getActionQueue().pushKick(player.getPlayer(), "Illegal GUI Swap Exploit");
-                return false;
-            }
-
         } catch (Throwable t) {
             return false;
         }

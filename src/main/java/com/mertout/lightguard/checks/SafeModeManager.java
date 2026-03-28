@@ -30,12 +30,16 @@ public class SafeModeManager {
     }
 
     public boolean isCheckEnabled(String checkName) {
+        if (isCritical(checkName)) return true;
+
         return !disabledChecks.contains(checkName);
     }
 
     public boolean isCritical(String checkName) {
+        if (checkName == null) return false;
+        String lowerName = checkName.toLowerCase();
         for (String pattern : criticalPatterns) {
-            if (checkName.toLowerCase().contains(pattern.toLowerCase())) {
+            if (lowerName.contains(pattern.toLowerCase())) {
                 return true;
             }
         }
@@ -43,6 +47,11 @@ public class SafeModeManager {
     }
 
     public void recordException(String checkName, Throwable t) {
+        if (isCritical(checkName)) {
+            plugin.getLogger().warning("[Sentinel] Critical check '" + checkName + "' threw an exception but will stay ENABLED for security.");
+            return;
+        }
+
         int count = exceptionCounts.merge(checkName, 1, Integer::sum);
 
         if (count >= errorThreshold && !disabledChecks.contains(checkName)) {
@@ -69,5 +78,8 @@ public class SafeModeManager {
 
     public Set<String> getDisabledChecks() {
         return disabledChecks;
+    }
+    public Map<String, Integer> getExceptionCounts() {
+        return exceptionCounts;
     }
 }

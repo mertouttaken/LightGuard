@@ -27,9 +27,10 @@ settings:
   # If a check throws too many errors, it disables it automatically to prevent TPS loss.
   sentinel:
     enabled: true
+    safe-mode-threshold: 10
     silent-failures: false # If true, errors are hidden from the console.
     geyser-support: true # Relaxes certain movement/packet checks for Bedrock players.
-    
+
     # Checks listed here are considered "Critical".
     # Sentinel will NEVER disable these checks, even if they throw errors, 
     # because disabling them would leave the server vulnerable to instant crashes.

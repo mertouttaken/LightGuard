@@ -4,17 +4,16 @@ import com.mertout.lightguard.LightGuard;
 import org.bukkit.command.CommandSender;
 
 public class LGStatsCommand {
+
     private final LightGuard plugin;
     public LGStatsCommand(LightGuard plugin) { this.plugin = plugin; }
 
     public void execute(CommandSender sender, String[] args) {
-        if (args.length > 1 && args[1].equalsIgnoreCase("reset")) {
+        if (args.length > 0 && args[0].equalsIgnoreCase("reset")) {
             plugin.getMetrics().reset();
-            sender.sendMessage("§c[LightGuard] Statistics have been reset.");
+            sender.sendMessage("§a[LightGuard] Statistics have been reset.");
+            return;
         }
-        else
-        {
-            sender.sendMessage(plugin.getMetrics().getFormattedReport());
-        }
+        sender.sendMessage(plugin.getMetrics().getFormattedReport());
     }
 }

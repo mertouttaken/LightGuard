@@ -65,29 +65,46 @@ public class Dispatcher {
     }
 
     public boolean dispatch(Object packet, ProtocolPlayer player) {
-        String packetName = packet.getClass().getSimpleName();
-        if (!player.getStateMachine().analyzeCrashCombo(packet.getClass().getSimpleName())) {
-            plugin.getActionQueue().pushKick(player.getPlayer(), "Exploit Combo Pattern (Crash Attempt)");
-            return false;
-        }
+        long startTime = System.nanoTime();
+        boolean blocked = true; // Varsayılan olarak bloklandı kabul edip sonunda düzelteceğiz
 
-        if (!player.getStateMachine().isActionValid(packetName, player)) {
-            plugin.getActionQueue().pushKick(player.getPlayer(), "Invalid Sequence / State Action");
-            return false;
-        }
+        try {
+            String packetName = packet.getClass().getSimpleName();
 
-        for (Check check : globalChecks) {
-            if (!runCheck(check, packet, player)) return false;
-        }
-
-        List<Check> specificChecks = packetMap.get(packet.getClass());
-        if (specificChecks != null) {
-            for (Check check : specificChecks) {
-                if (!runCheck(check, packet, player)) return false;
+            if (!player.getStateMachine().analyzeCrashCombo(packetName)) {
+                plugin.getActionQueue().pushKick(player.getPlayer(), "Exploit Combo Pattern (Crash Attempt)");
+                return false;
             }
-        }
 
-        return true;
+            if (!player.getStateMachine().isActionValid(packetName, player)) {
+                plugin.getActionQueue().pushKick(player.getPlayer(), "Invalid Sequence / State Action");
+                return false;
+            }
+
+            for (Check check : globalChecks) {
+                long checkStart = System.nanoTime();
+                boolean result = runCheck(check, packet, player);
+                plugin.getPerformanceMonitor().recordCheck(check.getClass().getSimpleName(), System.nanoTime() - checkStart);
+                if (!result) return false;
+            }
+
+            List<Check> specificChecks = packetMap.get(packet.getClass());
+            if (specificChecks != null) {
+                for (Check check : specificChecks) {
+                    long checkStart = System.nanoTime();
+                    boolean result = runCheck(check, packet, player);
+                    plugin.getPerformanceMonitor().recordCheck(check.getClass().getSimpleName(), System.nanoTime() - checkStart);
+                    if (!result) return false;
+                }
+            }
+
+            blocked = false;
+            return true;
+
+        } finally {
+            long totalDuration = System.nanoTime() - startTime;
+            plugin.getMetrics().recordPacket(blocked, totalDuration);
+        }
     }
 
     private boolean runCheck(Check check, Object packet, ProtocolPlayer player) {

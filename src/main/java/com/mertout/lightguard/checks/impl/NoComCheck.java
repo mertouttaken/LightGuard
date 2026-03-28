@@ -5,6 +5,7 @@ import com.mertout.lightguard.checks.Check;
 import com.mertout.lightguard.data.ProtocolPlayer;
 import net.minecraft.server.v1_16_R3.BlockPosition;
 import net.minecraft.server.v1_16_R3.PacketPlayInBlockDig;
+import net.minecraft.server.v1_16_R3.PacketPlayInBlockDig.EnumPlayerDigType;
 
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.VarHandle;
@@ -12,11 +13,13 @@ import java.lang.invoke.VarHandle;
 public class NoComCheck extends Check {
 
     private static final VarHandle POS_FIELD;
+    private static final VarHandle TYPE_FIELD;
 
     static {
         try {
-            POS_FIELD = MethodHandles.privateLookupIn(PacketPlayInBlockDig.class, MethodHandles.lookup())
-                    .findVarHandle(PacketPlayInBlockDig.class, "a", BlockPosition.class);
+            MethodHandles.Lookup lookup = MethodHandles.privateLookupIn(PacketPlayInBlockDig.class, MethodHandles.lookup());
+            POS_FIELD = lookup.findVarHandle(PacketPlayInBlockDig.class, "a", BlockPosition.class);
+            TYPE_FIELD = lookup.findVarHandle(PacketPlayInBlockDig.class, "c", EnumPlayerDigType.class);
         } catch (Exception e) {
             throw new ExceptionInInitializerError(e);
         }
@@ -31,7 +34,14 @@ public class NoComCheck extends Check {
         if (!(packet instanceof PacketPlayInBlockDig)) return true;
 
         try {
-            if (player.isInTeleportGrace()) {
+            if (player.isInTeleportGrace()) return true;
+
+            EnumPlayerDigType type = (EnumPlayerDigType) TYPE_FIELD.get(packet);
+
+            if (type == EnumPlayerDigType.DROP_ITEM ||
+                    type == EnumPlayerDigType.DROP_ALL_ITEMS ||
+                    type == EnumPlayerDigType.SWAP_ITEM_WITH_OFFHAND ||
+                    type == EnumPlayerDigType.RELEASE_USE_ITEM) {
                 return true;
             }
 

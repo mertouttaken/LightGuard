@@ -8,33 +8,38 @@ import java.util.concurrent.atomic.LongAdder;
 public class PerformanceMonitor {
 
     private final LightGuard plugin;
-    private final Map<String, LongAdder> checkDurations = new ConcurrentHashMap<>();
-    private final Map<String, LongAdder> checkCounts = new ConcurrentHashMap<>();
+    private final Map<String, CheckData> statsMap = new ConcurrentHashMap<>();
 
     public PerformanceMonitor(LightGuard plugin) {
         this.plugin = plugin;
     }
 
     public void recordCheck(String checkName, long durationNs) {
-        checkDurations.computeIfAbsent(checkName, k -> new LongAdder()).add(durationNs);
-        checkCounts.computeIfAbsent(checkName, k -> new LongAdder()).increment();
+        CheckData data = statsMap.get(checkName);
+        if (data == null) {
+            data = statsMap.computeIfAbsent(checkName, k -> new CheckData());
+        }
+
+        data.totalDuration.add(durationNs);
+        data.callCount.increment();
     }
 
     public void printStats() {
         plugin.getLogger().info("§e[LightGuard] === Performance Benchmark ===");
 
-        if (checkDurations.isEmpty()) {
+        if (statsMap.isEmpty()) {
             plugin.getLogger().info("§cNo data collected yet.");
             return;
         }
 
-        checkDurations.entrySet().stream()
-                .sorted((a, b) -> Long.compare(b.getValue().sum(), a.getValue().sum()))
+        statsMap.entrySet().stream()
+                .sorted((a, b) -> Long.compare(b.getValue().totalDuration.sum(), a.getValue().totalDuration.sum()))
                 .limit(10)
                 .forEach(entry -> {
                     String name = entry.getKey();
-                    long totalNs = entry.getValue().sum();
-                    long count = checkCounts.get(name).sum();
+                    CheckData data = entry.getValue();
+                    long totalNs = data.totalDuration.sum();
+                    long count = data.callCount.sum();
                     long avgNs = count > 0 ? totalNs / count : 0;
 
                     plugin.getLogger().info(String.format(
@@ -45,7 +50,11 @@ public class PerformanceMonitor {
     }
 
     public void reset() {
-        checkDurations.clear();
-        checkCounts.clear();
+        statsMap.clear();
+    }
+
+    private static class CheckData {
+        final LongAdder totalDuration = new LongAdder();
+        final LongAdder callCount = new LongAdder();
     }
 }

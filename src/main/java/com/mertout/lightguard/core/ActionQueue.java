@@ -27,6 +27,7 @@ public class ActionQueue {
     }
 
     public void pushKick(Player player, String reason) {
+        plugin.getMetrics().recordViolation(player.getName(), reason);
         queue.offer(new Action(player, reason, ActionType.KICK));
     }
 
