@@ -72,14 +72,14 @@ LightGuard doesn't just stop packet crashers; it patches notorious Vanilla Minec
 
 ## 📊 Metrics & Performance Commands
 
-| Command | Description
-| --- | --- | --- |
-| `/lg reload` | Reloads configurations, illegal block caches, and checks.
-| `/lg profile` | Toggles the live packet profiler (Shows Top PPS players).
-| `/lg safemode` | Shows active internal errors and automatically disabled checks.
-| `/lg benchmark` | Prints nanosecond performance stats for every check module.
-| `/lg stats` | Shows total blocked packets, uptime, and top violators.
-| `/lg tps` | Displays accurate internal server TPS.
+| Command | Description |
+| --- | --- |
+| `/lg reload` | Reloads configurations, illegal block caches, and checks. |
+| `/lg profile` | Toggles the live packet profiler (Shows Top PPS players). |
+| `/lg safemode` | Shows active internal errors and automatically disabled checks. |
+| `/lg benchmark` | Prints nanosecond performance stats for every check module. |
+| `/lg stats` | Shows total blocked packets, uptime, and top violators. |
+| `/lg tps` | Displays accurate internal server TPS. |
 
 **Permissions:** * `lg.admin`: Grants access to commands and total immunity to security checks.
 
