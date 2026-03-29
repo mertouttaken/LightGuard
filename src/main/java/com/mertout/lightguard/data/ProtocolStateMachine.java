@@ -4,23 +4,34 @@ public class ProtocolStateMachine {
 
     private int ghostWindowClicks = 0;
     private int ghostHotbarSwaps = 0;
+    private long lastGhostAction = 0;
 
     private long lastTabComplete = 0;
     private long lastPayload = 0;
     private int comboSpamCount = 0;
 
     public synchronized boolean isActionValid(String packetName, ProtocolPlayer pp) {
+        long now = System.currentTimeMillis();
+
+        if (now - lastGhostAction > 1000) {
+            ghostWindowClicks = 0;
+            ghostHotbarSwaps = 0;
+        }
 
         if (!pp.isInventoryOpen()) {
             if (packetName.equals("PacketPlayInWindowClick")) {
+                lastGhostAction = now;
                 ghostWindowClicks++;
-                if (ghostWindowClicks > 10000) ghostWindowClicks = 10000;
+
+                if (ghostWindowClicks > 100) ghostWindowClicks = 100;
 
                 if (ghostWindowClicks > 5) return false;
             }
             else if (packetName.equals("PacketPlayInHeldItemSlot")) {
+                lastGhostAction = now;
                 ghostHotbarSwaps++;
-                if (ghostHotbarSwaps > 10000) ghostHotbarSwaps = 10000;
+
+                if (ghostHotbarSwaps > 100) ghostHotbarSwaps = 100;
 
                 if (ghostHotbarSwaps > 8) return false;
             }

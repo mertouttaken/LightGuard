@@ -18,7 +18,7 @@ public class WorldChunkManager implements Listener {
     private final Map<String, Set<Long>> loadedChunks = new ConcurrentHashMap<>();
 
     public WorldChunkManager(LightGuard plugin) {
-        bootstrap();
+        Bukkit.getScheduler().runTaskLater(plugin, this::bootstrap, 20L);
         Bukkit.getPluginManager().registerEvents(this, plugin);
     }
 
