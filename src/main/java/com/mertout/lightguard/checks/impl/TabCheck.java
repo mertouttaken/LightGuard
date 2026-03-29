@@ -39,7 +39,8 @@ public class TabCheck extends Check {
     public boolean check(Object packet, ProtocolPlayer player) {
         if (!(packet instanceof PacketPlayInTabComplete)) return true;
 
-        if (player.incrementAndGetTabCount(System.currentTimeMillis()) > 4) {
+        if (player.getRateLimiter().addAndCheck(110.0)) {
+            plugin.getActionQueue().pushKick(player.getPlayer(), "Tab Complete Flood (Hybrid Limit)");
             return false;
         }
 
@@ -47,7 +48,7 @@ public class TabCheck extends Check {
         if (buffer == null) return true;
 
         if (buffer.length() > maxLength) {
-            plugin.getActionQueue().pushKick(player.getPlayer(), "Oversized Tab Request");
+            plugin.getActionQueue().pushKick(player.getPlayer(), "Oversized Tab Request (" + buffer.length() + " chars)");
             return false;
         }
 

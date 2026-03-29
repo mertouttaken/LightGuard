@@ -26,11 +26,13 @@ public class NBTStreamingScanner {
                     if (result == -1) {
                         isSafe = false;
                         break;
+                    } else if (result == 1) {
+                        continue;
+                    } else {
+                        buf.resetReaderIndex();
+                        buf.readByte();
                     }
                 }
-
-                buf.resetReaderIndex();
-                buf.readByte();
             }
         } catch (Exception ignored) {
         } finally {
@@ -93,7 +95,7 @@ public class NBTStreamingScanner {
                     while (true) {
                         if (!buf.isReadable()) return 0;
                         byte inner = buf.readByte();
-                        if (inner == 0) break;
+                        if (inner == 0) break; // TAG_End
 
                         if (buf.readableBytes() < 2) return 0;
                         int nLen = buf.readUnsignedShort();

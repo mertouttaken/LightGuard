@@ -1,7 +1,7 @@
 package com.mertout.lightguard.checks;
 
 import com.mertout.lightguard.LightGuard;
-
+import java.util.concurrent.locks.ReentrantLock;
 
 public class HybridRateLimiter {
 
@@ -18,65 +18,85 @@ public class HybridRateLimiter {
     private final long[] burstTimestamps = new long[20];
     private int burstIndex = 0;
 
+    private final ReentrantLock lock = new ReentrantLock();
+
     public HybridRateLimiter(LightGuard plugin) {
         this.maxThreshold = plugin.getConfig().getDouble("checks.flood.max-threshold", 500.0);
         this.decayPerSecond = plugin.getConfig().getDouble("checks.flood.decay-per-second", 150.0);
         this.maxViolations = plugin.getConfig().getInt("checks.flood.max-violations", 3);
     }
 
-    public synchronized boolean addAndCheck(double baseWeight) {
-        long now = System.currentTimeMillis();
-
-        if (lastPacketTime == 0) {
-            lastPacketTime = now;
-            lastViolationDecayTime = now;
+    public boolean addAndCheck(double baseWeight) {
+        if (!lock.tryLock()) {
+            return true;
         }
 
-        long timeDelta = now - lastPacketTime;
-        if (timeDelta > 0) {
-            double decayAmount = (timeDelta / 1000.0) * decayPerSecond;
-            this.threatScore = Math.max(0.0, this.threatScore - decayAmount);
-        }
-        this.lastPacketTime = now;
+        try {
+            long now = System.currentTimeMillis();
 
-        long violationTimeDelta = now - lastViolationDecayTime;
-        if (violationTimeDelta > 5000) {
-            if (this.violationLevel > 0) {
-                this.violationLevel--;
+            if (lastPacketTime == 0) {
+                lastPacketTime = now;
+                lastViolationDecayTime = now;
             }
-            this.lastViolationDecayTime = now;
-        }
 
-        double finalWeight = baseWeight;
-        long oldestTimestamp = burstTimestamps[(burstIndex + 1) % 20];
-
-        if (oldestTimestamp > 0 && (now - oldestTimestamp) < 50) {
-            finalWeight *= 4.0;
-        }
-
-        burstTimestamps[burstIndex] = now;
-        burstIndex = (burstIndex + 1) % 20;
-
-        this.threatScore += finalWeight;
-
-        if (this.threatScore > maxThreshold) {
-            this.violationLevel++;
-
-            this.threatScore = maxThreshold * 0.5;
-
-            if (this.violationLevel >= maxViolations) {
-                return true;
+            long timeDelta = now - lastPacketTime;
+            if (timeDelta > 0) {
+                double decayAmount = (timeDelta / 1000.0) * decayPerSecond;
+                this.threatScore = Math.max(0.0, this.threatScore - decayAmount);
             }
-        }
+            this.lastPacketTime = now;
 
-        return false;
+            long violationTimeDelta = now - lastViolationDecayTime;
+            if (violationTimeDelta > 5000) {
+                if (this.violationLevel > 0) {
+                    this.violationLevel--;
+                }
+                this.lastViolationDecayTime = now;
+            }
+
+            double finalWeight = baseWeight;
+            long oldestTimestamp = burstTimestamps[(burstIndex + 1) % 20];
+
+            if (oldestTimestamp > 0 && (now - oldestTimestamp) < 50) {
+                finalWeight *= 4.0;
+            }
+
+            burstTimestamps[burstIndex] = now;
+            burstIndex = (burstIndex + 1) % 20;
+
+            this.threatScore += finalWeight;
+
+            if (this.threatScore > maxThreshold) {
+                this.violationLevel++;
+
+                this.threatScore = maxThreshold * 0.5;
+
+                if (this.violationLevel >= maxViolations) {
+                    return true;
+                }
+            }
+
+            return false;
+        } finally {
+            lock.unlock();
+        }
     }
 
     public double getThreatScore() {
-        return threatScore;
+        lock.lock();
+        try {
+            return threatScore;
+        } finally {
+            lock.unlock();
+        }
     }
 
     public int getViolationLevel() {
-        return violationLevel;
+        lock.lock();
+        try {
+            return violationLevel;
+        } finally {
+            lock.unlock();
+        }
     }
 }

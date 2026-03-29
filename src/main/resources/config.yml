@@ -269,7 +269,7 @@ checks:
   # Secures the Tab-Complete feature against Log4j and massive argument requests.
   tab:
     enabled: true
-    max-length: 128 # Maximum length of a tab-complete request.
+    max-length: 256 # Maximum length of a tab-complete request.
     # Single characters that are completely forbidden in tab completions.
     block-chars:
       - "["

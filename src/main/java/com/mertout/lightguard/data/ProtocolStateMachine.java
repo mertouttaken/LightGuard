@@ -9,7 +9,7 @@ public class ProtocolStateMachine {
     private long lastPayload = 0;
     private int comboSpamCount = 0;
 
-    public boolean isActionValid(String packetName, ProtocolPlayer pp) {
+    public synchronized boolean isActionValid(String packetName, ProtocolPlayer pp) {
 
         if (!pp.isInventoryOpen()) {
             if (packetName.equals("PacketPlayInWindowClick")) {
@@ -32,7 +32,7 @@ public class ProtocolStateMachine {
         return true;
     }
 
-    public boolean analyzeCrashCombo(String packetName) {
+    public synchronized boolean analyzeCrashCombo(String packetName) {
         long now = System.currentTimeMillis();
 
         if (packetName.equals("PacketPlayInTabComplete")) {
