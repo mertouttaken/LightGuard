@@ -4,7 +4,6 @@ import com.mertout.lightguard.LightGuard;
 import com.mertout.lightguard.checks.HybridRateLimiter;
 import org.bukkit.entity.Player;
 import java.util.UUID;
-import java.util.concurrent.atomic.AtomicInteger;
 
 public class ProtocolPlayer {
     private final Player player;
@@ -14,9 +13,6 @@ public class ProtocolPlayer {
     private final ProtocolStateMachine stateMachine = new ProtocolStateMachine();
     private final HybridRateLimiter rateLimiter;
     private final KeepAliveTracker keepAliveTracker = new KeepAliveTracker();
-
-    private volatile int pps = 0;
-    private final AtomicInteger packetCounter = new AtomicInteger(0);
 
     private volatile boolean inventoryOpen = false;
     private volatile int openWindowId = 0;
@@ -31,48 +27,132 @@ public class ProtocolPlayer {
     private volatile boolean isHoldingBook = false;
     private volatile boolean brandSent = false;
     private volatile boolean isBedrock = false;
+    private volatile boolean isPrinterMode = false;
 
     private volatile double lastX = -1, lastY = -1, lastZ = -1;
     private volatile double lastVehicleX = -1, lastVehicleY = -1, lastVehicleZ = -1;
 
-    private volatile long lastMapTime = 0;
-    private final AtomicInteger mapCount = new AtomicInteger(0);
+    private int pps = 0;
+    private int packetCounter = 0;
 
-    private volatile long lastBlockPlaceTime = 0;
-    private final AtomicInteger blockPlaceCount = new AtomicInteger(0);
+    private long lastMapTime = 0;
+    private int mapCount = 0;
 
-    private volatile long lastPrinterTime = 0;
-    private final AtomicInteger printerCount = new AtomicInteger(0);
-    private volatile boolean isPrinterMode = false;
+    private long lastBlockPlaceTime = 0;
+    private int blockPlaceCount = 0;
 
-    private volatile long lastRespawnTime = 0;
-    private final AtomicInteger respawnCount = new AtomicInteger(0);
+    private long lastPrinterTime = 0;
+    private int printerCount = 0;
 
-    private volatile long lastTabTime = 0;
-    private final AtomicInteger tabCount = new AtomicInteger(0);
+    private long lastRespawnTime = 0;
+    private int respawnCount = 0;
 
-    private volatile long lastChannelRegisterTime = 0;
-    private final AtomicInteger recentChannelRegisters = new AtomicInteger(0);
+    private long lastTabTime = 0;
+    private int tabCount = 0;
 
-    private volatile long lastRecipeTime = 0;
-    private final AtomicInteger recipeCount = new AtomicInteger(0);
+    private long lastChannelRegisterTime = 0;
+    private int recentChannelRegisters = 0;
 
-    private volatile long lastQuickMoveTime = 0;
-    private final AtomicInteger quickMoveCount = new AtomicInteger(0);
+    private long lastRecipeTime = 0;
+    private int recipeCount = 0;
 
-    private volatile long lastEntityInteractTime = 0;
+    private long lastQuickMoveTime = 0;
+    private int quickMoveCount = 0;
+
+    private long lastEntityInteractTime = 0;
 
     public ProtocolPlayer(Player player, LightGuard plugin) {
         this.player = player;
         this.uuid = player.getUniqueId();
         this.entityId = player.getEntityId();
-
         this.rateLimiter = new HybridRateLimiter(plugin);
     }
 
-    public void incrementPacketCount() { packetCounter.incrementAndGet(); }
-    public void updatePPS() { this.pps = packetCounter.getAndSet(0); }
-    public int getPPS() { return pps; }
+    public synchronized void incrementPacketCount() { packetCounter++; }
+    public synchronized void updatePPS() {
+        this.pps = packetCounter;
+        this.packetCounter = 0;
+    }
+    public synchronized int getPPS() { return pps; }
+
+    public synchronized int incrementAndGetMapCount(long now) {
+        if (now - lastMapTime > 1000) {
+            lastMapTime = now;
+            mapCount = 1;
+            return 1;
+        }
+        return ++mapCount;
+    }
+
+    public synchronized int incrementAndGetBlockPlaceCount(long now) {
+        if (now - lastBlockPlaceTime > 1000) {
+            lastBlockPlaceTime = now;
+            blockPlaceCount = 1;
+            return 1;
+        }
+        return ++blockPlaceCount;
+    }
+
+    public synchronized boolean checkAndSetEntityInteractDelay(long now, long ms) {
+        if (now - lastEntityInteractTime < ms) return true;
+        lastEntityInteractTime = now;
+        return false;
+    }
+
+    public synchronized int incrementAndGetPrinterCount(long now) {
+        if (now - lastPrinterTime > 1000) {
+            lastPrinterTime = now;
+            printerCount = 1;
+            return 1;
+        }
+        return ++printerCount;
+    }
+
+    public synchronized int incrementAndGetRespawnCount(long now) {
+        if (now - lastRespawnTime > 1000) {
+            lastRespawnTime = now;
+            respawnCount = 1;
+            return 1;
+        }
+        return ++respawnCount;
+    }
+
+    public synchronized int incrementAndGetTabCount(long now) {
+        if (now - lastTabTime > 1000) {
+            lastTabTime = now;
+            tabCount = 1;
+            return 1;
+        }
+        return ++tabCount;
+    }
+
+    public synchronized int incrementAndGetChannelRegisterCount(int amount, long now) {
+        if (now - lastChannelRegisterTime > 60000) {
+            lastChannelRegisterTime = now;
+            recentChannelRegisters = amount;
+            return amount;
+        }
+        recentChannelRegisters += amount;
+        return recentChannelRegisters;
+    }
+
+    public synchronized int incrementAndGetRecipeCount(long now) {
+        if (now - lastRecipeTime > 1000) {
+            lastRecipeTime = now;
+            recipeCount = 1;
+            return 1;
+        }
+        return ++recipeCount;
+    }
+
+    public synchronized int incrementAndGetQuickMoveCount(long now) {
+        if (now - lastQuickMoveTime > 1000) {
+            lastQuickMoveTime = now;
+            quickMoveCount = 1;
+            return 1;
+        }
+        return ++quickMoveCount;
+    }
 
     public Player getPlayer() { return player; }
     public UUID getUuid() { return uuid; }
@@ -106,6 +186,8 @@ public class ProtocolPlayer {
     public void setBrandSent(boolean brandSent) { this.brandSent = brandSent; }
     public boolean isBedrock() { return isBedrock; }
     public void setBedrock(boolean bedrock) { isBedrock = bedrock; }
+    public void setPrinterMode(boolean mode) { this.isPrinterMode = mode; }
+    public boolean isPrinterMode() { return isPrinterMode; }
 
     public double getLastX() { return lastX; }
     public double getLastY() { return lastY; }
@@ -121,77 +203,4 @@ public class ProtocolPlayer {
     }
     public boolean isInTeleportGrace() { return (System.currentTimeMillis() - lastTeleportTime) < 1500; }
     public void markTeleport() { this.lastTeleportTime = System.currentTimeMillis(); }
-
-    public int incrementAndGetMapCount(long now) {
-        if (now - lastMapTime > 1000) {
-            lastMapTime = now;
-            mapCount.set(1);
-            return 1;
-        }
-        return mapCount.incrementAndGet();
-    }
-    public int incrementAndGetBlockPlaceCount(long now) {
-        if (now - lastBlockPlaceTime > 1000) {
-            lastBlockPlaceTime = now;
-            blockPlaceCount.set(1);
-            return 1;
-        }
-        return blockPlaceCount.incrementAndGet();
-    }
-    public boolean checkAndSetEntityInteractDelay(long now, long ms) {
-        if (now - lastEntityInteractTime < ms) return true;
-        lastEntityInteractTime = now;
-        return false;
-    }
-    public int incrementAndGetPrinterCount(long now) {
-        if (now - lastPrinterTime > 1000) {
-            lastPrinterTime = now;
-            printerCount.set(1);
-            return 1;
-        }
-        return printerCount.incrementAndGet();
-    }
-    public int incrementAndGetRespawnCount(long now) {
-        if (now - lastRespawnTime > 1000) {
-            lastRespawnTime = now;
-            respawnCount.set(1);
-            return 1;
-        }
-        return respawnCount.incrementAndGet();
-    }
-    public int incrementAndGetTabCount(long now) {
-        if (now - lastTabTime > 1000) {
-            lastTabTime = now;
-            tabCount.set(1);
-            return 1;
-        }
-        return tabCount.incrementAndGet();
-    }
-    public int incrementAndGetChannelRegisterCount(int amount, long now) {
-        if (now - lastChannelRegisterTime > 60000) {
-            lastChannelRegisterTime = now;
-            recentChannelRegisters.set(amount);
-            return amount;
-        }
-        return recentChannelRegisters.addAndGet(amount);
-    }
-    public int incrementAndGetRecipeCount(long now) {
-        if (now - lastRecipeTime > 1000) {
-            lastRecipeTime = now;
-            recipeCount.set(1);
-            return 1;
-        }
-        return recipeCount.incrementAndGet();
-    }
-    public int incrementAndGetQuickMoveCount(long now) {
-        if (now - lastQuickMoveTime > 1000) {
-            lastQuickMoveTime = now;
-            quickMoveCount.set(1);
-            return 1;
-        }
-        return quickMoveCount.incrementAndGet();
-    }
-
-    public void setPrinterMode(boolean mode) { this.isPrinterMode = mode; }
-    public boolean isPrinterMode() { return isPrinterMode; }
 }

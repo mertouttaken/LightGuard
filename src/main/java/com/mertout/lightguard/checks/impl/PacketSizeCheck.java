@@ -13,12 +13,14 @@ public class PacketSizeCheck extends Check {
 
     private static final VarHandle CHAT_MSG;
     private static final VarHandle TAB_TEXT;
+    private static final VarHandle PAYLOAD_DATA;
 
     static {
         try {
             MethodHandles.Lookup lookup = MethodHandles.lookup();
             CHAT_MSG = MethodHandles.privateLookupIn(PacketPlayInChat.class, lookup).findVarHandle(PacketPlayInChat.class, "a", String.class);
             TAB_TEXT = MethodHandles.privateLookupIn(PacketPlayInTabComplete.class, lookup).findVarHandle(PacketPlayInTabComplete.class, "b", String.class);
+            PAYLOAD_DATA = MethodHandles.privateLookupIn(PacketPlayInCustomPayload.class, lookup).findVarHandle(PacketPlayInCustomPayload.class, "b", PacketDataSerializer.class);
         } catch (Exception e) { throw new ExceptionInInitializerError(e); }
     }
 
@@ -36,7 +38,7 @@ public class PacketSizeCheck extends Check {
     @Override
     public boolean check(Object packet, ProtocolPlayer player) {
         String packetName = packet.getClass().getSimpleName();
-        if (packet instanceof PacketPlayInCustomPayload || excludedPackets.contains(packetName)) return true;
+        if (excludedPackets.contains(packetName)) return true;
 
         if (packet instanceof PacketPlayInChat) {
             String msg = (String) CHAT_MSG.get(packet);
@@ -44,6 +46,7 @@ public class PacketSizeCheck extends Check {
                 plugin.getActionQueue().pushKick(player.getPlayer(), "Oversized Chat Message");
                 return false;
             }
+            return true;
         }
 
         if (packet instanceof PacketPlayInTabComplete) {
@@ -52,18 +55,29 @@ public class PacketSizeCheck extends Check {
                 plugin.getActionQueue().pushKick(player.getPlayer(), "Oversized Tab Complete Request");
                 return false;
             }
+            return true;
         }
 
-        if (estimateSize(packet) > globalLimit) {
-            plugin.getActionQueue().pushKick(player.getPlayer(), "Oversized Packet Detected");
-            return false;
+        if (packet instanceof PacketPlayInCustomPayload) {
+            PacketDataSerializer data = (PacketDataSerializer) PAYLOAD_DATA.get(packet);
+            if (data != null && data.readableBytes() > globalLimit) {
+                plugin.getActionQueue().pushKick(player.getPlayer(), "Oversized Custom Payload (" + data.readableBytes() + " bytes)");
+                return false;
+            }
         }
+
+        if (packet instanceof PacketPlayInUpdateSign) {
+            PacketPlayInUpdateSign signPacket = (PacketPlayInUpdateSign) packet;
+            int totalSignChars = 0;
+            for (String line : signPacket.c()) {
+                if (line != null) totalSignChars += line.length();
+            }
+            if (totalSignChars > 300) {
+                plugin.getActionQueue().pushKick(player.getPlayer(), "Oversized Sign Data");
+                return false;
+            }
+        }
+
         return true;
-    }
-
-    private long estimateSize(Object packet) {
-        if (packet instanceof PacketPlayInSetCreativeSlot) return 1500;
-        if (packet instanceof PacketPlayInUpdateSign) return 500;
-        return 20;
     }
 }

@@ -115,10 +115,16 @@ public class PositionCheck extends Check {
                     return false;
                 }
 
-                if ((diffX >= 10.0 && diffX % 1.0 == 0.0) ||
-                        (diffZ >= 10.0 && diffZ % 1.0 == 0.0) ||
-                        (diffY >= 10.0 && diffY % 1.0 == 0.0)) {
-                    plugin.getActionQueue().pushKick(player.getPlayer(), "Integer Step Exploit");
+                double epsilon = 1e-5;
+
+                boolean isXInteger = Math.abs(Math.abs(diffX) - Math.round(Math.abs(diffX))) < epsilon;
+                boolean isYInteger = Math.abs(Math.abs(diffY) - Math.round(Math.abs(diffY))) < epsilon;
+                boolean isZInteger = Math.abs(Math.abs(diffZ) - Math.round(Math.abs(diffZ))) < epsilon;
+
+                if ((Math.abs(diffX) >= 10.0 && isXInteger) ||
+                        (Math.abs(diffZ) >= 10.0 && isZInteger) ||
+                        (Math.abs(diffY) >= 10.0 && isYInteger)) {
+                    plugin.getActionQueue().pushKick(player.getPlayer(), "Integer Step Exploit (Math Bypass Blocked)");
                     return false;
                 }
 

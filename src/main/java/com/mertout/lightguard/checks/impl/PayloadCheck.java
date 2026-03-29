@@ -3,6 +3,7 @@ package com.mertout.lightguard.checks.impl;
 import com.mertout.lightguard.LightGuard;
 import com.mertout.lightguard.checks.Check;
 import com.mertout.lightguard.data.ProtocolPlayer;
+import com.mertout.lightguard.netty.nbt.NBTStreamingScanner;
 import net.minecraft.server.v1_16_R3.PacketPlayInCustomPayload;
 import io.netty.buffer.ByteBuf;
 import java.util.List;
@@ -26,7 +27,7 @@ public class PayloadCheck extends Check {
         if (!(packet instanceof PacketPlayInCustomPayload)) return true;
 
         PacketPlayInCustomPayload p = (PacketPlayInCustomPayload) packet;
-        String channel = p.tag.toString();
+        String channel = p.tag != null ? p.tag.toString() : "";
 
         if (!isValidChannel(channel)) {
             plugin.getActionQueue().pushKick(player.getPlayer(), "Invalid Payload Channel Format");
@@ -46,25 +47,6 @@ public class PayloadCheck extends Check {
             if (!player.isHoldingBook()) {
                 plugin.getActionQueue().pushKick(player.getPlayer(), "Ghost Book Exploit (No Book in Hand)");
                 return false;
-            }
-
-            ByteBuf dataBuffer = p.data;
-            if (dataBuffer != null && dataBuffer.readableBytes() > 0) {
-                ByteBuf copy = null;
-                try {
-                    copy = dataBuffer.copy();
-                    if (copy.readableBytes() > 0) {
-                        byte firstByte = copy.readByte();
-                        if (firstByte != 0x0A && firstByte != 0x00) {
-                            plugin.getActionQueue().pushKick(player.getPlayer(), "Malformed NBT Root Tag");
-                            return false;
-                        }
-                    }
-                } catch (Exception e) {
-                    return false;
-                } finally {
-                    if (copy != null) copy.release();
-                }
             }
         }
 
@@ -92,11 +74,21 @@ public class PayloadCheck extends Check {
         }
 
         try {
-            if (p.data != null && p.data.readableBytes() > maxPayloadSize && !channel.equalsIgnoreCase("WDL|INIT")) {
-                plugin.getActionQueue().pushKick(player.getPlayer(), "Oversized Payload (" + p.data.readableBytes() + " bytes)");
-                return false;
+            if (p.data != null && p.data.readableBytes() > 0) {
+
+                if (p.data.readableBytes() > maxPayloadSize) {
+                    plugin.getActionQueue().pushKick(player.getPlayer(), "Oversized Payload (" + p.data.readableBytes() + " bytes)");
+                    return false;
+                }
+
+                if (!NBTStreamingScanner.scan(p.data)) {
+                    plugin.getActionQueue().pushKick(player.getPlayer(), "Malicious NBT Data in Payload (Crash Attempt)");
+                    return false;
+                }
             }
-        } catch (Exception ignored) { return false; }
+        } catch (Exception ignored) {
+            return false;
+        }
 
         return true;
     }

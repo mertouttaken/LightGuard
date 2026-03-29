@@ -46,7 +46,7 @@ public class LightGuard extends JavaPlugin {
         this.configManager = new ConfigManager(this);
         this.actionQueue = new ActionQueue(this);
         this.protocolManager = new ProtocolManager(this);
-        this.worldChunkManager = new WorldChunkManager();
+        this.worldChunkManager = new WorldChunkManager(this);
         this.checkDispatcher = new Dispatcher(this);
 
         this.packetInjector = new LGPacketInjector(this);
@@ -56,7 +56,6 @@ public class LightGuard extends JavaPlugin {
         this.metrics = new MetricsCollector(this);
 
         getServer().getPluginManager().registerEvents(new MechanicListener(this), this);
-        getServer().getPluginManager().registerEvents(worldChunkManager, this);
 
         getCommand("lg").setExecutor(new LGCommand(this));
 

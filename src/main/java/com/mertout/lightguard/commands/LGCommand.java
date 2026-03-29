@@ -60,6 +60,7 @@ public class LGCommand implements CommandExecutor {
 
             case "safemode":
                 SafeModeManager smm = plugin.getDispatcher().getSafeModeManager();
+
                 if (args.length > 1 && args[1].equalsIgnoreCase("reset")) {
                     smm.reset();
                     sender.sendMessage("§a[LightGuard] Safe Mode data reset. All checks re-enabled.");
@@ -70,9 +71,11 @@ public class LGCommand implements CommandExecutor {
                     sender.sendMessage("§8§m----------§r §cSafe Mode Status §8§m----------");
 
                     if (!counts.isEmpty()) {
-                        sender.sendMessage("§eRecorded Internal Errors:");
+                        sender.sendMessage("§eRecorded Internal Errors (Last 60s):");
+                        int threshold = plugin.getConfig().getInt("settings.sentinel.safe-mode-threshold", 50);
+
                         counts.forEach((name, count) -> {
-                            String status = smm.isCritical(name) ? "§c[CRITICAL-ALWAYS-ON]" : "§7[" + count + "/10]";
+                            String status = smm.isCritical(name) ? "§c[CRITICAL-ALWAYS-ON]" : "§7[" + count + "/" + threshold + "]";
                             sender.sendMessage(" §7- " + name + ": " + status);
                         });
                         sender.sendMessage("");

@@ -151,6 +151,7 @@ checks:
     max-threshold: 500.0
     # The amount of threat score decayed per second for a normal playing user.
     decay-per-second: 150.0
+    max-violations: 3
 
   # Controls block placement speeds and prevents illegal blocks from being placed.
   block-place:
@@ -268,7 +269,7 @@ checks:
   # Secures the Tab-Complete feature against Log4j and massive argument requests.
   tab:
     enabled: true
-    max-length: 32 # Maximum length of a tab-complete request.
+    max-length: 128 # Maximum length of a tab-complete request.
     # Single characters that are completely forbidden in tab completions.
     block-chars:
       - "["

@@ -70,7 +70,7 @@ public class ConfigManager {
         if (plugin.getPacketLoggerManager() != null) {
             plugin.getPacketLoggerManager().getConfig().reload(plugin);
         }
-
+        plugin.getWorldChunkManager().clearCache();
         plugin.getLogger().info("§a[LightGuard] Configuration and caches reloaded successfully.");
     }
 

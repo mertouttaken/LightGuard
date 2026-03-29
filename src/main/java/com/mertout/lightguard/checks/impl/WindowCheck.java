@@ -3,8 +3,7 @@ package com.mertout.lightguard.checks.impl;
 import com.mertout.lightguard.LightGuard;
 import com.mertout.lightguard.checks.Check;
 import com.mertout.lightguard.data.ProtocolPlayer;
-import net.minecraft.server.v1_16_R3.*;
-import org.bukkit.craftbukkit.v1_16_R3.entity.CraftPlayer;
+import net.minecraft.server.v1_16_R3.PacketPlayInWindowClick;
 
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
@@ -19,10 +18,13 @@ public class WindowCheck extends Check {
             MethodHandles.Lookup lookup = MethodHandles.lookup();
             Field fWindowId = PacketPlayInWindowClick.class.getDeclaredField("a"); fWindowId.setAccessible(true);
             WINDOW_ID_GETTER = lookup.unreflectGetter(fWindowId);
+
             Field fSlot = PacketPlayInWindowClick.class.getDeclaredField("slot"); fSlot.setAccessible(true);
             SLOT_GETTER = lookup.unreflectGetter(fSlot);
+
             Field fButton = PacketPlayInWindowClick.class.getDeclaredField("button"); fButton.setAccessible(true);
             BUTTON_GETTER = lookup.unreflectGetter(fButton);
+
             Field fShift = PacketPlayInWindowClick.class.getDeclaredField("shift"); fShift.setAccessible(true);
             CLICK_TYPE_GETTER = lookup.unreflectGetter(fShift);
         } catch (Exception e) { throw new RuntimeException(e); }
@@ -43,37 +45,13 @@ public class WindowCheck extends Check {
             Enum<?> type = (Enum<?>) CLICK_TYPE_GETTER.invoke(packet);
             String typeName = type != null ? type.name() : "";
 
-            if (button < 0 || button > 99 || slot > 127) return false;
-
-            if (player.isInventoryOpen()) {
-                EntityPlayer nmsPlayer = ((CraftPlayer) player.getPlayer()).getHandle();
-                Container container = nmsPlayer.activeContainer;
-
-                if (container instanceof ContainerLectern) {
-                    ContainerLectern lectern = (ContainerLectern) container;
-
-                    ItemStack book = lectern.getSlot(0).getItem();
-
-                    if (book != null && book.hasTag()) {
-                        NBTTagCompound tag = book.getTag();
-
-                        if (tag.hasKeyOfType("pages", 9)) { // 9 = TAG_List
-                            int totalPages = tag.getList("pages", 8).size(); // 8 = TAG_String
-
-                            if (button > totalPages && button > 3) {
-                                plugin.getActionQueue().pushKick(player.getPlayer(), "Invalid Lectern Page (" + button + ")");
-                                return false;
-                            }
-                        }
-                    }
-
-                    if (player.incrementAndGetQuickMoveCount(System.currentTimeMillis()) > 10) {
-                        return false;
-                    }
-                }
+            if (button < 0 || button > 100 || slot > 127 || slot < -999) {
+                plugin.getActionQueue().pushKick(player.getPlayer(), "Invalid Window Bounds (S:" + slot + " B:" + button + ")");
+                return false;
             }
 
             if (typeName.equals("QUICK_MOVE") && player.incrementAndGetQuickMoveCount(System.currentTimeMillis()) > 50) {
+                plugin.getActionQueue().pushKick(player.getPlayer(), "Window QuickMove Spam");
                 return false;
             }
 
