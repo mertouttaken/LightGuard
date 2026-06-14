@@ -6,13 +6,14 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArraySet;
 
 public class SafeModeManager {
 
     private final LightGuard plugin;
     private final Map<String, ExceptionData> exceptionTracker = new ConcurrentHashMap<>();
     private final Set<String> disabledChecks = ConcurrentHashMap.newKeySet();
-    private final Set<String> criticalPatterns = new HashSet<>();
+    private final Set<String> criticalPatterns = new CopyOnWriteArraySet<>();
 
     private final int errorThreshold;
     private final long timeWindowMillis = 60000L;
@@ -27,7 +28,9 @@ public class SafeModeManager {
         criticalPatterns.clear();
         List<String> list = plugin.getConfig().getStringList("settings.sentinel.critical-checks");
         if (list != null) {
-            criticalPatterns.addAll(list);
+            for (String s : list) {
+                criticalPatterns.add(s.toLowerCase());
+            }
         }
     }
 

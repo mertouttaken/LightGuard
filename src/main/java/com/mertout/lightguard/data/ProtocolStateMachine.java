@@ -1,62 +1,72 @@
 package com.mertout.lightguard.data;
 
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
+
 public class ProtocolStateMachine {
 
-    private int ghostWindowClicks = 0;
-    private int ghostHotbarSwaps = 0;
-    private long lastGhostAction = 0;
+    private final AtomicInteger ghostWindowClicks = new AtomicInteger(0);
+    private final AtomicInteger ghostHotbarSwaps = new AtomicInteger(0);
+    private final AtomicLong lastGhostAction = new AtomicLong(0);
 
-    private long lastTabComplete = 0;
-    private long lastPayload = 0;
-    private int comboSpamCount = 0;
+    private final AtomicLong lastTabComplete = new AtomicLong(-1);
+    private final AtomicLong lastPayload = new AtomicLong(-1);
+    private final AtomicInteger comboSpamCount = new AtomicInteger(0);
 
-    public synchronized boolean isActionValid(String packetName, ProtocolPlayer pp) {
+    public boolean isActionValid(String packetName, ProtocolPlayer pp) {
         long now = System.currentTimeMillis();
 
-        if (now - lastGhostAction > 1000) {
-            ghostWindowClicks = 0;
-            ghostHotbarSwaps = 0;
+        if (now - lastGhostAction.get() > 1000) {
+            ghostWindowClicks.set(0);
+            ghostHotbarSwaps.set(0);
         }
 
         if (!pp.isInventoryOpen()) {
             if (packetName.equals("PacketPlayInWindowClick")) {
-                lastGhostAction = now;
-                ghostWindowClicks++;
+                lastGhostAction.set(now);
+                int clicks = ghostWindowClicks.incrementAndGet();
 
-                if (ghostWindowClicks > 100) ghostWindowClicks = 100;
+                if (clicks > 100) ghostWindowClicks.set(100);
 
-                if (ghostWindowClicks > 5) return false;
+                if (clicks > 5) return false;
             }
             else if (packetName.equals("PacketPlayInHeldItemSlot")) {
-                lastGhostAction = now;
-                ghostHotbarSwaps++;
+                lastGhostAction.set(now);
+                int swaps = ghostHotbarSwaps.incrementAndGet();
 
-                if (ghostHotbarSwaps > 100) ghostHotbarSwaps = 100;
+                if (swaps > 100) ghostHotbarSwaps.set(100);
 
-                if (ghostHotbarSwaps > 8) return false;
+                if (swaps > 8) return false;
             }
         } else {
-            ghostWindowClicks = 0;
-            ghostHotbarSwaps = 0;
+            ghostWindowClicks.set(0);
+            ghostHotbarSwaps.set(0);
         }
 
         return true;
     }
 
-    public synchronized boolean analyzeCrashCombo(String packetName) {
+    public boolean analyzeCrashCombo(String packetName) {
         long now = System.currentTimeMillis();
 
         if (packetName.equals("PacketPlayInTabComplete")) {
-            lastTabComplete = now;
+            lastTabComplete.set(now);
         } else if (packetName.equals("PacketPlayInCustomPayload")) {
-            lastPayload = now;
+            lastPayload.set(now);
         }
 
-        if (Math.abs(lastTabComplete - lastPayload) < 50) {
-            comboSpamCount++;
-            if (comboSpamCount > 10) return false;
+        long tabTime = lastTabComplete.get();
+        long payloadTime = lastPayload.get();
+
+        if (tabTime == -1 || payloadTime == -1) {
+            return true;
+        }
+
+        if (Math.abs(tabTime - payloadTime) < 50) {
+            int spam = comboSpamCount.incrementAndGet();
+            if (spam > 10) return false;
         } else {
-            comboSpamCount = Math.max(0, comboSpamCount - 3);
+            comboSpamCount.updateAndGet(current -> Math.max(0, current - 3));
         }
 
         return true;

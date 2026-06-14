@@ -49,20 +49,28 @@ public class BlockPlaceCheck extends Check {
         }
 
         MovingObjectPositionBlock position = p.c();
-        if (position == null || position.getDirection() == null) return false;
+
+        if (position == null || position.getDirection() == null || position.getPos() == null || position.getBlockPosition() == null) {
+            plugin.getActionQueue().pushKick(player.getPlayer(), "Malformed Place Packet (Null Data)");
+            return false;
+        }
 
         if (checkCoordinates) {
             Vec3D vec = position.getPos();
+
             if (!Double.isFinite(vec.x) || !Double.isFinite(vec.y) || !Double.isFinite(vec.z)) {
-                plugin.getActionQueue().pushKick(player.getPlayer(), "Invalid Cursor");
+                plugin.getActionQueue().pushKick(player.getPlayer(), "Invalid Cursor (Crash Attempt)");
                 return false;
             }
+
             BlockPosition pos = position.getBlockPosition();
-            if (Math.abs(pos.getX()) > 30000000 || Math.abs(pos.getZ()) > 30000000) {
-                plugin.getActionQueue().pushKick(player.getPlayer(), "Invalid Coordinates");
+
+            if (Math.abs(pos.getX()) > 30000000 || Math.abs(pos.getZ()) > 30000000 || pos.getY() < -500 || pos.getY() > 500) {
+                plugin.getActionQueue().pushKick(player.getPlayer(), "Invalid Coordinates (Out of Bounds)");
                 return false;
             }
         }
+
         return true;
     }
 }

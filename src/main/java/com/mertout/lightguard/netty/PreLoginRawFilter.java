@@ -8,11 +8,6 @@ import io.netty.channel.ChannelInboundHandlerAdapter;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 
-/**
- * 🛡️ PRE-LOGIN RAW FILTER
- * Oyuncu henüz sunucuya "Login" olmadan önce gönderilen ham byte trafiğini denetler.
- * Bot saldırılarını ve "Login Crash" denemelerini ağ katmanında durdurur.
- */
 public class PreLoginRawFilter extends ChannelInboundHandlerAdapter {
 
     private final LightGuard plugin;

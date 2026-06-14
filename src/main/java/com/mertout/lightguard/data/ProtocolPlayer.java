@@ -4,6 +4,8 @@ import com.mertout.lightguard.LightGuard;
 import com.mertout.lightguard.checks.HybridRateLimiter;
 import org.bukkit.entity.Player;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 
 public class ProtocolPlayer {
     private final Player player;
@@ -14,8 +16,17 @@ public class ProtocolPlayer {
     private final HybridRateLimiter rateLimiter;
     private final KeepAliveTracker keepAliveTracker = new KeepAliveTracker();
 
-    private volatile boolean inventoryOpen = false;
-    private volatile int openWindowId = 0;
+    private static final class InventoryState {
+        final boolean isOpen;
+        final int windowId;
+        InventoryState(boolean isOpen, int windowId) {
+            this.isOpen = isOpen;
+            this.windowId = windowId;
+        }
+    }
+    private static final InventoryState CLOSED_STATE = new InventoryState(false, 0);
+    private volatile InventoryState inventoryState = CLOSED_STATE;
+
     private volatile boolean isAnvilOpen = false;
     private volatile long lastTeleportTime = 0;
 
@@ -32,34 +43,34 @@ public class ProtocolPlayer {
     private volatile double lastX = -1, lastY = -1, lastZ = -1;
     private volatile double lastVehicleX = -1, lastVehicleY = -1, lastVehicleZ = -1;
 
-    private int pps = 0;
-    private int packetCounter = 0;
+    private final AtomicInteger pps = new AtomicInteger(0);
+    private final AtomicInteger packetCounter = new AtomicInteger(0);
 
-    private long lastMapTime = 0;
-    private int mapCount = 0;
+    private final AtomicLong lastMapTime = new AtomicLong(0);
+    private final AtomicInteger mapCount = new AtomicInteger(0);
 
-    private long lastBlockPlaceTime = 0;
-    private int blockPlaceCount = 0;
+    private final AtomicLong lastBlockPlaceTime = new AtomicLong(0);
+    private final AtomicInteger blockPlaceCount = new AtomicInteger(0);
 
-    private long lastPrinterTime = 0;
-    private int printerCount = 0;
+    private final AtomicLong lastPrinterTime = new AtomicLong(0);
+    private final AtomicInteger printerCount = new AtomicInteger(0);
 
-    private long lastRespawnTime = 0;
-    private int respawnCount = 0;
+    private final AtomicLong lastRespawnTime = new AtomicLong(0);
+    private final AtomicInteger respawnCount = new AtomicInteger(0);
 
-    private long lastTabTime = 0;
-    private int tabCount = 0;
+    private final AtomicLong lastTabTime = new AtomicLong(0);
+    private final AtomicInteger tabCount = new AtomicInteger(0);
 
-    private long lastChannelRegisterTime = 0;
-    private int recentChannelRegisters = 0;
+    private final AtomicLong lastChannelRegisterTime = new AtomicLong(0);
+    private final AtomicInteger recentChannelRegisters = new AtomicInteger(0);
 
-    private long lastRecipeTime = 0;
-    private int recipeCount = 0;
+    private final AtomicLong lastRecipeTime = new AtomicLong(0);
+    private final AtomicInteger recipeCount = new AtomicInteger(0);
 
-    private long lastQuickMoveTime = 0;
-    private int quickMoveCount = 0;
+    private final AtomicLong lastQuickMoveTime = new AtomicLong(0);
+    private final AtomicInteger quickMoveCount = new AtomicInteger(0);
 
-    private long lastEntityInteractTime = 0;
+    private final AtomicLong lastEntityInteractTime = new AtomicLong(0);
 
     public ProtocolPlayer(Player player, LightGuard plugin) {
         this.player = player;
@@ -68,90 +79,87 @@ public class ProtocolPlayer {
         this.rateLimiter = new HybridRateLimiter(plugin);
     }
 
-    public synchronized void incrementPacketCount() { packetCounter++; }
-    public synchronized void updatePPS() {
-        this.pps = packetCounter;
-        this.packetCounter = 0;
-    }
-    public synchronized int getPPS() { return pps; }
 
-    public synchronized int incrementAndGetMapCount(long now) {
-        if (now - lastMapTime > 1000) {
-            lastMapTime = now;
-            mapCount = 1;
+    public void incrementPacketCount() { packetCounter.incrementAndGet(); }
+    public void updatePPS() { pps.set(packetCounter.getAndSet(0)); }
+    public int getPPS() { return pps.get(); }
+
+    public int incrementAndGetMapCount(long now) {
+        if (now - lastMapTime.get() > 1000) {
+            lastMapTime.set(now);
+            mapCount.set(1);
             return 1;
         }
-        return ++mapCount;
+        return mapCount.incrementAndGet();
     }
 
-    public synchronized int incrementAndGetBlockPlaceCount(long now) {
-        if (now - lastBlockPlaceTime > 1000) {
-            lastBlockPlaceTime = now;
-            blockPlaceCount = 1;
+    public int incrementAndGetBlockPlaceCount(long now) {
+        if (now - lastBlockPlaceTime.get() > 1000) {
+            lastBlockPlaceTime.set(now);
+            blockPlaceCount.set(1);
             return 1;
         }
-        return ++blockPlaceCount;
+        return blockPlaceCount.incrementAndGet();
     }
 
-    public synchronized boolean checkAndSetEntityInteractDelay(long now, long ms) {
-        if (now - lastEntityInteractTime < ms) return true;
-        lastEntityInteractTime = now;
+    public boolean checkAndSetEntityInteractDelay(long now, long ms) {
+        if (now - lastEntityInteractTime.get() < ms) return true;
+        lastEntityInteractTime.set(now);
         return false;
     }
 
-    public synchronized int incrementAndGetPrinterCount(long now) {
-        if (now - lastPrinterTime > 1000) {
-            lastPrinterTime = now;
-            printerCount = 1;
+    public int incrementAndGetPrinterCount(long now) {
+        if (now - lastPrinterTime.get() > 1000) {
+            lastPrinterTime.set(now);
+            printerCount.set(1);
             return 1;
         }
-        return ++printerCount;
+        return printerCount.incrementAndGet();
     }
 
-    public synchronized int incrementAndGetRespawnCount(long now) {
-        if (now - lastRespawnTime > 1000) {
-            lastRespawnTime = now;
-            respawnCount = 1;
+    public int incrementAndGetRespawnCount(long now) {
+        if (now - lastRespawnTime.get() > 1000) {
+            lastRespawnTime.set(now);
+            respawnCount.set(1);
             return 1;
         }
-        return ++respawnCount;
+        return respawnCount.incrementAndGet();
     }
 
-    public synchronized int incrementAndGetTabCount(long now) {
-        if (now - lastTabTime > 1000) {
-            lastTabTime = now;
-            tabCount = 1;
+    public int incrementAndGetTabCount(long now) {
+        if (now - lastTabTime.get() > 1000) {
+            lastTabTime.set(now);
+            tabCount.set(1);
             return 1;
         }
-        return ++tabCount;
+        return tabCount.incrementAndGet();
     }
 
-    public synchronized int incrementAndGetChannelRegisterCount(int amount, long now) {
-        if (now - lastChannelRegisterTime > 60000) {
-            lastChannelRegisterTime = now;
-            recentChannelRegisters = amount;
+    public int incrementAndGetChannelRegisterCount(int amount, long now) {
+        if (now - lastChannelRegisterTime.get() > 60000) {
+            lastChannelRegisterTime.set(now);
+            recentChannelRegisters.set(amount);
             return amount;
         }
-        recentChannelRegisters += amount;
-        return recentChannelRegisters;
+        return recentChannelRegisters.addAndGet(amount);
     }
 
-    public synchronized int incrementAndGetRecipeCount(long now) {
-        if (now - lastRecipeTime > 1000) {
-            lastRecipeTime = now;
-            recipeCount = 1;
+    public int incrementAndGetRecipeCount(long now) {
+        if (now - lastRecipeTime.get() > 1000) {
+            lastRecipeTime.set(now);
+            recipeCount.set(1);
             return 1;
         }
-        return ++recipeCount;
+        return recipeCount.incrementAndGet();
     }
 
-    public synchronized int incrementAndGetQuickMoveCount(long now) {
-        if (now - lastQuickMoveTime > 1000) {
-            lastQuickMoveTime = now;
-            quickMoveCount = 1;
+    public int incrementAndGetQuickMoveCount(long now) {
+        if (now - lastQuickMoveTime.get() > 1000) {
+            lastQuickMoveTime.set(now);
+            quickMoveCount.set(1);
             return 1;
         }
-        return ++quickMoveCount;
+        return quickMoveCount.incrementAndGet();
     }
 
     public Player getPlayer() { return player; }
@@ -161,11 +169,10 @@ public class ProtocolPlayer {
     public HybridRateLimiter getRateLimiter() { return rateLimiter; }
     public KeepAliveTracker getKeepAliveTracker() { return keepAliveTracker; }
 
-    public boolean isInventoryOpen() { return inventoryOpen; }
-    public int getOpenWindowId() { return openWindowId; }
+    public boolean isInventoryOpen() { return inventoryState.isOpen; }
+    public int getOpenWindowId() { return inventoryState.windowId; }
     public void setInventoryState(boolean isOpen, int windowId) {
-        this.inventoryOpen = isOpen;
-        this.openWindowId = isOpen ? windowId : 0;
+        this.inventoryState = isOpen ? new InventoryState(true, windowId) : CLOSED_STATE;
     }
 
     public boolean isAnvilOpen() { return isAnvilOpen; }
@@ -176,6 +183,7 @@ public class ProtocolPlayer {
     public void setCreativeOrSpectator(boolean val) { isCreativeOrSpectator = val; }
     public boolean isAllowedFlight() { return allowedFlight; }
     public void setAllowedFlight(boolean allowedFlight) { this.allowedFlight = allowedFlight; }
+
     public boolean isGliding() { return isGliding; }
     public void setGliding(boolean gliding) { this.isGliding = gliding; }
     public boolean isDead() { return isDead; }
@@ -201,6 +209,7 @@ public class ProtocolPlayer {
     public void setLastVehicleLocation(double x, double y, double z) {
         this.lastVehicleX = x; this.lastVehicleY = y; this.lastVehicleZ = z;
     }
+
     public boolean isInTeleportGrace() { return (System.currentTimeMillis() - lastTeleportTime) < 1500; }
     public void markTeleport() { this.lastTeleportTime = System.currentTimeMillis(); }
 }

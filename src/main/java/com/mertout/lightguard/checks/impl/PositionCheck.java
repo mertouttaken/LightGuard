@@ -110,9 +110,10 @@ public class PositionCheck extends Check {
                 double diffY = y - lastY;
                 double diffZ = z - lastZ;
 
-                if (Math.abs(Math.abs(diffY) - 0.1) < 1e-7) {
-                    plugin.getActionQueue().pushKick(player.getPlayer(), "Invalid Vertical Step (0.1 Fly)");
-                    return false;
+                if (diffY > 0 && Math.abs(diffY - 0.1) < 1e-4) {
+                    if (!player.isGliding()) {
+                        return false;
+                    }
                 }
 
                 double epsilon = 1e-5;
