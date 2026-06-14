@@ -155,7 +155,9 @@ public class PositionCheck extends Check {
                 }
             }
 
-            player.setLastLocation(x, y, z);
+            if (!player.isInTeleportGrace()) {
+                player.setLastLocation(x, y, z);
+            }
 
         } catch (Exception e) {
             return false;

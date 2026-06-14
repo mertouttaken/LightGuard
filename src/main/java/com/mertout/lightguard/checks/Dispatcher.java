@@ -123,7 +123,8 @@ public class Dispatcher {
             if (t instanceof NullPointerException ||
                     t instanceof IndexOutOfBoundsException ||
                     t instanceof ClassCastException ||
-                    t instanceof IllegalArgumentException) {
+                    t instanceof IllegalArgumentException ||
+                    t instanceof io.netty.util.IllegalReferenceCountException) {
 
                 plugin.getLogger().warning("§c[LightGuard] Malformed Packet Attack from " + player.getPlayer().getName() + " intercepted at " + checkName);
 

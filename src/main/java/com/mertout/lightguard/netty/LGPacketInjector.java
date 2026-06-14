@@ -14,11 +14,22 @@ public class LGPacketInjector {
 
     private final LightGuard plugin;
     private static final VarHandle KEEPALIVE_ID_FIELD;
+    private static final VarHandle WINDOW_ID_FIELD;
+    private static final VarHandle POS_X_FIELD, POS_Y_FIELD, POS_Z_FIELD;
 
     static {
         try {
+            MethodHandles.Lookup lookup = MethodHandles.lookup();
             KEEPALIVE_ID_FIELD = MethodHandles.privateLookupIn(net.minecraft.server.v1_16_R3.PacketPlayOutKeepAlive.class, MethodHandles.lookup())
                     .findVarHandle(net.minecraft.server.v1_16_R3.PacketPlayOutKeepAlive.class, "a", long.class);
+            WINDOW_ID_FIELD = MethodHandles.privateLookupIn(net.minecraft.server.v1_16_R3.PacketPlayOutOpenWindow.class, lookup)
+                    .findVarHandle(net.minecraft.server.v1_16_R3.PacketPlayOutOpenWindow.class, "a", int.class);
+            POS_X_FIELD = MethodHandles.privateLookupIn(net.minecraft.server.v1_16_R3.PacketPlayOutPosition.class, lookup)
+                    .findVarHandle(net.minecraft.server.v1_16_R3.PacketPlayOutPosition.class, "a", double.class);
+            POS_Y_FIELD = MethodHandles.privateLookupIn(net.minecraft.server.v1_16_R3.PacketPlayOutPosition.class, lookup)
+                    .findVarHandle(net.minecraft.server.v1_16_R3.PacketPlayOutPosition.class, "b", double.class);
+            POS_Z_FIELD = MethodHandles.privateLookupIn(net.minecraft.server.v1_16_R3.PacketPlayOutPosition.class, lookup)
+                    .findVarHandle(net.minecraft.server.v1_16_R3.PacketPlayOutPosition.class, "c", double.class);
         } catch (Exception e) {
             throw new ExceptionInInitializerError(e);
         }
@@ -77,12 +88,32 @@ public class LGPacketInjector {
 
                 @Override
                 public void write(ChannelHandlerContext ctx, Object msg, ChannelPromise promise) throws Exception {
-                    if (msg instanceof net.minecraft.server.v1_16_R3.PacketPlayOutKeepAlive) {
+
+                    if (msg instanceof net.minecraft.server.v1_16_R3.PacketPlayOutOpenWindow) {
+                        try {
+                            int windowId = (int) WINDOW_ID_FIELD.get(msg);
+                            protocolPlayer.setInventoryState(true, windowId);
+                        } catch (Exception ignored) {}
+                    }
+
+                    else if (msg instanceof net.minecraft.server.v1_16_R3.PacketPlayOutPosition) {
+                        try {
+                            double safeX = (double) POS_X_FIELD.get(msg);
+                            double safeY = (double) POS_Y_FIELD.get(msg);
+                            double safeZ = (double) POS_Z_FIELD.get(msg);
+
+                            protocolPlayer.setLastLocation(safeX, safeY, safeZ);
+                            protocolPlayer.markTeleport();
+                        } catch (Exception ignored) {}
+                    }
+
+                    else if (msg instanceof net.minecraft.server.v1_16_R3.PacketPlayOutKeepAlive) {
                         try {
                             long id = (long) KEEPALIVE_ID_FIELD.get(msg);
                             protocolPlayer.getKeepAliveTracker().onKeepAliveSent(id);
                         } catch (Exception ignored) {}
                     }
+
                     super.write(ctx, msg, promise);
                 }
 

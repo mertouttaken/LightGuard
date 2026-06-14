@@ -34,8 +34,6 @@ public class NoComCheck extends Check {
         if (!(packet instanceof PacketPlayInBlockDig)) return true;
 
         try {
-            if (player.isInTeleportGrace()) return true;
-
             EnumPlayerDigType type = (EnumPlayerDigType) TYPE_FIELD.get(packet);
 
             if (type == EnumPlayerDigType.DROP_ITEM ||
