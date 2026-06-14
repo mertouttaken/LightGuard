@@ -93,7 +93,8 @@ public class PositionCheck extends Check {
 
             int chunkX = (int) x >> 4;
             int chunkZ = (int) z >> 4;
-            String worldName = player.getPlayer().getWorld().getName();
+
+            String worldName = player.getCurrentWorldName();
 
             if (!plugin.getWorldChunkManager().isChunkLoadedAsynchronously(worldName, chunkX, chunkZ)) {
                 if (!player.isInTeleportGrace()) {

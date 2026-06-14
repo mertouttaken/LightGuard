@@ -12,6 +12,8 @@ public class ProtocolPlayer {
     private final UUID uuid;
     private final int entityId;
 
+    private volatile String currentWorldName = "world";
+
     private final ProtocolStateMachine stateMachine = new ProtocolStateMachine();
     private final HybridRateLimiter rateLimiter;
     private final KeepAliveTracker keepAliveTracker = new KeepAliveTracker();
@@ -196,6 +198,9 @@ public class ProtocolPlayer {
     public void setBedrock(boolean bedrock) { isBedrock = bedrock; }
     public void setPrinterMode(boolean mode) { this.isPrinterMode = mode; }
     public boolean isPrinterMode() { return isPrinterMode; }
+
+    public String getCurrentWorldName() { return currentWorldName; }
+    public void setCurrentWorldName(String worldName) { this.currentWorldName = worldName; }
 
     public double getLastX() { return lastX; }
     public double getLastY() { return lastY; }

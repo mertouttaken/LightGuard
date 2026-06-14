@@ -120,6 +120,17 @@ public class Dispatcher {
         try {
             return check.check(packet, player);
         } catch (Throwable t) {
+            if (t instanceof NullPointerException ||
+                    t instanceof IndexOutOfBoundsException ||
+                    t instanceof ClassCastException ||
+                    t instanceof IllegalArgumentException) {
+
+                plugin.getLogger().warning("§c[LightGuard] Malformed Packet Attack from " + player.getPlayer().getName() + " intercepted at " + checkName);
+
+                plugin.getActionQueue().pushKick(player.getPlayer(), "Malformed Packet (Internal Exploit Attempt)");
+                return false;
+            }
+
             safeModeManager.recordException(checkName, t);
 
             boolean silent = plugin.getConfig().getBoolean("settings.sentinel.silent-failures", false);

@@ -81,11 +81,19 @@ public class MechanicListener implements Listener {
         Player player = event.getPlayer();
         ProtocolPlayer pp = plugin.getProtocolManager().get(player.getUniqueId());
         if (pp != null) {
+            pp.setCurrentWorldName(player.getWorld().getName());
             pp.setAdmin(player.isOp() || player.hasPermission("lightguard.admin"));
             pp.setCreativeOrSpectator(player.getGameMode() == GameMode.CREATIVE || player.getGameMode() == GameMode.SPECTATOR);
             pp.setAllowedFlight(player.getAllowFlight());
             pp.setHoldingBook(isHoldingBook(player));
             pp.setDead(player.isDead());
+        }
+    }
+    @EventHandler(priority = EventPriority.MONITOR)
+    public void onWorldChange(org.bukkit.event.player.PlayerChangedWorldEvent event) {
+        ProtocolPlayer pp = plugin.getProtocolManager().get(event.getPlayer().getUniqueId());
+        if (pp != null) {
+            pp.setCurrentWorldName(event.getPlayer().getWorld().getName());
         }
     }
 

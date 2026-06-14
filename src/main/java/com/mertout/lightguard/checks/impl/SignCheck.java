@@ -61,7 +61,8 @@ public class SignCheck extends Check {
                 }
             }
 
-            String worldName = player.getPlayer().getWorld().getName();
+            String worldName = player.getCurrentWorldName();
+
             if (!plugin.getWorldChunkManager().isChunkLoadedAsynchronously(worldName, pos.getX() >> 4, pos.getZ() >> 4)) {
                 return false;
             }
