@@ -129,7 +129,7 @@ checks:
   # Restricts the custom "brand" payload sent by clients (e.g., "vanilla", "lunarclient").
   client-brand:
     enabled: true
-    max-length: 30 # Shortened brand name to prevent memory spam.
+    max-length: 128 # Shortened brand name to prevent memory spam.
     block-invalid-chars: true # Blocks invisible control characters in the brand name.
 
   # Validates the status of Resource Packs to prevent malformed responses.

@@ -52,7 +52,7 @@ public class PayloadCheck extends Check {
 
         if (channel.equalsIgnoreCase("minecraft:register") || channel.equalsIgnoreCase("REGISTER")) {
             ByteBuf data = p.data;
-            if (data != null) {
+            if (data != null && data.refCnt() > 0) {
                 int readableBytes = data.readableBytes();
                 int channelCount = 0;
 
@@ -74,7 +74,7 @@ public class PayloadCheck extends Check {
         }
 
         try {
-            if (p.data != null && p.data.readableBytes() > 0) {
+            if (p.data != null && p.data.refCnt() > 0 && p.data.readableBytes() > 0) {
 
                 if (p.data.readableBytes() > maxPayloadSize) {
                     plugin.getActionQueue().pushKick(player.getPlayer(), "Oversized Payload (" + p.data.readableBytes() + " bytes)");

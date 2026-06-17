@@ -68,7 +68,7 @@ public class SignCheck extends Check {
             }
 
             String[] lines = (String[]) LINES_FIELD.get(packet);
-            if (lines == null) return true;
+            if (lines == null || lines.length != 4) return true;
 
             for (String line : lines) {
                 if (line == null) continue;

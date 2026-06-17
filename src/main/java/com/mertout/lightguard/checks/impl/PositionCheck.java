@@ -50,7 +50,7 @@ public class PositionCheck extends Check {
 
         try {
             if (player.isDead()) {
-                return false;
+                return true;
             }
 
             boolean hasLook = (boolean) HAS_LOOK.get(packet);

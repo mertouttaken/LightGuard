@@ -49,7 +49,7 @@ public class SettingsCheck extends Check {
 
     public SettingsCheck(LightGuard plugin) {
         super(plugin);
-        this.maxLength = plugin.getConfig().getInt("checks.client-settings.max-length", 16);
+        this.maxLength = plugin.getConfig().getInt("checks.client-settings.max-length", 128);
     }
 
     @Override
@@ -61,14 +61,16 @@ public class SettingsCheck extends Check {
         try {
             String locale = (String) LOCALE_HANDLE.get(packet);
 
-            if (locale == null || locale.length() > maxLength) {
-                plugin.getActionQueue().pushKick(player.getPlayer(), "Invalid Language Locale");
-                return false;
+            if (locale != null && locale.length() > maxLength) {
+                if (locale.length() > 512) {
+                    plugin.getActionQueue().pushKick(player.getPlayer(), "Invalid Language Locale (Buffer Overflow)");
+                    return false;
+                }
             }
 
             if (VIEW_DIST_HANDLE != null) {
                 int viewDistance = (int) VIEW_DIST_HANDLE.get(packet);
-                if (viewDistance < 0 || viewDistance > 32) {
+                if (viewDistance < 0 || viewDistance > 64) {
                     return false;
                 }
             }
