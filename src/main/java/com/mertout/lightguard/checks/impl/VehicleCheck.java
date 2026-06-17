@@ -52,7 +52,7 @@ public class VehicleCheck extends Check {
 
                 if (!Double.isFinite(x) || !Double.isFinite(y) || !Double.isFinite(z)) return false;
 
-                String worldName = player.getPlayer().getWorld().getName();
+                String worldName = player.getCurrentWorldName();
                 if (!plugin.getWorldChunkManager().isChunkLoadedAsynchronously(worldName, (int)x >> 4, (int)z >> 4)) {
                     return false;
                 }

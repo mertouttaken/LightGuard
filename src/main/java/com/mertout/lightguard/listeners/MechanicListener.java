@@ -115,10 +115,14 @@ public class MechanicListener implements Listener {
 
     @EventHandler(priority = EventPriority.MONITOR)
     public void onInventoryClose(InventoryCloseEvent event) {
-        ProtocolPlayer pp = plugin.getProtocolManager().get(event.getPlayer().getUniqueId());
+        if (!(event.getPlayer() instanceof Player)) return;
+        Player player = (Player) event.getPlayer();
+
+        ProtocolPlayer pp = plugin.getProtocolManager().get(player.getUniqueId());
         if (pp != null) {
-            pp.setInventoryState(false, -1);
-            pp.setAnvilOpen(false);
+            if (event.getInventory().getType() == InventoryType.ANVIL) {
+                pp.setAnvilOpen(false);
+            }
         }
     }
 
@@ -436,8 +440,8 @@ public class MechanicListener implements Listener {
         if (plugin.getConfig().getBoolean("mechanics.prevent-mule-dupe")) {
             if (event.getInventory().getHolder() instanceof ChestedHorse) {
                 ChestedHorse mule = (ChestedHorse) event.getInventory().getHolder();
-
-                if (!mule.getWorld().equals(player.getWorld()) || mule.getLocation().distanceSquared(player.getLocation()) > 64) {
+                if (!mule.getWorld().equals(player.getWorld()) ||
+                        mule.getLocation().distanceSquared(player.getLocation()) > 64) {
                     event.setCancelled(true);
                     return;
                 }
@@ -447,17 +451,12 @@ public class MechanicListener implements Listener {
                 }
             }
         }
+
         ProtocolPlayer pp = plugin.getProtocolManager().get(player.getUniqueId());
         if (pp != null) {
             if (event.getInventory().getType() == InventoryType.ANVIL) {
                 pp.setAnvilOpen(true);
             }
-            plugin.getServer().getScheduler().runTask(plugin, () -> {
-                if (player.isOnline()) {
-                    int realWindowId = ((org.bukkit.craftbukkit.v1_16_R3.entity.CraftPlayer) player).getHandle().activeContainer.windowId;
-                    pp.setInventoryState(true, realWindowId);
-                }
-            });
         }
     }
     @EventHandler(priority = EventPriority.LOWEST, ignoreCancelled = true)

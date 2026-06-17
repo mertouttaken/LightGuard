@@ -2,6 +2,7 @@ package com.mertout.lightguard.netty;
 
 import com.mertout.lightguard.LightGuard;
 import com.mertout.lightguard.data.ProtocolPlayer;
+
 import io.netty.channel.*;
 import io.netty.util.ReferenceCountUtil;
 import org.bukkit.craftbukkit.v1_16_R3.entity.CraftPlayer;
@@ -15,7 +16,7 @@ public class LGPacketInjector {
     private final LightGuard plugin;
     private static final VarHandle KEEPALIVE_ID_FIELD;
     private static final VarHandle WINDOW_ID_FIELD;
-    private static final VarHandle POS_X_FIELD, POS_Y_FIELD, POS_Z_FIELD;
+    private static final VarHandle POS_X_FIELD, POS_Y_FIELD, POS_Z_FIELD, POS_FLAGS_FIELD;
 
     static {
         try {
@@ -30,6 +31,8 @@ public class LGPacketInjector {
                     .findVarHandle(net.minecraft.server.v1_16_R3.PacketPlayOutPosition.class, "b", double.class);
             POS_Z_FIELD = MethodHandles.privateLookupIn(net.minecraft.server.v1_16_R3.PacketPlayOutPosition.class, lookup)
                     .findVarHandle(net.minecraft.server.v1_16_R3.PacketPlayOutPosition.class, "c", double.class);
+            POS_FLAGS_FIELD = MethodHandles.privateLookupIn(net.minecraft.server.v1_16_R3.PacketPlayOutPosition.class, lookup)
+                    .findVarHandle(net.minecraft.server.v1_16_R3.PacketPlayOutPosition.class, "f", java.util.Set.class);
         } catch (Exception e) {
             throw new ExceptionInInitializerError(e);
         }
@@ -54,8 +57,7 @@ public class LGPacketInjector {
 
                     if (msg instanceof net.minecraft.server.v1_16_R3.PacketPlayInCloseWindow) {
                         protocolPlayer.setInventoryState(false, -1);
-                    }
-                    else if (msg instanceof net.minecraft.server.v1_16_R3.PacketPlayInWindowClick) {
+                    } else if (msg instanceof net.minecraft.server.v1_16_R3.PacketPlayInWindowClick) {
                         net.minecraft.server.v1_16_R3.PacketPlayInWindowClick clickPacket =
                                 (net.minecraft.server.v1_16_R3.PacketPlayInWindowClick) msg;
 
@@ -77,6 +79,7 @@ public class LGPacketInjector {
                     try {
                         if (!plugin.getDispatcher().dispatch(msg, protocolPlayer)) {
                             releaseMessage(msg);
+                            ctx.close();
                             return;
                         }
                     } catch (Exception e) {
@@ -94,20 +97,30 @@ public class LGPacketInjector {
                             int windowId = (int) WINDOW_ID_FIELD.get(msg);
                             protocolPlayer.setInventoryState(true, windowId);
                         } catch (Exception ignored) {}
-                    }
-
-                    else if (msg instanceof net.minecraft.server.v1_16_R3.PacketPlayOutPosition) {
+                    } else if (msg instanceof net.minecraft.server.v1_16_R3.PacketPlayOutPosition) {
                         try {
-                            double safeX = (double) POS_X_FIELD.get(msg);
-                            double safeY = (double) POS_Y_FIELD.get(msg);
-                            double safeZ = (double) POS_Z_FIELD.get(msg);
+                            java.util.Set<?> flags = (java.util.Set<?>) POS_FLAGS_FIELD.get(msg);
+                            boolean hasRelativeCoord = false;
 
-                            protocolPlayer.setLastLocation(safeX, safeY, safeZ);
+                            if (flags != null) {
+                                for (Object f : flags) {
+                                    String name = f.toString();
+                                    if (name.equals("X") || name.equals("Y") || name.equals("Z")) {
+                                        hasRelativeCoord = true;
+                                        break;
+                                    }
+                                }
+                            }
+
+                            if (!hasRelativeCoord) {
+                                double safeX = (double) POS_X_FIELD.get(msg);
+                                double safeY = (double) POS_Y_FIELD.get(msg);
+                                double safeZ = (double) POS_Z_FIELD.get(msg);
+                                protocolPlayer.setLastLocation(safeX, safeY, safeZ);
+                            }
                             protocolPlayer.markTeleport();
                         } catch (Exception ignored) {}
-                    }
-
-                    else if (msg instanceof net.minecraft.server.v1_16_R3.PacketPlayOutKeepAlive) {
+                    } else if (msg instanceof net.minecraft.server.v1_16_R3.PacketPlayOutKeepAlive) {
                         try {
                             long id = (long) KEEPALIVE_ID_FIELD.get(msg);
                             protocolPlayer.getKeepAliveTracker().onKeepAliveSent(id);
@@ -151,14 +164,18 @@ public class LGPacketInjector {
 
     private double getPacketWeight(Object packet) {
         String name = packet.getClass().getSimpleName();
-        return switch (name) {
-            case "PacketPlayInWindowClick" -> 40.0;
-            case "PacketPlayInSetCreativeSlot" -> 80.0;
-            case "PacketPlayInCustomPayload" -> 50.0;
-            case "PacketPlayInUpdateSign" -> 60.0;
-            case "PacketPlayInUseItem", "PacketPlayInBlockPlace" -> 25.0;
-            case "PacketPlayInFlying", "PacketPlayInPosition", "PacketPlayInPositionLook", "PacketPlayInLook" -> 1.0;
-            default -> 5.0;
-        };
+        switch (name) {
+            case "PacketPlayInWindowClick": return 40.0;
+            case "PacketPlayInSetCreativeSlot": return 80.0;
+            case "PacketPlayInCustomPayload": return 50.0;
+            case "PacketPlayInUpdateSign": return 60.0;
+            case "PacketPlayInUseItem":
+            case "PacketPlayInBlockPlace": return 25.0;
+            case "PacketPlayInFlying":
+            case "PacketPlayInPosition":
+            case "PacketPlayInPositionLook":
+            case "PacketPlayInLook": return 1.0;
+            default: return 5.0;
+        }
     }
 }
