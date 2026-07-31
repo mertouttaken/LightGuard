@@ -33,7 +33,7 @@ public class WorldChunkManager implements Listener {
                 cachedCount++;
             }
         }
-        Bukkit.getLogger().info("[LightGuard] Sentinel: " + cachedCount + " pre-loaded chunks cached for async inspection.");
+        Bukkit.getLogger().info("Sentinel: " + cachedCount + " pre-loaded chunks cached for async inspection.");
     }
 
     public static long getChunkKey(int x, int z) {

@@ -28,7 +28,7 @@ public class Dispatcher {
         register(PacketPlayInTabComplete.class, new TabCheck(plugin));
 
         register(PacketPlayInWindowClick.class, new ItemExploitCheck(plugin), new WindowCheck(plugin), new GameStateCheck(plugin));
-        register(PacketPlayInSetCreativeSlot.class, new ItemExploitCheck(plugin), new MapExploitCheck(plugin));
+        register(PacketPlayInSetCreativeSlot.class, new ItemExploitCheck(plugin), new MapExploitCheck(plugin), new CreativeCheck(plugin));
         register(PacketPlayInItemName.class, new AnvilCheck(plugin));
         register(PacketPlayInHeldItemSlot.class, new HeldItemSlotCheck(plugin));
         register(PacketPlayInBEdit.class, new BookExploitCheck(plugin));
@@ -57,7 +57,6 @@ public class Dispatcher {
         register(PacketPlayInRecipeDisplayed.class, new RecipeCheck(plugin));
         register(PacketPlayInAbilities.class, new AbilitiesCheck(plugin));
         register(PacketPlayInClientCommand.class, new ClientActionCheck(plugin));
-        register(PacketPlayInSpectate.class, new SpectateCheck(plugin));
     }
 
     private void register(Class<?> packetClass, Check... checks) {
@@ -118,30 +117,25 @@ public class Dispatcher {
         }
 
         try {
-            return check.check(packet, player);
-        } catch (Throwable t) {
-            if (t instanceof NullPointerException ||
-                    t instanceof IndexOutOfBoundsException ||
-                    t instanceof ClassCastException ||
-                    t instanceof IllegalArgumentException ||
-                    t instanceof io.netty.util.IllegalReferenceCountException) {
+            boolean isPassed = check.check(packet, player);
 
-                plugin.getLogger().warning("§c[LightGuard] Malformed Packet Attack from " + player.getPlayer().getName() + " intercepted at " + checkName);
+            if (!isPassed) {
+                String packetName = packet.getClass().getSimpleName();
+                String time = new java.text.SimpleDateFormat("HH:mm:ss").format(new java.util.Date());
 
-                plugin.getActionQueue().pushKick(player.getPlayer(), "Malformed Packet (Internal Exploit Attempt)");
-                return false;
+                String debugMsg = String.format("§8[§e%s§8] §f%s§7's §e%s §7packet was blocked by §c%s",
+                        time, player.getPlayer().getName(), packetName, checkName);
+
+                org.bukkit.Bukkit.getConsoleSender().sendMessage(debugMsg);
             }
+            return isPassed;
 
+        } catch (Throwable t) {
             safeModeManager.recordException(checkName, t);
 
             boolean silent = plugin.getConfig().getBoolean("settings.sentinel.silent-failures", false);
             if (!silent) {
-                plugin.getLogger().warning("§c[LightGuard] Error in " + checkName + ": " + t.getMessage());
-            }
-
-            boolean sentinelEnabled = plugin.getConfig().getBoolean("settings.sentinel.enabled", true);
-            if (sentinelEnabled && safeModeManager.isCritical(checkName)) {
-                return false;
+                plugin.getLogger().warning("Check Error (" + checkName + ") - Packet passed with tolerance: " + t.getMessage());
             }
 
             return true;

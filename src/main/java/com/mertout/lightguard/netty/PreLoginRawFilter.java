@@ -34,7 +34,7 @@ public class PreLoginRawFilter extends ChannelInboundHandlerAdapter {
                 String ip = address.getHostAddress();
 
                 int limitInKB = preLoginMaxBytes / 1024;
-                plugin.getLogger().warning("§c[LightGuard] Pre-Login Flooder Blocked: " + ip + " (Sent >" + limitInKB + "KB raw data)");
+                plugin.getLogger().warning("Pre-Login Flooder Blocked: " + ip + " (Sent >" + limitInKB + "KB raw data)");
 
                 buf.release();
                 ctx.close();

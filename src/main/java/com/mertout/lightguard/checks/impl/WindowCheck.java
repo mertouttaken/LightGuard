@@ -45,23 +45,32 @@ public class WindowCheck extends Check {
             Enum<?> type = (Enum<?>) CLICK_TYPE_GETTER.invoke(packet);
             String typeName = type != null ? type.name() : "";
 
-            if (button < 0 || button > 100 || slot > 127 || slot < -999) {
-                plugin.getActionQueue().pushKick(player.getPlayer(), "Invalid Window Bounds (S:" + slot + " B:" + button + ")");
+            if (button < 0 || button > 40 || slot > 127 || (slot < -1 && slot != -999)) {
                 return false;
             }
 
             if (typeName.equals("QUICK_MOVE") && player.incrementAndGetQuickMoveCount(System.currentTimeMillis()) > 50) {
-                plugin.getActionQueue().pushKick(player.getPlayer(), "Window QuickMove Spam");
                 return false;
             }
 
-            if (windowId > 0 && player.getOpenWindowId() != windowId) {
+            if (typeName.equals("CLONE") && !player.isCreativeOrSpectator()) {
                 return false;
+            }
+
+            if (windowId > 0) {
+                if (!player.isInventoryOpen()) {
+                    return false;
+                }
+
+                if (player.getOpenWindowId() != windowId) {
+                    return false;
+                }
             }
 
         } catch (Throwable t) {
             return false;
         }
+
         return true;
     }
 }

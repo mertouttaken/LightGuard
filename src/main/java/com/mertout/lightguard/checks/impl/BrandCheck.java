@@ -104,7 +104,7 @@ public class BrandCheck extends Check {
                 player.setBrandSent(true);
             }
         } catch (Throwable t) {
-            return false;
+            return true;
         }
 
         return true;

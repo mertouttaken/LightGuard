@@ -50,8 +50,7 @@ public class LGPacketInjector {
         }
 
         if (channel.pipeline().get("lg_check") == null) {
-            channel.pipeline().addBefore("packet_handler", "lg_check", new ChannelDuplexHandler() {
-
+            ChannelDuplexHandler checkHandler = new ChannelDuplexHandler() {
                 @Override
                 public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
 
@@ -68,9 +67,9 @@ public class LGPacketInjector {
 
                     double weight = getPacketWeight(msg);
                     if (protocolPlayer.getRateLimiter().addAndCheck(weight)) {
-                        plugin.getLogger().warning("§c[LightGuard] Rate Limit: " + player.getName());
+                        plugin.getLogger().warning("Rate Limit Exceeded: " + player.getName());
+                        plugin.getActionQueue().pushKick(player, "Excessive Packet Sending (Rate Limit)");
                         releaseMessage(msg);
-                        ctx.close();
                         return;
                     }
 
@@ -79,13 +78,13 @@ public class LGPacketInjector {
                     try {
                         if (!plugin.getDispatcher().dispatch(msg, protocolPlayer)) {
                             releaseMessage(msg);
-                            ctx.close();
                             return;
                         }
                     } catch (Exception e) {
-                        plugin.getLogger().severe("[LightGuard] Dispatcher Error for " + player.getName() + ": " + e.getMessage());
+                        plugin.getLogger().severe("Dispatcher Error for " + player.getName() + ": " + e.getMessage());
                     }
-
+                    plugin.getLogger().warning("Rate Limit Exceeded: " + player.getName());
+                    plugin.getActionQueue().pushKick(player, "Excessive Packet Sending (Rate Limit)");
                     super.channelRead(ctx, msg);
                 }
 
@@ -132,10 +131,16 @@ public class LGPacketInjector {
 
                 @Override
                 public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
-                    plugin.getLogger().severe("[LightGuard] Netty Pipeline Exception for " + player.getName() + " -> " + cause.getMessage());
+                    plugin.getLogger().severe("Netty Pipeline Exception for " + player.getName() + " -> " + cause.getMessage());
                     super.exceptionCaught(ctx, cause);
                 }
-            });
+            };
+
+            if (channel.pipeline().get("decoder") != null) {
+                channel.pipeline().addAfter("decoder", "lg_check", checkHandler);
+            } else {
+                channel.pipeline().addLast("lg_check", checkHandler);
+            }
         }
     }
 

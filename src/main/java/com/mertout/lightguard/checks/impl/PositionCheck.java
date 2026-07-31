@@ -33,7 +33,6 @@ public class PositionCheck extends Check {
 
     public PositionCheck(LightGuard plugin) {
         super(plugin);
-
         double offset = plugin.getConfig().getDouble("checks.position.max-offset", 25.0);
         this.maxOffsetSq = offset * offset;
 
@@ -49,27 +48,20 @@ public class PositionCheck extends Check {
         if (!(packet instanceof PacketPlayInFlying)) return true;
 
         try {
-            if (player.isDead()) {
-                return true;
-            }
-
             boolean hasLook = (boolean) HAS_LOOK.get(packet);
             if (hasLook) {
                 float yaw = (float) YAW.get(packet);
                 float pitch = (float) PITCH.get(packet);
 
                 if (!Float.isFinite(yaw) || !Float.isFinite(pitch)) {
-                    plugin.getActionQueue().pushKick(player.getPlayer(), "Invalid Rotation (NaN/Inf)");
                     return false;
                 }
 
                 if (Math.abs(pitch) > 90.0F) {
-                    plugin.getActionQueue().pushKick(player.getPlayer(), "Invalid Pitch Angle (" + pitch + ")");
                     return false;
                 }
 
                 if (Math.abs(yaw) > 3.0E7F) {
-                    plugin.getActionQueue().pushKick(player.getPlayer(), "Extreme Yaw Angle Exploit");
                     return false;
                 }
             }
@@ -82,12 +74,10 @@ public class PositionCheck extends Check {
             double z = (double) Z.get(packet);
 
             if (!Double.isFinite(x) || !Double.isFinite(y) || !Double.isFinite(z)) {
-                plugin.getActionQueue().pushKick(player.getPlayer(), "Invalid Coordinates (NaN/Inf)");
                 return false;
             }
 
             if (Math.abs(x) > outOfWorldLimit || Math.abs(z) > outOfWorldLimit || Math.abs(y) > 1000000) {
-                plugin.getActionQueue().pushKick(player.getPlayer(), "Illegal Position (Border/Overflow)");
                 return false;
             }
 
@@ -118,7 +108,6 @@ public class PositionCheck extends Check {
                 }
 
                 double epsilon = 1e-5;
-
                 boolean isXInteger = Math.abs(Math.abs(diffX) - Math.round(Math.abs(diffX))) < epsilon;
                 boolean isYInteger = Math.abs(Math.abs(diffY) - Math.round(Math.abs(diffY))) < epsilon;
                 boolean isZInteger = Math.abs(Math.abs(diffZ) - Math.round(Math.abs(diffZ))) < epsilon;
@@ -126,7 +115,6 @@ public class PositionCheck extends Check {
                 if ((Math.abs(diffX) >= 10.0 && isXInteger) ||
                         (Math.abs(diffZ) >= 10.0 && isZInteger) ||
                         (Math.abs(diffY) >= 10.0 && isYInteger)) {
-                    plugin.getActionQueue().pushKick(player.getPlayer(), "Integer Step Exploit (Math Bypass Blocked)");
                     return false;
                 }
 
@@ -135,22 +123,18 @@ public class PositionCheck extends Check {
 
                 if (horizontalDistSq > maxOffsetSq) {
                     if (!player.isGliding()) {
-                        plugin.getActionQueue().pushKick(player.getPlayer(), "Excessive Horizontal Movement");
                         return false;
                     } else if (horizontalDistSq > maxElytraOffsetSq) {
-                        plugin.getActionQueue().pushKick(player.getPlayer(), "Extreme Elytra Speed Exploit");
                         return false;
                     }
                 }
 
                 if (verticalDist > maxVerticalDist) {
-                    plugin.getActionQueue().pushKick(player.getPlayer(), "Excessive Vertical Movement");
                     return false;
                 }
 
                 double totalDistSq = horizontalDistSq + (diffY * diffY);
                 if (totalDistSq > maxElytraOffsetSq) {
-                    plugin.getActionQueue().pushKick(player.getPlayer(), "Instant Teleport Exploit");
                     return false;
                 }
             }
@@ -159,7 +143,7 @@ public class PositionCheck extends Check {
                 player.setLastLocation(x, y, z);
             }
 
-        } catch (Exception e) {
+        } catch (Throwable t) {
             return false;
         }
 

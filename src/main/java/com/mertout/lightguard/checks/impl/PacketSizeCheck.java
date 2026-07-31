@@ -33,7 +33,7 @@ public class PacketSizeCheck extends Check {
             }
 
         } catch (Exception e) {
-            System.err.println("[LightGuard] Reflection failed in PacketSizeCheck: " + e.getMessage());
+            System.err.println("Reflection failed in PacketSizeCheck: " + e.getMessage());
         }
     }
 

@@ -25,7 +25,7 @@ public class PerformanceMonitor {
     }
 
     public void printStats() {
-        plugin.getLogger().info("§e[LightGuard] === Performance Benchmark ===");
+        plugin.getLogger().info("=== Performance Benchmark ===");
 
         if (statsMap.isEmpty()) {
             plugin.getLogger().info("§cNo data collected yet.");

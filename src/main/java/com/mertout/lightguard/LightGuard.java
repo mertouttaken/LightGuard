@@ -79,6 +79,7 @@ public class LightGuard extends JavaPlugin {
 
     @Override
     public void onDisable() {
+        LGStartupValidator.uninject();
         LGProfileCommand.cancelAll();
 
         if (packetLoggerManager != null) packetLoggerManager.shutdown();

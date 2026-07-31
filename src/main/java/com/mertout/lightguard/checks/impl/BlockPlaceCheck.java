@@ -28,17 +28,14 @@ public class BlockPlaceCheck extends Check {
         long now = System.currentTimeMillis();
 
         if (player.isDead()) {
-            plugin.getActionQueue().pushKick(player.getPlayer(), "Invalid Sequence (Place while Dead)");
             return false;
         }
 
-        if (player.isInventoryOpen()) {
-            plugin.getActionQueue().pushKick(player.getPlayer(), "Invalid Sequence (Place while GUI Open)");
+        if (player.isInventoryOpen() && player.getOpenWindowId() > 0) {
             return false;
         }
 
         if (player.incrementAndGetBlockPlaceCount(now) > maxPPS) {
-            plugin.getActionQueue().pushKick(player.getPlayer(), "Block Place Flood");
             return false;
         }
 
@@ -51,7 +48,6 @@ public class BlockPlaceCheck extends Check {
         MovingObjectPositionBlock position = p.c();
 
         if (position == null || position.getDirection() == null || position.getPos() == null || position.getBlockPosition() == null) {
-            plugin.getActionQueue().pushKick(player.getPlayer(), "Malformed Place Packet (Null Data)");
             return false;
         }
 
@@ -59,15 +55,31 @@ public class BlockPlaceCheck extends Check {
             Vec3D vec = position.getPos();
 
             if (!Double.isFinite(vec.x) || !Double.isFinite(vec.y) || !Double.isFinite(vec.z)) {
-                plugin.getActionQueue().pushKick(player.getPlayer(), "Invalid Cursor (Crash Attempt)");
                 return false;
             }
 
             BlockPosition pos = position.getBlockPosition();
 
             if (Math.abs(pos.getX()) > 30000000 || Math.abs(pos.getZ()) > 30000000 || pos.getY() < -500 || pos.getY() > 500) {
-                plugin.getActionQueue().pushKick(player.getPlayer(), "Invalid Coordinates (Out of Bounds)");
                 return false;
+            }
+
+            double px = player.getLastX();
+            double py = player.getLastY();
+            double pz = player.getLastZ();
+
+            if (px != -1 && !player.isInTeleportGrace()) {
+                double dx = px - vec.x;
+                double dy = (py + 1.62) - vec.y;
+                double dz = pz - vec.z;
+
+                double distSq = (dx * dx) + (dy * dy) + (dz * dz);
+
+                double maxReachSq = player.isCreativeOrSpectator() ? 49.0 : 36.0;
+
+                if (distSq > maxReachSq) {
+                    return false;
+                }
             }
         }
 

@@ -76,7 +76,7 @@ public class SettingsCheck extends Check {
             }
 
         } catch (Exception e) {
-            return false;
+            return true;
         }
 
         return true;

@@ -30,13 +30,15 @@ public class PayloadCheck extends Check {
         String channel = p.tag != null ? p.tag.toString() : "";
 
         if (!isValidChannel(channel)) {
-            plugin.getActionQueue().pushKick(player.getPlayer(), "Invalid Payload Channel Format");
+            return false;
+        }
+
+        if (channel.equalsIgnoreCase("BungeeCord") || channel.equalsIgnoreCase("bungeecord:main")) {
             return false;
         }
 
         for (String blocked : blockedChannels) {
             if (channel.equalsIgnoreCase(blocked)) {
-                plugin.getActionQueue().pushKick(player.getPlayer(), "Blocked Channel Attempt: " + channel);
                 return false;
             }
         }
@@ -45,7 +47,6 @@ public class PayloadCheck extends Check {
                 channel.equalsIgnoreCase("MC|BSign") || channel.equalsIgnoreCase("minecraft:bsign")) {
 
             if (!player.isHoldingBook()) {
-                plugin.getActionQueue().pushKick(player.getPlayer(), "Ghost Book Exploit (No Book in Hand)");
                 return false;
             }
         }
@@ -62,12 +63,10 @@ public class PayloadCheck extends Check {
                 if (readableBytes > 0) channelCount++;
 
                 if (channelCount > 20) {
-                    plugin.getActionQueue().pushKick(player.getPlayer(), "Channel Register Flood");
                     return false;
                 }
 
                 if (player.incrementAndGetChannelRegisterCount(channelCount, System.currentTimeMillis()) > 100) {
-                    plugin.getActionQueue().pushKick(player.getPlayer(), "Channel Register Flood (Rate Limit)");
                     return false;
                 }
             }
@@ -77,12 +76,10 @@ public class PayloadCheck extends Check {
             if (p.data != null && p.data.refCnt() > 0 && p.data.readableBytes() > 0) {
 
                 if (p.data.readableBytes() > maxPayloadSize) {
-                    plugin.getActionQueue().pushKick(player.getPlayer(), "Oversized Payload (" + p.data.readableBytes() + " bytes)");
                     return false;
                 }
 
                 if (!NBTStreamingScanner.scan(p.data)) {
-                    plugin.getActionQueue().pushKick(player.getPlayer(), "Malicious NBT Data in Payload (Crash Attempt)");
                     return false;
                 }
             }
@@ -100,7 +97,7 @@ public class PayloadCheck extends Check {
             if (Character.isISOControl(channel.charAt(i))) return false;
         }
 
-        if (channel.equals("REGISTER") || channel.equals("UNREGISTER") || channel.equals("BungeeCord")) return true;
+        if (channel.equals("REGISTER") || channel.equals("UNREGISTER")) return true;
         if (channel.startsWith("MC|") || channel.startsWith("FML|")) return true;
 
         return NAMESPACE_PATTERN.matcher(channel).matches();

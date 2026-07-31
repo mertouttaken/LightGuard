@@ -29,21 +29,25 @@ public class EntityCheck extends Check {
     public boolean check(Object packet, ProtocolPlayer player) {
         if (!(packet instanceof PacketPlayInUseEntity)) return true;
 
-        if (player.isDead()) {
-            plugin.getActionQueue().pushKick(player.getPlayer(), "Invalid Sequence (Interact while Dead)");
-            return false;
-        }
-
-        if (player.isInventoryOpen()) {
-            plugin.getActionQueue().pushKick(player.getPlayer(), "Invalid Sequence (Interact while GUI Open)");
-            return false;
-        }
-
-        if (preventArmorStandSpam) {
-            long now = System.currentTimeMillis();
-            if (player.checkAndSetEntityInteractDelay(now, 200)) {
+        try {
+            if (player.isDead()) {
+                plugin.getActionQueue().pushKick(player.getPlayer(), "Invalid Sequence (Interact while Dead)");
                 return false;
             }
+
+            if (player.isInventoryOpen() && player.getOpenWindowId() > 0) {
+                plugin.getActionQueue().pushKick(player.getPlayer(), "Invalid Sequence (Interact while GUI Open)");
+                return false;
+            }
+
+            if (preventArmorStandSpam) {
+                long now = System.currentTimeMillis();
+                if (player.checkAndSetEntityInteractDelay(now, 200)) {
+                    return false;
+                }
+            }
+        } catch (Throwable t) {
+            return true;
         }
 
         return true;

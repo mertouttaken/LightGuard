@@ -30,12 +30,10 @@ public class KeepAliveCheck extends Check {
         try {
             long id = (long) ID_FIELD.get(packet);
 
-            if (!player.getKeepAliveTracker().onKeepAliveReceived(id)) {
-                plugin.getActionQueue().pushKick(player.getPlayer(), "Invalid KeepAlive ID");
-                return false;
-            }
+            player.getKeepAliveTracker().onKeepAliveReceived(id);
 
-        } catch (Exception e) { return false; }
+        } catch (Throwable t) {
+        }
 
         return true;
     }
