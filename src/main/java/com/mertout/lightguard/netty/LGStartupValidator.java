@@ -15,35 +15,38 @@ import java.util.List;
 public class LGStartupValidator {
 
     private static final String SERVER_HANDLER_NAME = "lg_server_validator";
+    private static Field CHANNELS_FIELD;
 
     public static boolean validateAndInject(LightGuard plugin) {
         try {
             ServerConnection serverConnection = ((CraftServer) Bukkit.getServer()).getServer().getServerConnection();
             if (serverConnection == null) {
-                throw new IllegalStateException("ServerConnection is not initialized yet!");
+                return false;
             }
 
-            Field channelsField = null;
-            for (Field f : ServerConnection.class.getDeclaredFields()) {
-                if (List.class.isAssignableFrom(f.getType())) {
-                    f.setAccessible(true);
-                    Object val = f.get(serverConnection);
-                    if (val instanceof List && !((List<?>) val).isEmpty()) {
-                        Object first = ((List<?>) val).get(0);
-                        if (first instanceof ChannelFuture) {
-                            channelsField = f;
-                            break;
+            if (CHANNELS_FIELD == null) {
+                for (Field f : ServerConnection.class.getDeclaredFields()) {
+                    if (List.class.isAssignableFrom(f.getType())) {
+                        f.setAccessible(true);
+                        Object val = f.get(serverConnection);
+                        if (val instanceof List && !((List<?>) val).isEmpty()) {
+                            Object first = ((List<?>) val).get(0);
+                            if (first instanceof ChannelFuture) {
+                                CHANNELS_FIELD = f;
+                                break;
+                            }
                         }
                     }
                 }
             }
 
-            if (channelsField == null) {
-                throw new NoSuchFieldException("Could not detect Netty listening channels!");
+            if (CHANNELS_FIELD == null) {
+                plugin.getLogger().severe("CRITICAL: Could not detect Netty listening channels!");
+                return false;
             }
 
             @SuppressWarnings("unchecked")
-            List<ChannelFuture> futures = (List<ChannelFuture>) channelsField.get(serverConnection);
+            List<ChannelFuture> futures = (List<ChannelFuture>) CHANNELS_FIELD.get(serverConnection);
 
             for (ChannelFuture future : futures) {
                 if (future.channel().pipeline().get(SERVER_HANDLER_NAME) != null) {
@@ -67,8 +70,8 @@ public class LGStartupValidator {
             plugin.getLogger().info("Network Hooks successfully injected into Netty Pipeline.");
             return true;
 
-        } catch (Exception e) {
-            plugin.getLogger().severe("CRITICAL STARTUP FAILURE: " + e.getMessage());
+        } catch (Throwable t) {
+            plugin.getLogger().severe("CRITICAL STARTUP FAILURE: " + t.getMessage());
             return false;
         }
     }
@@ -76,33 +79,16 @@ public class LGStartupValidator {
     public static void uninject() {
         try {
             ServerConnection serverConnection = ((CraftServer) Bukkit.getServer()).getServer().getServerConnection();
-            if (serverConnection == null) return;
+            if (serverConnection == null || CHANNELS_FIELD == null) return;
 
-            Field channelsField = null;
-            for (Field f : ServerConnection.class.getDeclaredFields()) {
-                if (List.class.isAssignableFrom(f.getType())) {
-                    f.setAccessible(true);
-                    Object val = f.get(serverConnection);
-                    if (val instanceof List && !((List<?>) val).isEmpty()) {
-                        Object first = ((List<?>) val).get(0);
-                        if (first instanceof ChannelFuture) {
-                            channelsField = f;
-                            break;
-                        }
-                    }
+            @SuppressWarnings("unchecked")
+            List<ChannelFuture> futures = (List<ChannelFuture>) CHANNELS_FIELD.get(serverConnection);
+
+            for (ChannelFuture future : futures) {
+                if (future.channel().pipeline().get(SERVER_HANDLER_NAME) != null) {
+                    future.channel().pipeline().remove(SERVER_HANDLER_NAME);
                 }
             }
-
-            if (channelsField != null) {
-                @SuppressWarnings("unchecked")
-                List<ChannelFuture> futures = (List<ChannelFuture>) channelsField.get(serverConnection);
-
-                for (ChannelFuture future : futures) {
-                    if (future.channel().pipeline().get(SERVER_HANDLER_NAME) != null) {
-                        future.channel().pipeline().remove(SERVER_HANDLER_NAME);
-                    }
-                }
-            }
-        } catch (Exception ignored) {}
+        } catch (Throwable ignored) {}
     }
 }

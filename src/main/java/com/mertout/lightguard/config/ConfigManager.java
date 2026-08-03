@@ -1,13 +1,12 @@
 package com.mertout.lightguard.config;
 
 import com.mertout.lightguard.LightGuard;
-import com.mertout.lightguard.data.ProtocolPlayer;
 import com.mertout.lightguard.utils.NBTChecker;
 import net.minecraft.server.v1_16_R3.IRegistry;
+import net.minecraft.server.v1_16_R3.Item;
 import net.minecraft.server.v1_16_R3.Items;
 import net.minecraft.server.v1_16_R3.MinecraftKey;
 import org.bukkit.configuration.file.FileConfiguration;
-import net.minecraft.server.v1_16_R3.Item;
 
 import java.util.HashSet;
 import java.util.List;
@@ -60,8 +59,9 @@ public class ConfigManager {
 
         NBTChecker.reload();
 
-        plugin.getActionQueue().loadConfig();
-
+        if (plugin.getActionQueue() != null) {
+            plugin.getActionQueue().loadConfig();
+        }
 
         if (plugin.getDispatcher() != null) {
             plugin.reloadCheckDispatcher();
@@ -70,7 +70,11 @@ public class ConfigManager {
         if (plugin.getPacketLoggerManager() != null) {
             plugin.getPacketLoggerManager().getConfig().reload(plugin);
         }
-        plugin.getWorldChunkManager().clearCache();
+
+        if (plugin.getWorldChunkManager() != null) {
+            plugin.getWorldChunkManager().clearCache();
+        }
+
         plugin.getLogger().info("Configuration and caches reloaded successfully.");
     }
 

@@ -5,6 +5,7 @@ import org.bukkit.Bukkit;
 import org.bukkit.Chunk;
 import org.bukkit.World;
 import org.bukkit.event.EventHandler;
+import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.world.ChunkLoadEvent;
 import org.bukkit.event.world.ChunkUnloadEvent;
@@ -26,29 +27,32 @@ public class WorldChunkManager implements Listener {
         int cachedCount = 0;
         for (World world : Bukkit.getWorlds()) {
             String worldName = world.getName();
-            Set<Long> worldChunks = loadedChunks.computeIfAbsent(worldName, k -> ConcurrentHashMap.newKeySet());
+
+            loadedChunks.putIfAbsent(worldName, ConcurrentHashMap.newKeySet());
+            Set<Long> worldChunks = loadedChunks.get(worldName);
 
             for (Chunk chunk : world.getLoadedChunks()) {
                 worldChunks.add(getChunkKey(chunk.getX(), chunk.getZ()));
                 cachedCount++;
             }
         }
-        Bukkit.getLogger().info("Sentinel: " + cachedCount + " pre-loaded chunks cached for async inspection.");
+        Bukkit.getLogger().info("LightGuard: " + cachedCount + " pre-loaded chunks cached for async inspection.");
     }
 
     public static long getChunkKey(int x, int z) {
         return ((long) x << 32) | (z & 0xFFFFFFFFL);
     }
 
-    @EventHandler
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     public void onChunkLoad(ChunkLoadEvent event) {
         String worldName = event.getWorld().getName();
         long key = getChunkKey(event.getChunk().getX(), event.getChunk().getZ());
 
-        loadedChunks.computeIfAbsent(worldName, k -> ConcurrentHashMap.newKeySet()).add(key);
+        loadedChunks.putIfAbsent(worldName, ConcurrentHashMap.newKeySet());
+        loadedChunks.get(worldName).add(key);
     }
 
-    @EventHandler
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     public void onChunkUnload(ChunkUnloadEvent event) {
         String worldName = event.getWorld().getName();
         long key = getChunkKey(event.getChunk().getX(), event.getChunk().getZ());
@@ -61,8 +65,7 @@ public class WorldChunkManager implements Listener {
 
     public boolean isChunkLoadedAsynchronously(String worldName, int chunkX, int chunkZ) {
         Set<Long> chunks = loadedChunks.get(worldName);
-        if (chunks == null) return false;
-        return chunks.contains(getChunkKey(chunkX, chunkZ));
+        return chunks != null && chunks.contains(getChunkKey(chunkX, chunkZ));
     }
 
     public void clearCache() {

@@ -1,7 +1,6 @@
 package com.mertout.lightguard.logger;
 
 import com.mertout.lightguard.LightGuard;
-import org.bukkit.Bukkit;
 
 public class PacketLoggerManager {
     private final LightGuard plugin;
@@ -20,11 +19,11 @@ public class PacketLoggerManager {
         long threshold = config.getHeavyPacketThreshold();
         if (threshold != -1 && durationNs < threshold) return;
 
-        String packetName = PacketFilter.getPacketName(packet);
+        Class<?> packetClass = packet.getClass();
         if (!PacketFilter.isPlayerTracked(playerName, config)) return;
-        if (!PacketFilter.isAllowed(packetName, config)) return;
+        if (!PacketFilter.isAllowed(packetClass, config)) return;
 
-        String logLine = "Player: " + playerName + " | Packet: " + packetName + " | Time: " + (durationNs / 1000) + "us";
+        String logLine = "Player: " + playerName + " | Packet: " + packetClass.getSimpleName() + " | Time: " + (durationNs / 1000) + "us";
 
         PacketLoggerConfig.OutputMode mode = config.getOutputMode();
         if (mode == PacketLoggerConfig.OutputMode.CONSOLE || mode == PacketLoggerConfig.OutputMode.BOTH) {

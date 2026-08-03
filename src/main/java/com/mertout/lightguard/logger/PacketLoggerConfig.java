@@ -10,7 +10,9 @@ public class PacketLoggerConfig {
     private long heavyPacketThreshold;
     private OutputMode outputMode;
     private Set<String> playerList = new HashSet<>();
-    private Set<String> packetList = new HashSet<>();
+
+    private Set<Class<?>> packetList = new HashSet<>();
+
     private FilterMode playerMode;
     private FilterMode packetMode;
 
@@ -28,13 +30,20 @@ public class PacketLoggerConfig {
         this.playerList = new HashSet<>(config.getStringList("packet-logger.players"));
 
         this.packetMode = FilterMode.valueOf(config.getString("packet-logger.packet-mode", "BLACKLIST").toUpperCase());
-        this.packetList = new HashSet<>(config.getStringList("packet-logger.packets"));
+
+        Set<Class<?>> tempPacketList = new HashSet<>();
+        for (String packetName : config.getStringList("packet-logger.packets")) {
+            try {
+                tempPacketList.add(Class.forName("net.minecraft.server.v1_16_R3." + packetName));
+            } catch (ClassNotFoundException ignored) {}
+        }
+        this.packetList = tempPacketList;
     }
 
     public boolean isEnabled() { return enabled; }
     public long getHeavyPacketThreshold() { return heavyPacketThreshold; }
     public OutputMode getOutputMode() { return outputMode; }
-    public Set<String> getPacketList() { return packetList; }
+    public Set<Class<?>> getPacketList() { return packetList; }
     public Set<String> getPlayerList() { return playerList; }
     public FilterMode getPlayerMode() { return playerMode; }
     public FilterMode getPacketMode() { return packetMode; }

@@ -20,7 +20,6 @@ public class CreativeCheck extends Check {
         VarHandle item = null;
         try {
             MethodHandles.Lookup lookup = MethodHandles.privateLookupIn(PacketPlayInSetCreativeSlot.class, MethodHandles.lookup());
-
             for (Field field : PacketPlayInSetCreativeSlot.class.getDeclaredFields()) {
                 field.setAccessible(true);
                 if (field.getType() == int.class && slot == null) {
@@ -30,7 +29,6 @@ public class CreativeCheck extends Check {
                 }
             }
         } catch (Exception ignored) {}
-
         SLOT_FIELD = slot;
         ITEM_FIELD = item;
     }

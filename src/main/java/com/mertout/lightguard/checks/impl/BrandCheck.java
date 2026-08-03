@@ -7,41 +7,32 @@ import net.minecraft.server.v1_16_R3.PacketPlayInCustomPayload;
 import net.minecraft.server.v1_16_R3.PacketDataSerializer;
 import net.minecraft.server.v1_16_R3.MinecraftKey;
 
-import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
+import java.lang.invoke.VarHandle;
 import java.lang.reflect.Field;
 import java.nio.charset.StandardCharsets;
 
 public class BrandCheck extends Check {
 
-    private static final MethodHandle CHANNEL_GETTER;
-    private static final MethodHandle DATA_GETTER;
+    private static final VarHandle CHANNEL_FIELD;
+    private static final VarHandle DATA_FIELD;
 
     static {
+        VarHandle channel = null;
+        VarHandle data = null;
         try {
-            MethodHandles.Lookup lookup = MethodHandles.lookup();
-
-            Field fChannel;
-            try {
-                fChannel = PacketPlayInCustomPayload.class.getDeclaredField("tag");
-            } catch (NoSuchFieldException e) {
-                fChannel = PacketPlayInCustomPayload.class.getDeclaredField("a");
+            MethodHandles.Lookup lookup = MethodHandles.privateLookupIn(PacketPlayInCustomPayload.class, MethodHandles.lookup());
+            for (Field field : PacketPlayInCustomPayload.class.getDeclaredFields()) {
+                field.setAccessible(true);
+                if (field.getType() == MinecraftKey.class && channel == null) {
+                    channel = lookup.unreflectVarHandle(field);
+                } else if (field.getType() == PacketDataSerializer.class && data == null) {
+                    data = lookup.unreflectVarHandle(field);
+                }
             }
-            fChannel.setAccessible(true);
-            CHANNEL_GETTER = lookup.unreflectGetter(fChannel);
-
-            Field fData;
-            try {
-                fData = PacketPlayInCustomPayload.class.getDeclaredField("data");
-            } catch (NoSuchFieldException e) {
-                fData = PacketPlayInCustomPayload.class.getDeclaredField("b");
-            }
-            fData.setAccessible(true);
-            DATA_GETTER = lookup.unreflectGetter(fData);
-
-        } catch (Exception e) {
-            throw new ExceptionInInitializerError("Failed to initialize BrandCheck: " + e.getMessage());
-        }
+        } catch (Exception ignored) {}
+        CHANNEL_FIELD = channel;
+        DATA_FIELD = data;
     }
 
     private final int maxBrandLength;
@@ -58,16 +49,17 @@ public class BrandCheck extends Check {
         if (!(packet instanceof PacketPlayInCustomPayload)) return true;
 
         try {
-            MinecraftKey key = (MinecraftKey) CHANNEL_GETTER.invoke(packet);
+            if (CHANNEL_FIELD == null || DATA_FIELD == null) return true;
+
+            MinecraftKey key = (MinecraftKey) CHANNEL_FIELD.get(packet);
 
             if (key != null && (key.getKey().equals("brand") || key.toString().endsWith("brand"))) {
 
                 if (player.isBrandSent()) {
-                    plugin.getActionQueue().pushKick(player.getPlayer(), "Invalid Brand Sequence (Resent Brand)");
                     return false;
                 }
 
-                PacketDataSerializer serializer = (PacketDataSerializer) DATA_GETTER.invoke(packet);
+                PacketDataSerializer serializer = (PacketDataSerializer) DATA_FIELD.get(packet);
                 if (serializer == null || serializer.readableBytes() < 1) return true;
 
                 String brand = "";
@@ -80,31 +72,34 @@ public class BrandCheck extends Check {
                         brand = new String(bytes, StandardCharsets.UTF_8);
                     }
                 } catch (Exception e) {
-                    plugin.getActionQueue().pushKick(player.getPlayer(), "Malformed Brand Packet Structure");
                     return false;
                 } finally {
                     serializer.resetReaderIndex();
                 }
 
-                if (brand == null || brand.trim().isEmpty()) {
-                    plugin.getActionQueue().pushKick(player.getPlayer(), "Empty or Null Client Brand");
+                if (brand.isEmpty()) {
                     return false;
                 }
 
                 if (brand.length() > maxBrandLength) {
-                    plugin.getActionQueue().pushKick(player.getPlayer(), "Oversized Client Brand");
                     return false;
                 }
 
-                if (blockInvalidChars && !brand.matches("^[\\x20-\\x7E]+$")) {
-                    plugin.getActionQueue().pushKick(player.getPlayer(), "Illegal Characters in Brand");
-                    return false;
+                if (blockInvalidChars) {
+                    // Regex kullanmak yerine sıfır çöp (Zero-Allocation) karakter kontrolü
+                    int brandLen = brand.length();
+                    for (int i = 0; i < brandLen; i++) {
+                        char c = brand.charAt(i);
+                        if (c < 0x20 || c > 0x7E) {
+                            return false;
+                        }
+                    }
                 }
 
                 player.setBrandSent(true);
             }
         } catch (Throwable t) {
-            return true;
+            return false;
         }
 
         return true;

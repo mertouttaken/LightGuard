@@ -8,22 +8,46 @@ import net.minecraft.server.v1_16_R3.PacketPlayInSteerVehicle;
 
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.VarHandle;
+import java.lang.reflect.Field;
 
 public class VehicleCheck extends Check {
 
     private static final VarHandle X, Y, Z, STEER_X, STEER_Z, JUMP_FIELD, UNMOUNT_FIELD;
 
     static {
+        VarHandle x = null, y = null, z = null;
+        VarHandle steerX = null, steerZ = null, jump = null, unmount = null;
         try {
-            MethodHandles.Lookup lookup = MethodHandles.lookup();
-            X = MethodHandles.privateLookupIn(PacketPlayInVehicleMove.class, lookup).findVarHandle(PacketPlayInVehicleMove.class, "a", double.class);
-            Y = MethodHandles.privateLookupIn(PacketPlayInVehicleMove.class, lookup).findVarHandle(PacketPlayInVehicleMove.class, "b", double.class);
-            Z = MethodHandles.privateLookupIn(PacketPlayInVehicleMove.class, lookup).findVarHandle(PacketPlayInVehicleMove.class, "c", double.class);
-            STEER_X = MethodHandles.privateLookupIn(PacketPlayInSteerVehicle.class, lookup).findVarHandle(PacketPlayInSteerVehicle.class, "a", float.class);
-            STEER_Z = MethodHandles.privateLookupIn(PacketPlayInSteerVehicle.class, lookup).findVarHandle(PacketPlayInSteerVehicle.class, "b", float.class);
-            JUMP_FIELD = MethodHandles.privateLookupIn(PacketPlayInSteerVehicle.class, lookup).findVarHandle(PacketPlayInSteerVehicle.class, "c", boolean.class);
-            UNMOUNT_FIELD = MethodHandles.privateLookupIn(PacketPlayInSteerVehicle.class, lookup).findVarHandle(PacketPlayInSteerVehicle.class, "d", boolean.class);
-        } catch (Exception e) { throw new ExceptionInInitializerError(e); }
+            MethodHandles.Lookup moveLookup = MethodHandles.privateLookupIn(PacketPlayInVehicleMove.class, MethodHandles.lookup());
+            int moveDoubleCount = 0;
+            for (Field field : PacketPlayInVehicleMove.class.getDeclaredFields()) {
+                if (field.getType() == double.class) {
+                    field.setAccessible(true);
+                    if (moveDoubleCount == 0) x = moveLookup.unreflectVarHandle(field);
+                    else if (moveDoubleCount == 1) y = moveLookup.unreflectVarHandle(field);
+                    else if (moveDoubleCount == 2) z = moveLookup.unreflectVarHandle(field);
+                    moveDoubleCount++;
+                }
+            }
+
+            MethodHandles.Lookup steerLookup = MethodHandles.privateLookupIn(PacketPlayInSteerVehicle.class, MethodHandles.lookup());
+            int steerFloatCount = 0, steerBoolCount = 0;
+            for (Field field : PacketPlayInSteerVehicle.class.getDeclaredFields()) {
+                field.setAccessible(true);
+                if (field.getType() == float.class) {
+                    if (steerFloatCount == 0) steerX = steerLookup.unreflectVarHandle(field);
+                    else if (steerFloatCount == 1) steerZ = steerLookup.unreflectVarHandle(field);
+                    steerFloatCount++;
+                } else if (field.getType() == boolean.class) {
+                    if (steerBoolCount == 0) jump = steerLookup.unreflectVarHandle(field);
+                    else if (steerBoolCount == 1) unmount = steerLookup.unreflectVarHandle(field);
+                    steerBoolCount++;
+                }
+            }
+        } catch (Exception ignored) {}
+        X = x; Y = y; Z = z;
+        STEER_X = steerX; STEER_Z = steerZ;
+        JUMP_FIELD = jump; UNMOUNT_FIELD = unmount;
     }
 
     public VehicleCheck(LightGuard plugin) {
@@ -34,39 +58,45 @@ public class VehicleCheck extends Check {
     public boolean check(Object packet, ProtocolPlayer player) {
         if (packet instanceof PacketPlayInSteerVehicle) {
             try {
+                if (STEER_X == null || STEER_Z == null || JUMP_FIELD == null || UNMOUNT_FIELD == null) return true;
+
                 float steerX = (float) STEER_X.get(packet);
                 float steerZ = (float) STEER_Z.get(packet);
+
                 if (!Float.isFinite(steerX) || !Float.isFinite(steerZ)) {
-                    plugin.getActionQueue().pushKick(player.getPlayer(), "Invalid Steering Data (NaN)");
                     return false;
                 }
-                if ((boolean) JUMP_FIELD.get(packet) && (boolean) UNMOUNT_FIELD.get(packet)) return false;
-            } catch (Exception e) { return false; }
+                if ((boolean) JUMP_FIELD.get(packet) && (boolean) UNMOUNT_FIELD.get(packet)) {
+                    return false;
+                }
+            } catch (Throwable t) { return false; }
         }
 
         if (packet instanceof PacketPlayInVehicleMove) {
             try {
-                double x = (double) X.get(packet);
-                double y = (double) Y.get(packet);
-                double z = (double) Z.get(packet);
+                if (X == null || Y == null || Z == null) return true;
 
-                if (!Double.isFinite(x) || !Double.isFinite(y) || !Double.isFinite(z)) return false;
+                double pX = (double) X.get(packet);
+                double pY = (double) Y.get(packet);
+                double pZ = (double) Z.get(packet);
+
+                if (!Double.isFinite(pX) || !Double.isFinite(pY) || !Double.isFinite(pZ)) return false;
 
                 String worldName = player.getCurrentWorldName();
-                if (!plugin.getWorldChunkManager().isChunkLoadedAsynchronously(worldName, (int)x >> 4, (int)z >> 4)) {
+                if (!plugin.getWorldChunkManager().isChunkLoadedAsynchronously(worldName, (int) pX >> 4, (int) pZ >> 4)) {
                     return false;
                 }
 
                 double lX = player.getLastVehicleX();
                 if (lX != -1) {
-                    double distSq = Math.pow(x - lX, 2) + Math.pow(y - player.getLastVehicleY(), 2) + Math.pow(z - player.getLastVehicleZ(), 2);
+                    double distSq = Math.pow(pX - lX, 2) + Math.pow(pY - player.getLastVehicleY(), 2) + Math.pow(pZ - player.getLastVehicleZ(), 2);
                     if (distSq > 100.0 && !player.isInTeleportGrace()) {
-                        plugin.getActionQueue().pushKick(player.getPlayer(), "Vehicle Speed/Blink Exploit");
                         return false;
                     }
                 }
-                player.setLastVehicleLocation(x, y, z);
-            } catch (Exception e) { return false; }
+
+                player.setLastVehicleLocation(pX, pY, pZ);
+            } catch (Throwable t) { return false; }
         }
         return true;
     }

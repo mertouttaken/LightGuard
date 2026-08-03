@@ -32,139 +32,101 @@ settings:
     geyser-support: true # Relaxes certain movement/packet checks for Bedrock players.
 
     # Checks listed here are considered "Critical".
-    # Sentinel will NEVER disable these checks, even if they throw errors, 
-    # because disabling them would leave the server vulnerable to instant crashes.
+    # Sentinel will NEVER disable these checks, even if they throw errors.
     critical-checks:
-      - "NBTExploit"      # Item NBT (Book/Chest bans)
-      - "ItemExploit"     # Item Attribute manipulation
-      - "Payload"         # Custom channel crashers
-      - "Flood"           # Packet flooding
-      - "PacketSize"      # Memory exhaustion attacks
+      - "NBTExploit"
+      - "ItemExploit"
+      - "Payload"
+      - "Flood"
+      - "PacketSize"
 
 # ============================================================== #
 #                     PACKET & EXPLOIT CHECKS                    #
 # ============================================================== #
 checks:
-  # Validates Anvil rename requests to prevent oversized names and color code exploits.
   anvil:
     enabled: true
 
-  # Prevents clients from spamming recipe book packets to lag the server.
   recipe:
     enabled: true
 
-  # Validates KeepAlive IDs to prevent ping spoofing and dead-code exploits.
   keep-alive:
     enabled: true
 
-  # Intercepts raw network bytes BEFORE they are processed by the server (Netty level).
   raw-packet:
     enabled: true
-    # Maximum raw packet size (in Bytes) for authenticated players.
-    # 40960 Bytes = 40 KB
     max-raw-size: 40960
-    # Maximum raw byte accumulation for unauthenticated connections (Pre-Login).
-    # 131072 Bytes = 128 KB
     pre-login-max-size: 131072
 
-  # Limits the dimensions of individual packet fields to prevent memory allocation attacks.
   packet-size:
     enabled: true
-    max-string-length: 256 # Maximum allowed length for general strings (e.g., chat).
-    max-buffer-size: 16384 # Maximum byte buffer size.
-    per-packet-limit: 32000 # Hard limit for estimated packet size.
+    max-string-length: 256
+    max-buffer-size: 16384
+    per-packet-limit: 32000
     excluded-packets:
-      - "PacketPlayInCustomPayload"
       - "PacketPlayInBEdit"
 
-  # Prevents GUI-based exploits like ghost items, swap crashes, and lectern chunk bans.
   window:
     enabled: true
     strict-slots: true
     prevent-lectern-spam: true
     prevent-swap-in-gui: true
 
-  # Validates sign edits to prevent command execution and oversized text.
   sign:
     enabled: true
-    max-line-length: 45 # Maximum characters allowed per line on a sign.
-    block-json-syntax: true # Blocks JSON injection (e.g., {"text":"..."} click events).
+    max-line-length: 45
+    block-json-syntax: true
 
-  # Prevents malicious clients from sending extreme view distances or invalid language locales.
   client-settings:
     enabled: true
+    max-length: 128
 
-  # Ensures clients cannot interact with menus they haven't actually opened (Ghost Clicks).
-  game-state:
-    enabled: true
-    check-inventory-open: true
-
-  # Prevents End-Of-File (EOF) chunk errors caused by malformed packets.
   eof-exploit:
     enabled: true
 
-  # Validates vehicle movement to prevent boat-fly, invalid steering, and vehicle teleportation.
   vehicle:
     enabled: true
     check-steer: true
     prevent-invalid-move: true
 
-  # Mitigates map-based memory leaks by limiting how many maps a client can process.
   map-exploit:
     enabled: true
-    max-pps: 3 # Maximum map creation/update packets per second.
-    max-nbt-size: 4096
+    max-pps: 3
 
-  # Filters out unrenderable characters that can crash client games.
   chat-unicode:
     enabled: true
-    block-zalgo: true # Blocks glitchy/stacked characters (Zalgo text).
+    block-zalgo: true
 
-  # Blocks impossible actions (e.g., hitting yourself or interacting with vectors out of bounds).
   bad-packets:
     enabled: true
     check-negative-values: true
     prevent-self-interact: true
 
-  # Restricts the custom "brand" payload sent by clients (e.g., "vanilla", "lunarclient").
   client-brand:
     enabled: true
-    max-length: 128 # Shortened brand name to prevent memory spam.
-    block-invalid-chars: true # Blocks invisible control characters in the brand name.
+    max-length: 128
+    block-invalid-chars: true
 
-  # Validates the status of Resource Packs to prevent malformed responses.
   resource-pack:
     enabled: true
-    max-status-length: 50
-    block-invalid-status: true
 
-  # Prevents players from interacting with entities while dead, or spamming Armor Stands.
   entity:
     enabled: true
     prevent-invalid-entity: true
     prevent-armorstand-spam: true
 
-  # Hybrid Rate Limiter: Analyzes packet processing cost rather than just packet count.
+  # Hybrid Rate Limiter
   flood:
-    # The maximum threat score a player can accumulate.
-    # If this score is exceeded, the player is instantly dropped via Netty.
     max-threshold: 500.0
-    # The amount of threat score decayed per second for a normal playing user.
     decay-per-second: 150.0
     max-violations: 3
 
-  # Controls block placement speeds and prevents illegal blocks from being placed.
   block-place:
     enabled: true
-    kick-on-illegal-block: false # If false, the block is just cancelled without kicking.
-    max-pps: 12 # Blocks placed per second limit.
-    check-coordinates: true # Validates if the placement coordinates are mathematically possible.
-
-    # Schematic Printer / FastPlace Detection
+    max-pps: 12
+    check-coordinates: true
     printer-check: true
-    printer-threshold: 6 # Sustained placements over 6 PPS flag the player as using a Printer.
-    printer-leave-delay: 8000 # Delay (in ms) before the printer penalty expires.
-
+    printer-threshold: 6
     prevent-illegal-blocks: true
     illegal-blocks:
       - "COMMAND_BLOCK"
@@ -176,20 +138,18 @@ checks:
       - "END_PORTAL_FRAME"
       - "LIGHT"
 
-  # Deep NBT inspection to prevent Book Bans, Chest Bans, and Crash Items.
   item-exploit:
     enabled: true
-    max-nbt-size: 2048 # Maximum byte size of a single item's NBT.
-    max-string-len: 100 # Maximum characters for item Name or Lore.
-    max-lore-size: 10 # Maximum number of lines in item Lore.
-    max-list-size: 100 # Maximum elements inside an NBT TagList.
-    max-array-size: 256 # Maximum elements inside an IntArray/ByteArray.
-    max-total-nodes: 1000 # Maximum total NBT tags per item (Prevents recursive crashers).
-    max-depth: 7 # Maximum nested depth of NBT tags (Prevents StackOverflow).
-    max-attributes: 7 # Maximum attribute modifiers (e.g., +Attack Damage).
-    max-attribute-value: 100 # Maximum value for a single attribute.
-    max-enchant-level: 20 # Maximum enchantment level allowed.
-
+    max-nbt-size: 2048
+    max-string-len: 100
+    max-lore-size: 10
+    max-list-size: 100
+    max-array-size: 256
+    max-total-nodes: 1000
+    max-depth: 7
+    max-attributes: 7
+    max-attribute-value: 100
+    max-enchant-level: 20
     illegal-keys:
       - "run_command"
       - "clickEvent"
@@ -197,37 +157,28 @@ checks:
       - "Score"
       - "Selector"
       - "translation.test.invalid"
-
     nbt-occurrences:
-      - "extra:15"      # Blocks JSON bombs (massive text rendering).
-      - "{:50"          # Blocks heavily nested NBT structures.
-      - "translate:5"   # Blocks translation key spam (Client crasher).
-      - "score:5"       # Blocks Scoreboard rendering crashes.
+      - "extra:15"
+      - "{:50"
+      - "translate:5"
+      - "score:5"
 
-  # Validates movement packets to prevent instant teleports and out-of-bounds exploits.
   position:
     enabled: true
-    # Maximum horizontal distance a player can travel in one packet (in blocks).
     max-offset: 25.0
-    # Maximum horizontal distance while flying with Elytra (in blocks).
     elytra-max-distance: 50.0
-    # Maximum vertical distance a player can travel in one packet (in blocks).
     max-vertical-distance: 50.0
-    # Hard world border limit (Prevents Far-lands/Overflow exploits).
     out-of-world-limit: 29999984.0
 
-  # Prevents malicious book creation (Book Ban exploit).
   book:
     enabled: true
-    max-pages: 5 # Maximum allowed pages in a writable book.
-    max-bytes-per-page: 150 # Maximum size of a single page.
-    strip-ascii: true # Removes unrenderable ASCII characters from books.
+    max-pages: 5
+    max-bytes-per-page: 150
+    strip-ascii: true
 
-  # Secures the Custom Payload channel system against oversized data and exploit mods.
   payload:
     enabled: true
-    max-size: 1024 # Maximum byte size for generic payload packets.
-    # Channels listed here are completely blocked from being processed.
+    max-size: 1024
     blocked-channels:
       - "MC|BEdit"
       - "MC|BSign"
@@ -239,21 +190,20 @@ checks:
       - "minecraft:bedit"
       - "minecraft:bsign"
       - "minecraft:bopen"
-      - "wdl:init" # WorldDownloader Mod
+      - "wdl:init"
       - "world_downloader"
 
-  # Command syntax and execution security.
   command:
     enabled: true
-    block-syntax: true # Blocks invalid syntaxes like '::' or '//'.
+    block-syntax: true
     blacklist:
-      - "/calc"    # WorldEdit math crasher
+      - "/calc"
       - "//calc"
       - "/eval"
       - "//eval"
       - "/solve"
       - "//solve"
-      - "/hd readtext" # HolographicDisplays exploit
+      - "/hd readtext"
       - "/pex"
       - "/op"
       - "/deop"
@@ -266,11 +216,9 @@ checks:
       - "/reload"
       - "/rl"
 
-  # Secures the Tab-Complete feature against Log4j and massive argument requests.
   tab:
     enabled: true
-    max-length: 256 # Maximum length of a tab-complete request.
-    # Single characters that are completely forbidden in tab completions.
+    max-length: 256
     block-chars:
       - "["
       - "]"
@@ -284,8 +232,7 @@ checks:
       - "\""
       - "'"
       - "`"
-      - "$" # Mitigates Log4Shell (${jndi:...})
-    # Substrings/words that are forbidden in tab completions.
+      - "$"
     block-contains:
       - "targetoffset"
       - "for("
@@ -299,20 +246,20 @@ checks:
       - "tag"
       - "uuid"
       - "score"
-      - "jndi" # Log4j
-      - "ldap" # Log4j
-      - "rmi" # Log4j
+      - "jndi"
+      - "ldap"
+      - "rmi"
 
 # ============================================================== #
 #                       PACKET LOGGER                            #
 # ============================================================== #
-# Used for debugging and monitoring network traffic.
 packet-logger:
   enabled: false
-  heavy-packet-threshold: 5000000 # Logs packets that take longer than 5ms to process.
-  output: FILE # Options: CONSOLE, FILE, BOTH
-  players: [] # Leave empty to track everyone, or add specific names.
-  packet-mode: BLACKLIST # Options: WHITELIST or BLACKLIST
+  heavy-packet-threshold: 5000000
+  output: FILE
+  player-mode: WHITELIST
+  players: []
+  packet-mode: BLACKLIST
   packets:
     - "PacketPlayInKeepAlive"
     - "PacketPlayInFlying"
@@ -323,32 +270,35 @@ packet-logger:
 # ============================================================== #
 #                     GAMEPLAY MECHANICS                         #
 # ============================================================== #
-# Patches for Vanilla Minecraft bugs and dupes.
 mechanics:
-  nether-portal-delay: true
-  nether-portal-cooldown-ms: 4000 # 4s cooldown after passing through a portal to prevent trapping/lag.
-  max-arrow-velocity: 12.0 # Significantly limits bow speed to prevent velocity crashes.
-  shears-cooldown: true # Prevents shear spam on sheep (Lag exploit).
-  break-close-inventory: true # Closes GUI if the block being interacted with is broken.
-  interact-container-delay: 300 # 300ms cooldown for opening chests to prevent spam.
-  prevent-portal-break: true # Prevents breaking portals using water/lava flow.
-  prevent-mule-dupe: true # Patches the infamous Chested Horse / Llama duplication glitch.
-  block-dead-packets: true # Ignores actions from players who are currently dead.
-  null-chunk: true # Prevents players from moving into unloaded chunks (Chunk exploit).
-  self-damage: true # Prevents players from damaging themselves via exploits.
-  bed-duplication: true # Closes inventory when entering a bed.
-  disable-piglin-trading: false # Disables bartering if set to true.
-  close-inventory-on-teleport: true # Closes GUI on teleport to prevent cross-dimensional dupes.
-  limit-falling-blocks: true # Limits sand/gravel entities to prevent falling-block crashers.
+
+  # --- Dupe & Economy Protections ---
+  prevent-mule-dupe: true
+  bed-duplication: true
+  prevent-invalid-trade: true
+  prevent-anvil-dupe: true
+  prevent-furnace-dupe: true
+  prevent-hopper-dupe: true
+  prevent-bed-crop-dupe: true
+
+  # --- Exploit & Crash Protections ---
+  max-arrow-velocity: 12.0
+  prevent-portal-break: true
+  null-chunk: true
+  self-damage: true
+  limit-falling-blocks: true
   max-falling-blocks-per-chunk: 10
-  prevent-nether-roof: true # Prevents building above the Nether ceiling (Y: 127).
-  limit-map-creation: true # Restricts map creation frequency.
-  prevent-invalid-trade: true # Clears cursor items when opening a merchant to prevent trade dupes.
-  prevent-piston-crash: true # Prevents pistons from pushing tile entities (chests, hoppers).
-  trapdoor-rail-redstone: true # Mitigates noisy redstone clock lag machines.
-  prevent-anvil-dupe: true # Patches anvil UI duplication methods.
-  prevent-furnace-dupe: true # Patches furnace UI duplication methods.
-  prevent-hopper-dupe: true # Patches hopper/minecart related dupes.
-  prevent-end-teleport-exploits: true # Prevents entity duplication when traveling to The End.
-  prevent-dispenser-spam: true # Restricts dispenser fire rates.
-  prevent-bed-crop-dupe: true # Patches the bed + crop duplication glitch.
+  prevent-nether-roof: true
+  prevent-piston-crash: true
+  prevent-end-teleport-exploits: true
+
+  # --- Lag & Spam Mitigations ---
+  nether-portal-delay: true
+  shears-cooldown: true
+  break-close-inventory: true
+  interact-container-delay: 300
+  block-dead-packets: true
+  close-inventory-on-teleport: true
+  trapdoor-rail-redstone: true
+  prevent-dispenser-spam: true
+  disable-piglin-trading: false

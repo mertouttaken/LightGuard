@@ -16,9 +16,11 @@ public class RecipeCheck extends Check {
     @Override
     public boolean check(Object packet, ProtocolPlayer player) {
         if (packet instanceof PacketPlayInAutoRecipe || packet instanceof PacketPlayInRecipeDisplayed) {
-
-            if (player.incrementAndGetRecipeCount(System.currentTimeMillis()) > MAX_RECIPE_PACKETS) {
-                plugin.getActionQueue().pushKick(player.getPlayer(), "Recipe Book Spam Detected");
+            try {
+                if (player.incrementAndGetRecipeCount(System.currentTimeMillis()) > MAX_RECIPE_PACKETS) {
+                    return false;
+                }
+            } catch (Throwable t) {
                 return false;
             }
         }

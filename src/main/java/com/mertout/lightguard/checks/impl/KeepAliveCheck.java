@@ -7,16 +7,25 @@ import net.minecraft.server.v1_16_R3.PacketPlayInKeepAlive;
 
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.VarHandle;
+import java.lang.reflect.Field;
 
 public class KeepAliveCheck extends Check {
 
     private static final VarHandle ID_FIELD;
 
     static {
+        VarHandle id = null;
         try {
-            ID_FIELD = MethodHandles.privateLookupIn(PacketPlayInKeepAlive.class, MethodHandles.lookup())
-                    .findVarHandle(PacketPlayInKeepAlive.class, "a", long.class);
-        } catch (Exception e) { throw new ExceptionInInitializerError(e); }
+            MethodHandles.Lookup lookup = MethodHandles.privateLookupIn(PacketPlayInKeepAlive.class, MethodHandles.lookup());
+            for (Field field : PacketPlayInKeepAlive.class.getDeclaredFields()) {
+                if (field.getType() == long.class) {
+                    field.setAccessible(true);
+                    id = lookup.unreflectVarHandle(field);
+                    break;
+                }
+            }
+        } catch (Exception ignored) {}
+        ID_FIELD = id;
     }
 
     public KeepAliveCheck(LightGuard plugin) {
@@ -28,11 +37,12 @@ public class KeepAliveCheck extends Check {
         if (!(packet instanceof PacketPlayInKeepAlive)) return true;
 
         try {
-            long id = (long) ID_FIELD.get(packet);
-
-            player.getKeepAliveTracker().onKeepAliveReceived(id);
-
+            if (ID_FIELD != null) {
+                long id = (long) ID_FIELD.get(packet);
+                player.getKeepAliveTracker().onKeepAliveReceived(id);
+            }
         } catch (Throwable t) {
+            return false;
         }
 
         return true;

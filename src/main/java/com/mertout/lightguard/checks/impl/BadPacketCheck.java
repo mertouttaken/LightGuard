@@ -6,7 +6,6 @@ import com.mertout.lightguard.data.ProtocolPlayer;
 import net.minecraft.server.v1_16_R3.PacketPlayInUseEntity;
 import net.minecraft.server.v1_16_R3.Vec3D;
 
-import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.VarHandle;
 import java.lang.reflect.Field;
@@ -15,37 +14,29 @@ public class BadPacketCheck extends Check {
 
     private static final VarHandle ENTITY_ID;
     private static final VarHandle TARGET_VECTOR;
-    private static final MethodHandle ACTION_GETTER;
+    private static final VarHandle ACTION_FIELD;
 
     static {
+        VarHandle entityId = null;
+        VarHandle targetVector = null;
+        VarHandle actionField = null;
         try {
             MethodHandles.Lookup lookup = MethodHandles.privateLookupIn(PacketPlayInUseEntity.class, MethodHandles.lookup());
-
-            ENTITY_ID = lookup.findVarHandle(PacketPlayInUseEntity.class, "a", int.class);
-
-            VarHandle targetHandle = null;
-            try {
-                targetHandle = lookup.findVarHandle(PacketPlayInUseEntity.class, "c", Vec3D.class);
-            } catch (Exception e) {
-                try {
-                    targetHandle = lookup.findVarHandle(PacketPlayInUseEntity.class, "d", Vec3D.class);
-                } catch (Exception ignored) {}
-            }
-            TARGET_VECTOR = targetHandle;
-
-            MethodHandle actionHandle = null;
             for (Field field : PacketPlayInUseEntity.class.getDeclaredFields()) {
-                if (field.getType().isEnum() && field.getName().equals("b")) {
-                    field.setAccessible(true);
-                    actionHandle = lookup.unreflectGetter(field);
-                    break;
+                field.setAccessible(true);
+                if (field.getType() == int.class && entityId == null) {
+                    entityId = lookup.unreflectVarHandle(field);
+                } else if (field.getType() == Vec3D.class && targetVector == null) {
+                    targetVector = lookup.unreflectVarHandle(field);
+                } else if (field.getType().isEnum() && actionField == null) {
+                    actionField = lookup.unreflectVarHandle(field);
                 }
             }
-            ACTION_GETTER = actionHandle;
+        } catch (Exception ignored) {}
 
-        } catch (Exception e) {
-            throw new ExceptionInInitializerError(e);
-        }
+        ENTITY_ID = entityId;
+        TARGET_VECTOR = targetVector;
+        ACTION_FIELD = actionField;
     }
 
     private final boolean preventSelfInteract;
@@ -60,28 +51,25 @@ public class BadPacketCheck extends Check {
         if (!(packet instanceof PacketPlayInUseEntity)) return true;
 
         try {
-            PacketPlayInUseEntity useEntity = (PacketPlayInUseEntity) packet;
-            int entityId = (int) ENTITY_ID.get(useEntity);
+            if (ENTITY_ID == null) return true;
+
+            int entityId = (int) ENTITY_ID.get(packet);
 
             if (preventSelfInteract && player.getPlayer() != null && entityId == player.getPlayer().getEntityId()) {
-                plugin.getActionQueue().pushKick(player.getPlayer(), "Self Interaction (Bad Packet)");
                 return false;
             }
 
-            if (ACTION_GETTER != null) {
-                Enum<?> actionEnum = (Enum<?>) ACTION_GETTER.invoke(useEntity);
+            if (ACTION_FIELD != null) {
+                Enum<?> actionEnum = (Enum<?>) ACTION_FIELD.get(packet);
 
                 if (actionEnum != null && actionEnum.name().equals("INTERACT_AT")) {
-
                     if (TARGET_VECTOR != null) {
-                        Vec3D target = (Vec3D) TARGET_VECTOR.get(useEntity);
+                        Vec3D target = (Vec3D) TARGET_VECTOR.get(packet);
                         if (target != null) {
                             if (!Double.isFinite(target.x) || !Double.isFinite(target.y) || !Double.isFinite(target.z)) {
-                                plugin.getActionQueue().pushKick(player.getPlayer(), "Invalid Interaction Vector");
                                 return false;
                             }
                             if (Math.abs(target.x) > 30 || Math.abs(target.y) > 30 || Math.abs(target.z) > 30) {
-                                plugin.getActionQueue().pushKick(player.getPlayer(), "Interaction Vector Out of Range");
                                 return false;
                             }
                         }
@@ -89,7 +77,7 @@ public class BadPacketCheck extends Check {
                 }
             }
         } catch (Throwable t) {
-            return true;
+            return false;
         }
 
         return true;

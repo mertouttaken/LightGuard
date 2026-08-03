@@ -28,7 +28,8 @@ public class PacketLogWriter {
                     try {
                         String log = logQueue.poll(2, TimeUnit.SECONDS);
                         if (log != null) {
-                            writer.write(log);
+                            String time = LocalTime.now().format(TIME_FORMAT);
+                            writer.write("[" + time + "] " + log);
                             writer.newLine();
                             if (logQueue.size() < 10) writer.flush();
                         }
@@ -50,10 +51,7 @@ public class PacketLogWriter {
 
     public void log(String message) {
         if (!running) return;
-
-        String formattedMessage = "[" + LocalTime.now().format(TIME_FORMAT) + "] " + message;
-
-        logQueue.offer(formattedMessage);
+        logQueue.offer(message);
     }
 
     public void shutdown() {

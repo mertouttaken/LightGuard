@@ -18,16 +18,7 @@ public class ProtocolPlayer {
     private final HybridRateLimiter rateLimiter;
     private final KeepAliveTracker keepAliveTracker = new KeepAliveTracker();
 
-    private static final class InventoryState {
-        final boolean isOpen;
-        final int windowId;
-        InventoryState(boolean isOpen, int windowId) {
-            this.isOpen = isOpen;
-            this.windowId = windowId;
-        }
-    }
-    private static final InventoryState CLOSED_STATE = new InventoryState(false, 0);
-    private volatile InventoryState inventoryState = CLOSED_STATE;
+    private volatile int openWindowId = -1;
 
     private volatile boolean isAnvilOpen = false;
     private volatile long lastTeleportTime = 0;
@@ -80,7 +71,6 @@ public class ProtocolPlayer {
         this.entityId = player.getEntityId();
         this.rateLimiter = new HybridRateLimiter(plugin);
     }
-
 
     public void incrementPacketCount() { packetCounter.incrementAndGet(); }
     public void updatePPS() { pps.set(packetCounter.getAndSet(0)); }
@@ -171,10 +161,10 @@ public class ProtocolPlayer {
     public HybridRateLimiter getRateLimiter() { return rateLimiter; }
     public KeepAliveTracker getKeepAliveTracker() { return keepAliveTracker; }
 
-    public boolean isInventoryOpen() { return inventoryState.isOpen; }
-    public int getOpenWindowId() { return inventoryState.windowId; }
+    public boolean isInventoryOpen() { return openWindowId != -1; }
+    public int getOpenWindowId() { return openWindowId; }
     public void setInventoryState(boolean isOpen, int windowId) {
-        this.inventoryState = isOpen ? new InventoryState(true, windowId) : CLOSED_STATE;
+        this.openWindowId = isOpen ? windowId : -1;
     }
 
     public boolean isAnvilOpen() { return isAnvilOpen; }

@@ -15,7 +15,10 @@ import com.mertout.lightguard.monitor.PerformanceMonitor;
 import com.mertout.lightguard.netty.LGPacketInjector;
 import com.mertout.lightguard.netty.LGStartupValidator;
 
+import org.bukkit.Bukkit;
 import org.bukkit.plugin.java.JavaPlugin;
+
+import java.lang.reflect.Method;
 
 public class LightGuard extends JavaPlugin {
 
@@ -31,6 +34,7 @@ public class LightGuard extends JavaPlugin {
     private Dispatcher checkDispatcher;
 
     private double currentTps = 20.0;
+    private Method getTpsMethod = null;
 
     @Override
     public void onEnable() {
@@ -43,34 +47,39 @@ public class LightGuard extends JavaPlugin {
             return;
         }
 
+        try {
+            getTpsMethod = Bukkit.getServer().getClass().getMethod("getTPS");
+        } catch (Exception ignored) {}
+
         this.configManager = new ConfigManager(this);
         this.actionQueue = new ActionQueue(this);
         this.protocolManager = new ProtocolManager(this);
         this.worldChunkManager = new WorldChunkManager(this);
         this.checkDispatcher = new Dispatcher(this);
-
         this.packetInjector = new LGPacketInjector(this);
-
         this.packetLoggerManager = new PacketLoggerManager(this);
         this.performanceMonitor = new PerformanceMonitor(this);
         this.metrics = new MetricsCollector(this);
 
         getServer().getPluginManager().registerEvents(new MechanicListener(this), this);
-
         getCommand("lg").setExecutor(new LGCommand(this));
 
         getServer().getScheduler().runTaskTimer(this, () -> {
             try {
-                double recentTps = net.minecraft.server.v1_16_R3.MinecraftServer.getServer().recentTps[0];
-                this.currentTps = Math.min(20.0, Math.max(0.0, recentTps));
+                if (getTpsMethod != null) {
+                    double[] tpsArr = (double[]) getTpsMethod.invoke(Bukkit.getServer());
+                    this.currentTps = Math.min(20.0, Math.max(0.0, tpsArr[0]));
+                } else {
+                    this.currentTps = 20.0;
+                }
             } catch (Exception e) {
                 this.currentTps = 20.0;
             }
         }, 40L, 40L);
 
         getServer().getScheduler().runTaskTimerAsynchronously(this, () -> {
-            if (getProtocolManager() != null) {
-                getProtocolManager().getPlayers().values().forEach(ProtocolPlayer::updatePPS);
+            if (protocolManager != null) {
+                protocolManager.getPlayers().values().forEach(ProtocolPlayer::updatePPS);
             }
         }, 20L, 20L);
 
@@ -82,11 +91,15 @@ public class LightGuard extends JavaPlugin {
         LGStartupValidator.uninject();
         LGProfileCommand.cancelAll();
 
-        if (packetLoggerManager != null) packetLoggerManager.shutdown();
+        if (packetLoggerManager != null) {
+            packetLoggerManager.shutdown();
+        }
 
         if (protocolManager != null && packetInjector != null) {
             protocolManager.getPlayers().forEach((uuid, pp) -> {
-                if (pp.getPlayer().isOnline()) packetInjector.removePlayer(pp.getPlayer());
+                if (pp.getPlayer() != null && pp.getPlayer().isOnline()) {
+                    packetInjector.removePlayer(pp.getPlayer());
+                }
             });
         }
 
@@ -107,6 +120,5 @@ public class LightGuard extends JavaPlugin {
     public ProtocolManager getProtocolManager() { return protocolManager; }
     public LGPacketInjector getPacketInjector() { return packetInjector; }
     public Dispatcher getDispatcher() { return checkDispatcher; }
-
     public double getTPS() { return currentTps; }
 }

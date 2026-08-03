@@ -5,7 +5,6 @@ import com.mertout.lightguard.data.ProtocolPlayer;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 
-import java.util.List;
 import java.util.Queue;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
@@ -13,8 +12,7 @@ public class ActionQueue {
 
     private final LightGuard plugin;
     private final Queue<Action> queue = new ConcurrentLinkedQueue<>();
-
-    private List<String> cachedKickLayout;
+    private String[] cachedKickLayout;
 
     public ActionQueue(LightGuard plugin) {
         this.plugin = plugin;
@@ -23,7 +21,7 @@ public class ActionQueue {
     }
 
     public void loadConfig() {
-        this.cachedKickLayout = plugin.getConfig().getStringList("settings.kick-layout");
+        this.cachedKickLayout = plugin.getConfig().getStringList("settings.kick-layout").toArray(new String[0]);
     }
 
     public void pushKick(Player player, String reason) {
@@ -36,23 +34,22 @@ public class ActionQueue {
             Action action;
             while ((action = queue.poll()) != null) {
                 if (action.player.isOnline()) {
-                    StringBuilder sb = new StringBuilder();
-
+                    StringBuilder sb = new StringBuilder(256);
                     String pingStr = "0";
+
                     try {
                         ProtocolPlayer pp = plugin.getProtocolManager().get(action.player.getUniqueId());
                         if (pp != null) {
                             pingStr = String.valueOf(pp.getKeepAliveTracker().getPing());
                         }
-                    } catch (Exception ignored) {
-                    }
+                    } catch (Exception ignored) {}
 
                     for (String line : cachedKickLayout) {
-                        sb.append(line.replace("&", "§")
-                                        .replace("%player%", action.player.getName())
-                                        .replace("%check%", action.reason)
-                                        .replace("%ping%", pingStr))
-                                .append("\n");
+                        String formatted = line.replace("&", "§")
+                                .replace("%player%", action.player.getName())
+                                .replace("%check%", action.reason)
+                                .replace("%ping%", pingStr);
+                        sb.append(formatted).append("\n");
                     }
                     action.player.kickPlayer(sb.toString());
                 }

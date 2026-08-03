@@ -45,16 +45,16 @@ public class MetricsCollector {
         double blockRate = total > 0 ? (blocked * 100.0 / total) : 0;
         double avgTimeUs = total > 0 ? (totalProcessingTimeNs.get() / (double) total) / 1000.0 : 0;
 
-        StringBuilder sb = new StringBuilder();
-        sb.append("§8════════════════════════════════════════════════\n");
-        sb.append("        §cLightGuard Statistics Report\n");
-        sb.append("§b════════════════════════════════════════════════\n");
-        sb.append("§cUptime: §4").append(String.format("%.2f", uptimeHours)).append(" hours\n");
-        sb.append("§cPackets Processed: §4").append(total).append("\n");
-        sb.append("§cPackets Blocked: §4").append(blocked).append(" §8(§e").append(String.format("%.2f", blockRate)).append("%§8)\n");
-        sb.append("§cAvg Processing Time: §4").append(String.format("%.2f", avgTimeUs)).append(" μs\n\n");
+        StringBuilder sb = new StringBuilder(1024);
+        sb.append("§8════════════════════════════════════════════════\n")
+                .append("        §cLightGuard Statistics Report\n")
+                .append("§b════════════════════════════════════════════════\n")
+                .append("§cUptime: §4").append(String.format("%.2f", uptimeHours)).append(" hours\n")
+                .append("§cPackets Processed: §4").append(total).append("\n")
+                .append("§cPackets Blocked: §4").append(blocked).append(" §8(§e").append(String.format("%.2f", blockRate)).append("%§8)\n")
+                .append("§cAvg Processing Time: §4").append(String.format("%.2f", avgTimeUs)).append(" μs\n\n")
+                .append("§c--- Violation Breakdown ---\n");
 
-        sb.append("§c--- Violation Breakdown ---\n");
         violationsByType.forEach((type, count) -> sb.append("  §7- §f").append(type).append(": §e").append(count.get()).append("\n"));
 
         sb.append("\n§c--- Top 5 Violators ---\n");

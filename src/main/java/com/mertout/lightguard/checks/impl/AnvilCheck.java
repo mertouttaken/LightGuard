@@ -7,18 +7,25 @@ import net.minecraft.server.v1_16_R3.PacketPlayInItemName;
 
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.VarHandle;
+import java.lang.reflect.Field;
 
 public class AnvilCheck extends Check {
 
     private static final VarHandle NAME_FIELD;
 
     static {
+        VarHandle name = null;
         try {
             MethodHandles.Lookup lookup = MethodHandles.privateLookupIn(PacketPlayInItemName.class, MethodHandles.lookup());
-            NAME_FIELD = lookup.findVarHandle(PacketPlayInItemName.class, "a", String.class);
-        } catch (Exception e) {
-            throw new ExceptionInInitializerError(e);
-        }
+            for (Field field : PacketPlayInItemName.class.getDeclaredFields()) {
+                if (field.getType() == String.class) {
+                    field.setAccessible(true);
+                    name = lookup.unreflectVarHandle(field);
+                    break;
+                }
+            }
+        } catch (Exception ignored) {}
+        NAME_FIELD = name;
     }
 
     public AnvilCheck(LightGuard plugin) {
@@ -30,8 +37,9 @@ public class AnvilCheck extends Check {
         if (!(packet instanceof PacketPlayInItemName)) return true;
 
         try {
+            if (NAME_FIELD == null) return true;
+
             if (!player.isAnvilOpen()) {
-                plugin.getActionQueue().pushKick(player.getPlayer(), "Ghost Anvil Payload (Desync)");
                 return false;
             }
 
@@ -41,22 +49,25 @@ public class AnvilCheck extends Check {
             int len = newName.length();
 
             if (len > 60) {
-                plugin.getActionQueue().pushKick(player.getPlayer(), "Oversized Anvil Rename");
                 return false;
             }
 
-            if (len > 0 && newName.trim().isEmpty()) {
-                plugin.getActionQueue().pushKick(player.getPlayer(), "Blank Item Name Exploit");
+            boolean isBlank = true;
+            for (int i = 0; i < len; i++) {
+                if (newName.charAt(i) > 0x20) {
+                    isBlank = false;
+                    break;
+                }
+            }
+            if (len > 0 && isBlank) {
                 return false;
             }
 
             if (containsLog4Shell(newName)) {
-                plugin.getActionQueue().pushKick(player.getPlayer(), "Invalid Command Syntax (Log4j)");
                 return false;
             }
 
             boolean hasColor = false;
-
             for (int i = 0; i < len; i++) {
                 char c = newName.charAt(i);
 
@@ -65,7 +76,6 @@ public class AnvilCheck extends Check {
                 }
 
                 if (c < 0x20 && c != 0) {
-                    plugin.getActionQueue().pushKick(player.getPlayer(), "Invalid Characters in Anvil");
                     return false;
                 }
             }
@@ -74,7 +84,7 @@ public class AnvilCheck extends Check {
                 return false;
             }
 
-        } catch (Exception e) {
+        } catch (Throwable t) {
             return false;
         }
 
@@ -82,10 +92,10 @@ public class AnvilCheck extends Check {
     }
 
     private boolean containsLog4Shell(String msg) {
-        String lower = msg.toLowerCase();
-        return lower.contains("${jndi:") ||
-                lower.contains("${ldap:") ||
-                lower.contains("${rmi:") ||
-                lower.contains("${dns:");
+        if (msg == null || msg.isEmpty()) return false;
+        return msg.contains("${jndi:") || msg.contains("${JNDI:") ||
+                msg.contains("${ldap:") || msg.contains("${LDAP:") ||
+                msg.contains("${rmi:")  || msg.contains("${RMI:")  ||
+                msg.contains("${dns:")  || msg.contains("${DNS:");
     }
 }

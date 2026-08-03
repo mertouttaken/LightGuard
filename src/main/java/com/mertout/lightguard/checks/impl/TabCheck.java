@@ -7,22 +7,30 @@ import net.minecraft.server.v1_16_R3.PacketPlayInTabComplete;
 
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.VarHandle;
-import java.util.List;
-import java.util.stream.Collectors;
+import java.lang.reflect.Field;
 
 public class TabCheck extends Check {
 
     private static final VarHandle BUFFER_FIELD;
+
     static {
+        VarHandle buffer = null;
         try {
             MethodHandles.Lookup lookup = MethodHandles.privateLookupIn(PacketPlayInTabComplete.class, MethodHandles.lookup());
-            BUFFER_FIELD = lookup.findVarHandle(PacketPlayInTabComplete.class, "b", String.class);
-        } catch (Exception e) { throw new ExceptionInInitializerError(e); }
+            for (Field field : PacketPlayInTabComplete.class.getDeclaredFields()) {
+                if (field.getType() == String.class) {
+                    field.setAccessible(true);
+                    buffer = lookup.unreflectVarHandle(field);
+                    break;
+                }
+            }
+        } catch (Exception ignored) {}
+        BUFFER_FIELD = buffer;
     }
 
     private final int maxLength;
-    private final List<String> blockedSubstrings;
-    private final List<String> blockedChars;
+    private final String[] blockedSubstringsArray;
+    private final String[] blockedCharsArray;
 
     private static final String[] CRASH_CHARS = {"{", "}", "[", "]", "@", "=", "nbt"};
 
@@ -30,53 +38,59 @@ public class TabCheck extends Check {
         super(plugin);
         this.maxLength = plugin.getConfig().getInt("checks.tab.max-length", 256);
 
-        this.blockedSubstrings = plugin.getConfig().getStringList("checks.tab.block-contains")
-                .stream().map(String::toLowerCase).collect(Collectors.toList());
+        this.blockedSubstringsArray = plugin.getConfig().getStringList("checks.tab.block-contains")
+                .stream().map(String::toLowerCase).toArray(String[]::new);
 
-        this.blockedChars = plugin.getConfig().getStringList("checks.tab.block-chars")
-                .stream().map(String::toLowerCase).collect(Collectors.toList());
+        this.blockedCharsArray = plugin.getConfig().getStringList("checks.tab.block-chars")
+                .stream().map(String::toLowerCase).toArray(String[]::new);
     }
 
     @Override
     public boolean check(Object packet, ProtocolPlayer player) {
         if (!(packet instanceof PacketPlayInTabComplete)) return true;
 
-        long now = System.currentTimeMillis();
+        try {
+            if (BUFFER_FIELD == null) return true;
 
-        if (player.incrementAndGetTabCount(now) > 50) {
-            return false;
-        }
+            long now = System.currentTimeMillis();
 
-        String buffer = (String) BUFFER_FIELD.get(packet);
-        if (buffer == null || buffer.isEmpty()) return true;
-
-        if (buffer.length() > maxLength) {
-            return false;
-        }
-
-        String lowerBuffer = buffer.toLowerCase();
-
-        if (lowerBuffer.startsWith("//calc") || lowerBuffer.startsWith("//eval") ||
-                lowerBuffer.startsWith("//solve") || lowerBuffer.startsWith("//math")) {
-            return false;
-        }
-
-        for (String c : CRASH_CHARS) {
-            if (lowerBuffer.contains(c)) {
+            if (player.incrementAndGetTabCount(now) > 50) {
                 return false;
             }
-        }
 
-        for (String c : blockedChars) {
-            if (lowerBuffer.contains(c)) {
+            String buffer = (String) BUFFER_FIELD.get(packet);
+            if (buffer == null || buffer.isEmpty()) return true;
+
+            if (buffer.length() > maxLength) {
                 return false;
             }
-        }
 
-        for (String s : blockedSubstrings) {
-            if (lowerBuffer.contains(s)) {
+            for (String c : CRASH_CHARS) {
+                if (buffer.contains(c)) {
+                    return false;
+                }
+            }
+
+            String lowerBuffer = buffer.toLowerCase();
+
+            if (lowerBuffer.startsWith("//calc") || lowerBuffer.startsWith("//eval") ||
+                    lowerBuffer.startsWith("//solve") || lowerBuffer.startsWith("//math")) {
                 return false;
             }
+
+            for (String c : blockedCharsArray) {
+                if (lowerBuffer.contains(c)) {
+                    return false;
+                }
+            }
+
+            for (String s : blockedSubstringsArray) {
+                if (lowerBuffer.contains(s)) {
+                    return false;
+                }
+            }
+        } catch (Throwable t) {
+            return false;
         }
 
         return true;

@@ -10,6 +10,9 @@ import org.bukkit.entity.Player;
 
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.VarHandle;
+import java.lang.reflect.Field;
+import java.util.HashMap;
+import java.util.Map;
 
 public class LGPacketInjector {
 
@@ -18,24 +21,51 @@ public class LGPacketInjector {
     private static final VarHandle WINDOW_ID_FIELD;
     private static final VarHandle POS_X_FIELD, POS_Y_FIELD, POS_Z_FIELD, POS_FLAGS_FIELD;
 
+    private static final Map<Class<?>, Double> PACKET_WEIGHTS = new HashMap<>();
+
     static {
+        VarHandle kaId = null, wId = null, px = null, py = null, pz = null, pFlags = null;
         try {
-            MethodHandles.Lookup lookup = MethodHandles.lookup();
-            KEEPALIVE_ID_FIELD = MethodHandles.privateLookupIn(net.minecraft.server.v1_16_R3.PacketPlayOutKeepAlive.class, MethodHandles.lookup())
-                    .findVarHandle(net.minecraft.server.v1_16_R3.PacketPlayOutKeepAlive.class, "a", long.class);
-            WINDOW_ID_FIELD = MethodHandles.privateLookupIn(net.minecraft.server.v1_16_R3.PacketPlayOutOpenWindow.class, lookup)
-                    .findVarHandle(net.minecraft.server.v1_16_R3.PacketPlayOutOpenWindow.class, "a", int.class);
-            POS_X_FIELD = MethodHandles.privateLookupIn(net.minecraft.server.v1_16_R3.PacketPlayOutPosition.class, lookup)
-                    .findVarHandle(net.minecraft.server.v1_16_R3.PacketPlayOutPosition.class, "a", double.class);
-            POS_Y_FIELD = MethodHandles.privateLookupIn(net.minecraft.server.v1_16_R3.PacketPlayOutPosition.class, lookup)
-                    .findVarHandle(net.minecraft.server.v1_16_R3.PacketPlayOutPosition.class, "b", double.class);
-            POS_Z_FIELD = MethodHandles.privateLookupIn(net.minecraft.server.v1_16_R3.PacketPlayOutPosition.class, lookup)
-                    .findVarHandle(net.minecraft.server.v1_16_R3.PacketPlayOutPosition.class, "c", double.class);
-            POS_FLAGS_FIELD = MethodHandles.privateLookupIn(net.minecraft.server.v1_16_R3.PacketPlayOutPosition.class, lookup)
-                    .findVarHandle(net.minecraft.server.v1_16_R3.PacketPlayOutPosition.class, "f", java.util.Set.class);
-        } catch (Exception e) {
-            throw new ExceptionInInitializerError(e);
-        }
+            MethodHandles.Lookup lookup = MethodHandles.privateLookupIn(net.minecraft.server.v1_16_R3.PacketPlayOutKeepAlive.class, MethodHandles.lookup());
+            for (Field f : net.minecraft.server.v1_16_R3.PacketPlayOutKeepAlive.class.getDeclaredFields()) {
+                if (f.getType() == long.class) { f.setAccessible(true); kaId = lookup.unreflectVarHandle(f); break; }
+            }
+
+            MethodHandles.Lookup wLookup = MethodHandles.privateLookupIn(net.minecraft.server.v1_16_R3.PacketPlayOutOpenWindow.class, MethodHandles.lookup());
+            for (Field f : net.minecraft.server.v1_16_R3.PacketPlayOutOpenWindow.class.getDeclaredFields()) {
+                if (f.getType() == int.class) { f.setAccessible(true); wId = wLookup.unreflectVarHandle(f); break; }
+            }
+
+            MethodHandles.Lookup pLookup = MethodHandles.privateLookupIn(net.minecraft.server.v1_16_R3.PacketPlayOutPosition.class, MethodHandles.lookup());
+            int doubleCount = 0;
+            for (Field f : net.minecraft.server.v1_16_R3.PacketPlayOutPosition.class.getDeclaredFields()) {
+                f.setAccessible(true);
+                if (f.getType() == double.class) {
+                    if (doubleCount == 0) px = pLookup.unreflectVarHandle(f);
+                    else if (doubleCount == 1) py = pLookup.unreflectVarHandle(f);
+                    else if (doubleCount == 2) pz = pLookup.unreflectVarHandle(f);
+                    doubleCount++;
+                } else if (f.getType() == java.util.Set.class) {
+                    pFlags = pLookup.unreflectVarHandle(f);
+                }
+            }
+
+            PACKET_WEIGHTS.put(net.minecraft.server.v1_16_R3.PacketPlayInWindowClick.class, 15.0);
+            PACKET_WEIGHTS.put(net.minecraft.server.v1_16_R3.PacketPlayInSetCreativeSlot.class, 30.0);
+            PACKET_WEIGHTS.put(net.minecraft.server.v1_16_R3.PacketPlayInCustomPayload.class, 25.0);
+            PACKET_WEIGHTS.put(net.minecraft.server.v1_16_R3.PacketPlayInUpdateSign.class, 30.0);
+            PACKET_WEIGHTS.put(net.minecraft.server.v1_16_R3.PacketPlayInUseItem.class, 5.0);
+            PACKET_WEIGHTS.put(net.minecraft.server.v1_16_R3.PacketPlayInBlockPlace.class, 10.0);
+
+            PACKET_WEIGHTS.put(net.minecraft.server.v1_16_R3.PacketPlayInFlying.class, 1.0);
+            PACKET_WEIGHTS.put(net.minecraft.server.v1_16_R3.PacketPlayInFlying.PacketPlayInPosition.class, 1.0);
+            PACKET_WEIGHTS.put(net.minecraft.server.v1_16_R3.PacketPlayInFlying.PacketPlayInPositionLook.class, 1.0);
+            PACKET_WEIGHTS.put(net.minecraft.server.v1_16_R3.PacketPlayInFlying.PacketPlayInLook.class, 1.0);
+
+        } catch (Exception ignored) {}
+
+        KEEPALIVE_ID_FIELD = kaId; WINDOW_ID_FIELD = wId;
+        POS_X_FIELD = px; POS_Y_FIELD = py; POS_Z_FIELD = pz; POS_FLAGS_FIELD = pFlags;
     }
 
     public LGPacketInjector(LightGuard plugin) {
@@ -65,7 +95,8 @@ public class LGPacketInjector {
                         }
                     }
 
-                    double weight = getPacketWeight(msg);
+                    double weight = PACKET_WEIGHTS.getOrDefault(msg.getClass(), 2.5);
+
                     if (protocolPlayer.getRateLimiter().addAndCheck(weight)) {
                         plugin.getLogger().warning("Rate Limit Exceeded: " + player.getName());
                         plugin.getActionQueue().pushKick(player, "Excessive Packet Sending (Rate Limit)");
@@ -83,21 +114,18 @@ public class LGPacketInjector {
                     } catch (Exception e) {
                         plugin.getLogger().severe("Dispatcher Error for " + player.getName() + ": " + e.getMessage());
                     }
-                    plugin.getLogger().warning("Rate Limit Exceeded: " + player.getName());
-                    plugin.getActionQueue().pushKick(player, "Excessive Packet Sending (Rate Limit)");
+
                     super.channelRead(ctx, msg);
                 }
 
                 @Override
                 public void write(ChannelHandlerContext ctx, Object msg, ChannelPromise promise) throws Exception {
-
-                    if (msg instanceof net.minecraft.server.v1_16_R3.PacketPlayOutOpenWindow) {
-                        try {
+                    try {
+                        if (msg instanceof net.minecraft.server.v1_16_R3.PacketPlayOutOpenWindow && WINDOW_ID_FIELD != null) {
                             int windowId = (int) WINDOW_ID_FIELD.get(msg);
                             protocolPlayer.setInventoryState(true, windowId);
-                        } catch (Exception ignored) {}
-                    } else if (msg instanceof net.minecraft.server.v1_16_R3.PacketPlayOutPosition) {
-                        try {
+
+                        } else if (msg instanceof net.minecraft.server.v1_16_R3.PacketPlayOutPosition && POS_X_FIELD != null) {
                             java.util.Set<?> flags = (java.util.Set<?>) POS_FLAGS_FIELD.get(msg);
                             boolean hasRelativeCoord = false;
 
@@ -118,20 +146,18 @@ public class LGPacketInjector {
                                 protocolPlayer.setLastLocation(safeX, safeY, safeZ);
                             }
                             protocolPlayer.markTeleport();
-                        } catch (Exception ignored) {}
-                    } else if (msg instanceof net.minecraft.server.v1_16_R3.PacketPlayOutKeepAlive) {
-                        try {
+
+                        } else if (msg instanceof net.minecraft.server.v1_16_R3.PacketPlayOutKeepAlive && KEEPALIVE_ID_FIELD != null) {
                             long id = (long) KEEPALIVE_ID_FIELD.get(msg);
                             protocolPlayer.getKeepAliveTracker().onKeepAliveSent(id);
-                        } catch (Exception ignored) {}
-                    }
+                        }
+                    } catch (Throwable ignored) {}
 
                     super.write(ctx, msg, promise);
                 }
 
                 @Override
                 public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
-                    plugin.getLogger().severe("Netty Pipeline Exception for " + player.getName() + " -> " + cause.getMessage());
                     super.exceptionCaught(ctx, cause);
                 }
             };
@@ -147,8 +173,8 @@ public class LGPacketInjector {
     public void removePlayer(Player player) {
         try {
             Channel channel = ((CraftPlayer) player).getHandle().playerConnection.networkManager.channel;
-            if (channel != null) {
-                if (channel.pipeline().get("lg_check") != null) channel.pipeline().remove("lg_check");
+            if (channel != null && channel.pipeline().get("lg_check") != null) {
+                channel.pipeline().remove("lg_check");
             }
         } catch (Exception ignored) { }
     }
@@ -156,8 +182,7 @@ public class LGPacketInjector {
     private void releaseMessage(Object msg) {
         try {
             if (msg instanceof net.minecraft.server.v1_16_R3.PacketPlayInCustomPayload) {
-                net.minecraft.server.v1_16_R3.PacketPlayInCustomPayload p =
-                        (net.minecraft.server.v1_16_R3.PacketPlayInCustomPayload) msg;
+                net.minecraft.server.v1_16_R3.PacketPlayInCustomPayload p = (net.minecraft.server.v1_16_R3.PacketPlayInCustomPayload) msg;
                 if (p.data != null) {
                     ReferenceCountUtil.safeRelease(p.data);
                 }
@@ -165,22 +190,5 @@ public class LGPacketInjector {
                 ReferenceCountUtil.safeRelease(msg);
             }
         } catch (Exception ignored) {}
-    }
-
-    private double getPacketWeight(Object packet) {
-        String name = packet.getClass().getSimpleName();
-        switch (name) {
-            case "PacketPlayInWindowClick": return 40.0;
-            case "PacketPlayInSetCreativeSlot": return 80.0;
-            case "PacketPlayInCustomPayload": return 50.0;
-            case "PacketPlayInUpdateSign": return 60.0;
-            case "PacketPlayInUseItem":
-            case "PacketPlayInBlockPlace": return 25.0;
-            case "PacketPlayInFlying":
-            case "PacketPlayInPosition":
-            case "PacketPlayInPositionLook":
-            case "PacketPlayInLook": return 1.0;
-            default: return 5.0;
-        }
     }
 }

@@ -15,10 +15,12 @@ public class ResourcePackCheck extends Check {
     public boolean check(Object packet, ProtocolPlayer player) {
         if (!(packet instanceof PacketPlayInResourcePackStatus)) return true;
 
-        PacketPlayInResourcePackStatus statusPacket = (PacketPlayInResourcePackStatus) packet;
-
-        if (statusPacket.status == null) {
-            plugin.getActionQueue().pushKick(player.getPlayer(), "Invalid Resource Pack Status");
+        try {
+            PacketPlayInResourcePackStatus statusPacket = (PacketPlayInResourcePackStatus) packet;
+            if (statusPacket.status == null) {
+                return false;
+            }
+        } catch (Throwable t) {
             return false;
         }
 

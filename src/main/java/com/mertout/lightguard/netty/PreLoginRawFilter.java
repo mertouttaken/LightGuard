@@ -5,15 +5,13 @@ import io.netty.buffer.ByteBuf;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
 
-import java.net.InetAddress;
 import java.net.InetSocketAddress;
 
 public class PreLoginRawFilter extends ChannelInboundHandlerAdapter {
 
     private final LightGuard plugin;
-    private int totalReadBytes = 0;
-
     private final int preLoginMaxBytes;
+    private int totalReadBytes = 0;
 
     public PreLoginRawFilter(LightGuard plugin) {
         this.plugin = plugin;
@@ -24,17 +22,14 @@ public class PreLoginRawFilter extends ChannelInboundHandlerAdapter {
     public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
         if (msg instanceof ByteBuf) {
             ByteBuf buf = (ByteBuf) msg;
-            int readable = buf.readableBytes();
-
-            InetAddress address = ((InetSocketAddress) ctx.channel().remoteAddress()).getAddress();
-
-            totalReadBytes += readable;
+            totalReadBytes += buf.readableBytes();
 
             if (totalReadBytes > preLoginMaxBytes) {
-                String ip = address.getHostAddress();
-
-                int limitInKB = preLoginMaxBytes / 1024;
-                plugin.getLogger().warning("Pre-Login Flooder Blocked: " + ip + " (Sent >" + limitInKB + "KB raw data)");
+                try {
+                    String ip = ((InetSocketAddress) ctx.channel().remoteAddress()).getAddress().getHostAddress();
+                    int limitInKB = preLoginMaxBytes >> 10;
+                    plugin.getLogger().warning("Pre-Login Flooder Blocked: " + ip + " (Sent >" + limitInKB + "KB raw data)");
+                } catch (Throwable ignored) {}
 
                 buf.release();
                 ctx.close();

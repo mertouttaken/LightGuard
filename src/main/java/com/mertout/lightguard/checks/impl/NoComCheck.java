@@ -9,6 +9,7 @@ import net.minecraft.server.v1_16_R3.PacketPlayInBlockDig.EnumPlayerDigType;
 
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.VarHandle;
+import java.lang.reflect.Field;
 
 public class NoComCheck extends Check {
 
@@ -16,13 +17,21 @@ public class NoComCheck extends Check {
     private static final VarHandle TYPE_FIELD;
 
     static {
+        VarHandle pos = null;
+        VarHandle type = null;
         try {
             MethodHandles.Lookup lookup = MethodHandles.privateLookupIn(PacketPlayInBlockDig.class, MethodHandles.lookup());
-            POS_FIELD = lookup.findVarHandle(PacketPlayInBlockDig.class, "a", BlockPosition.class);
-            TYPE_FIELD = lookup.findVarHandle(PacketPlayInBlockDig.class, "c", EnumPlayerDigType.class);
-        } catch (Exception e) {
-            throw new ExceptionInInitializerError(e);
-        }
+            for (Field field : PacketPlayInBlockDig.class.getDeclaredFields()) {
+                field.setAccessible(true);
+                if (field.getType() == BlockPosition.class && pos == null) {
+                    pos = lookup.unreflectVarHandle(field);
+                } else if (field.getType() == EnumPlayerDigType.class && type == null) {
+                    type = lookup.unreflectVarHandle(field);
+                }
+            }
+        } catch (Exception ignored) {}
+        POS_FIELD = pos;
+        TYPE_FIELD = type;
     }
 
     public NoComCheck(LightGuard plugin) {
@@ -34,6 +43,8 @@ public class NoComCheck extends Check {
         if (!(packet instanceof PacketPlayInBlockDig)) return true;
 
         try {
+            if (TYPE_FIELD == null || POS_FIELD == null) return true;
+
             EnumPlayerDigType type = (EnumPlayerDigType) TYPE_FIELD.get(packet);
 
             if (type == EnumPlayerDigType.DROP_ITEM ||
@@ -58,12 +69,11 @@ public class NoComCheck extends Check {
             double distSq = (dx * dx) + (dy * dy) + (dz * dz);
 
             if (distSq > 10000.0) {
-                plugin.getActionQueue().pushKick(player.getPlayer(), "Illegal Interaction Distance (NoCom)");
                 return false;
             }
 
-        } catch (Exception e) {
-            return true;
+        } catch (Throwable t) {
+            return false;
         }
 
         return true;

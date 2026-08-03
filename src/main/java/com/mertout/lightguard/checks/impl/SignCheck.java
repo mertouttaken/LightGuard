@@ -8,6 +8,7 @@ import net.minecraft.server.v1_16_R3.PacketPlayInUpdateSign;
 
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.VarHandle;
+import java.lang.reflect.Field;
 import java.util.regex.Pattern;
 
 public class SignCheck extends Check {
@@ -16,14 +17,23 @@ public class SignCheck extends Check {
     private static final VarHandle POS_FIELD;
 
     static {
+        VarHandle pos = null;
+        VarHandle lines = null;
         try {
             MethodHandles.Lookup lookup = MethodHandles.privateLookupIn(PacketPlayInUpdateSign.class, MethodHandles.lookup());
-            POS_FIELD = lookup.findVarHandle(PacketPlayInUpdateSign.class, "a", BlockPosition.class);
-            LINES_FIELD = lookup.findVarHandle(PacketPlayInUpdateSign.class, "b", String[].class);
-        } catch (Exception e) { throw new ExceptionInInitializerError(e); }
+            for (Field field : PacketPlayInUpdateSign.class.getDeclaredFields()) {
+                field.setAccessible(true);
+                if (field.getType() == BlockPosition.class && pos == null) {
+                    pos = lookup.unreflectVarHandle(field);
+                } else if (field.getType() == String[].class && lines == null) {
+                    lines = lookup.unreflectVarHandle(field);
+                }
+            }
+        } catch (Exception ignored) {}
+        POS_FIELD = pos;
+        LINES_FIELD = lines;
     }
 
-    private static final Pattern ILLEGAL_CHARS = Pattern.compile("[\\x00-\\x1F]");
     private static final Pattern JSON_EXPLOIT_PATTERN = Pattern.compile("[\"'](text|score|selector|extra|translate|clickEvent|hoverEvent|run_command|nbt)[\"']\\s*:");
 
     private final int maxLineLength;
@@ -40,6 +50,8 @@ public class SignCheck extends Check {
         if (!(packet instanceof PacketPlayInUpdateSign)) return true;
 
         try {
+            if (POS_FIELD == null || LINES_FIELD == null) return true;
+
             BlockPosition pos = (BlockPosition) POS_FIELD.get(packet);
             if (pos == null) return true;
 
@@ -47,7 +59,7 @@ public class SignCheck extends Check {
             double pY = player.getLastY();
             double pZ = player.getLastZ();
 
-            if (pX != -1) {
+            if (pX != -1 && !player.isInTeleportGrace()) {
                 double distX = pos.getX() - pX;
                 double distY = pos.getY() - pY;
                 double distZ = pos.getZ() - pZ;
@@ -56,7 +68,6 @@ public class SignCheck extends Check {
                 double maxDist = player.isBedrock() ? 225.0 : 100.0;
 
                 if (distanceSq > maxDist) {
-                    plugin.getActionQueue().pushKick(player.getPlayer(), "Sign Edit too far");
                     return false;
                 }
             }
@@ -71,25 +82,25 @@ public class SignCheck extends Check {
             if (lines == null || lines.length != 4) return true;
 
             for (String line : lines) {
-                if (line == null) continue;
+                if (line == null || line.isEmpty()) continue;
 
                 if (line.length() > maxLineLength) {
-                    plugin.getActionQueue().pushKick(player.getPlayer(), "Oversized Sign Line");
                     return false;
                 }
 
-                if (ILLEGAL_CHARS.matcher(line).find()) {
-                    plugin.getActionQueue().pushKick(player.getPlayer(), "Illegal Chars in Sign");
-                    return false;
+                for (int i = 0; i < line.length(); i++) {
+                    char c = line.charAt(i);
+                    if (c < 32 && c != 10 && c != 13) {
+                        return false;
+                    }
                 }
 
                 if (blockJson && JSON_EXPLOIT_PATTERN.matcher(line).find()) {
-                    plugin.getActionQueue().pushKick(player.getPlayer(), "Dangerous JSON in Sign");
                     return false;
                 }
             }
 
-        } catch (Exception e) {
+        } catch (Throwable t) {
             return false;
         }
         return true;

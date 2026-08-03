@@ -13,9 +13,10 @@ import java.util.stream.Collectors;
 public class LGProfileCommand {
 
     private static final Map<UUID, BukkitRunnable> activeTasks = new ConcurrentHashMap<>();
+    private static final UUID CONSOLE_UUID = new UUID(0, 0);
 
     public static void toggle(CommandSender sender) {
-        UUID senderId = (sender instanceof Player) ? ((Player) sender).getUniqueId() : new UUID(0, 0);
+        UUID senderId = (sender instanceof Player) ? ((Player) sender).getUniqueId() : CONSOLE_UUID;
 
         BukkitRunnable existingTask = activeTasks.get(senderId);
 
@@ -66,7 +67,9 @@ public class LGProfileCommand {
     }
 
     public static void cancelAll() {
-        activeTasks.values().forEach(task -> { if (!task.isCancelled()) task.cancel(); });
+        activeTasks.values().forEach(task -> {
+            if (!task.isCancelled()) task.cancel();
+        });
         activeTasks.clear();
     }
 }

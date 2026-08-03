@@ -15,16 +15,18 @@ public class AbilitiesCheck extends Check {
     public boolean check(Object packet, ProtocolPlayer player) {
         if (!(packet instanceof PacketPlayInAbilities)) return true;
 
-        PacketPlayInAbilities abilities = (PacketPlayInAbilities) packet;
+        try {
+            PacketPlayInAbilities abilities = (PacketPlayInAbilities) packet;
 
-        if (!player.isCreativeOrSpectator()) {
-
-            if (abilities.isFlying() && !player.isAllowedFlight()) {
-
-                plugin.getActionQueue().pushKick(player.getPlayer(), "Illegal Flying State (Spoof)");
-                return false;
+            if (!player.isCreativeOrSpectator()) {
+                if (abilities.isFlying() && !player.isAllowedFlight()) {
+                    return false;
+                }
             }
+        } catch (Throwable t) {
+            return false;
         }
+
         return true;
     }
 }

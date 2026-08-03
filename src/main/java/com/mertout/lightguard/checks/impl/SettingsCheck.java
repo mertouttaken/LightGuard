@@ -8,7 +8,6 @@ import net.minecraft.server.v1_16_R3.PacketPlayInSettings;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.VarHandle;
 import java.lang.reflect.Field;
-import java.util.Arrays;
 
 public class SettingsCheck extends Check {
 
@@ -19,28 +18,16 @@ public class SettingsCheck extends Check {
         VarHandle locale = null;
         VarHandle viewDist = null;
         try {
-            Field localeField = Arrays.stream(PacketPlayInSettings.class.getDeclaredFields())
-                    .filter(f -> f.getType() == String.class)
-                    .findFirst()
-                    .orElse(null);
-
-            Field viewDistField = Arrays.stream(PacketPlayInSettings.class.getDeclaredFields())
-                    .filter(f -> f.getType() == int.class)
-                    .findFirst()
-                    .orElse(null);
-
-            if (localeField != null) {
-                localeField.setAccessible(true);
-                locale = MethodHandles.lookup().unreflectVarHandle(localeField);
+            MethodHandles.Lookup lookup = MethodHandles.privateLookupIn(PacketPlayInSettings.class, MethodHandles.lookup());
+            for (Field field : PacketPlayInSettings.class.getDeclaredFields()) {
+                field.setAccessible(true);
+                if (field.getType() == String.class && locale == null) {
+                    locale = lookup.unreflectVarHandle(field);
+                } else if (field.getType() == int.class && viewDist == null) {
+                    viewDist = lookup.unreflectVarHandle(field);
+                }
             }
-
-            if (viewDistField != null) {
-                viewDistField.setAccessible(true);
-                viewDist = MethodHandles.lookup().unreflectVarHandle(viewDistField);
-            }
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
+        } catch (Exception ignored) {}
         LOCALE_HANDLE = locale;
         VIEW_DIST_HANDLE = viewDist;
     }
@@ -56,14 +43,10 @@ public class SettingsCheck extends Check {
     public boolean check(Object packet, ProtocolPlayer player) {
         if (!(packet instanceof PacketPlayInSettings)) return true;
 
-        if (LOCALE_HANDLE == null) return true;
-
         try {
-            String locale = (String) LOCALE_HANDLE.get(packet);
-
-            if (locale != null && locale.length() > maxLength) {
-                if (locale.length() > 512) {
-                    plugin.getActionQueue().pushKick(player.getPlayer(), "Invalid Language Locale (Buffer Overflow)");
+            if (LOCALE_HANDLE != null) {
+                String locale = (String) LOCALE_HANDLE.get(packet);
+                if (locale != null && locale.length() > maxLength) {
                     return false;
                 }
             }
@@ -74,9 +57,8 @@ public class SettingsCheck extends Check {
                     return false;
                 }
             }
-
-        } catch (Exception e) {
-            return true;
+        } catch (Throwable t) {
+            return false;
         }
 
         return true;

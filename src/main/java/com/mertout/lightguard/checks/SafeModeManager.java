@@ -1,19 +1,17 @@
 package com.mertout.lightguard.checks;
 
 import com.mertout.lightguard.LightGuard;
-import java.util.HashSet;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.CopyOnWriteArraySet;
+import java.util.concurrent.atomic.AtomicInteger;
 
 public class SafeModeManager {
 
     private final LightGuard plugin;
     private final Map<String, ExceptionData> exceptionTracker = new ConcurrentHashMap<>();
     private final Set<String> disabledChecks = ConcurrentHashMap.newKeySet();
-    private final Set<String> criticalPatterns = new CopyOnWriteArraySet<>();
+    private String[] criticalPatterns;
 
     private final int errorThreshold;
     private final long timeWindowMillis = 60000L;
@@ -25,13 +23,7 @@ public class SafeModeManager {
     }
 
     private void loadCriticalPatterns() {
-        criticalPatterns.clear();
-        List<String> list = plugin.getConfig().getStringList("settings.sentinel.critical-checks");
-        if (list != null) {
-            for (String s : list) {
-                criticalPatterns.add(s.toLowerCase());
-            }
-        }
+        criticalPatterns = plugin.getConfig().getStringList("settings.sentinel.critical-checks").toArray(new String[0]);
     }
 
     public boolean isCheckEnabled(String checkName) {
@@ -42,6 +34,7 @@ public class SafeModeManager {
     public boolean isCritical(String checkName) {
         if (checkName == null) return false;
         String lowerName = checkName.toLowerCase();
+
         for (String pattern : criticalPatterns) {
             if (lowerName.contains(pattern.toLowerCase())) {
                 return true;
@@ -52,7 +45,7 @@ public class SafeModeManager {
 
     public void recordException(String checkName, Throwable t) {
         if (isCritical(checkName)) {
-            plugin.getLogger().warning("[Sentinel] Critical check '" + checkName + "' threw an error but will stay ENABLED for security.");
+            plugin.getLogger().warning("[LightGuard] Critical check '" + checkName + "' threw an error but will stay ENABLED for security.");
             return;
         }
 
@@ -60,16 +53,12 @@ public class SafeModeManager {
 
         ExceptionData data = exceptionTracker.computeIfAbsent(checkName, k -> new ExceptionData(now));
 
-        synchronized (data) {
-            if (now - data.startTime > timeWindowMillis) {
-                data.startTime = now;
-                data.count = 1;
-            } else {
-                data.count++;
-            }
-
-            if (data.count >= errorThreshold && !disabledChecks.contains(checkName)) {
-                disabledChecks.add(checkName);
+        if (now - data.startTime > timeWindowMillis) {
+            data.startTime = now;
+            data.count.set(1);
+        } else {
+            int errors = data.count.incrementAndGet();
+            if (errors >= errorThreshold && disabledChecks.add(checkName)) {
                 plugin.getLogger().severe("╔══════════════════════════════════════════╗");
                 plugin.getLogger().severe("║        SAFE MODE CRITICAL ALERT          ║");
                 plugin.getLogger().severe("╠══════════════════════════════════════════╣");
@@ -95,18 +84,19 @@ public class SafeModeManager {
         return disabledChecks;
     }
 
+    public Map<String, Integer> getExceptionCounts() {
+        Map<String, Integer> counts = new java.util.HashMap<>();
+        exceptionTracker.forEach((name, data) -> counts.put(name, data.count.get()));
+        return counts;
+    }
+
     private static class ExceptionData {
-        long startTime;
-        int count;
+        volatile long startTime;
+        final AtomicInteger count;
 
         ExceptionData(long startTime) {
             this.startTime = startTime;
-            this.count = 0;
+            this.count = new AtomicInteger(0);
         }
-    }
-    public Map<String, Integer> getExceptionCounts() {
-        Map<String, Integer> counts = new java.util.HashMap<>();
-        exceptionTracker.forEach((name, data) -> counts.put(name, data.count));
-        return counts;
     }
 }

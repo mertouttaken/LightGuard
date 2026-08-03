@@ -26,20 +26,10 @@ public class PositionCheck extends Check {
         } catch (Exception e) { throw new ExceptionInInitializerError(e); }
     }
 
-    private final double maxOffsetSq;
-    private final double maxElytraOffsetSq;
-    private final double maxVerticalDist;
     private final double outOfWorldLimit;
 
     public PositionCheck(LightGuard plugin) {
         super(plugin);
-        double offset = plugin.getConfig().getDouble("checks.position.max-offset", 25.0);
-        this.maxOffsetSq = offset * offset;
-
-        double elytraOffset = plugin.getConfig().getDouble("checks.position.elytra-max-distance", 50.0);
-        this.maxElytraOffsetSq = elytraOffset * elytraOffset;
-
-        this.maxVerticalDist = plugin.getConfig().getDouble("checks.position.max-vertical-distance", 50.0);
         this.outOfWorldLimit = plugin.getConfig().getDouble("checks.position.out-of-world-limit", 29999984.0);
     }
 
@@ -60,7 +50,6 @@ public class PositionCheck extends Check {
                 if (Math.abs(pitch) > 90.0F) {
                     return false;
                 }
-
                 if (Math.abs(yaw) > 3.0E7F) {
                     return false;
                 }
@@ -80,71 +69,10 @@ public class PositionCheck extends Check {
             if (Math.abs(x) > outOfWorldLimit || Math.abs(z) > outOfWorldLimit || Math.abs(y) > 1000000) {
                 return false;
             }
-
-            int chunkX = (int) x >> 4;
-            int chunkZ = (int) z >> 4;
-
-            String worldName = player.getCurrentWorldName();
-
-            if (!plugin.getWorldChunkManager().isChunkLoadedAsynchronously(worldName, chunkX, chunkZ)) {
-                if (!player.isInTeleportGrace()) {
-                    return false;
-                }
-            }
-
-            double lastX = player.getLastX();
-            double lastY = player.getLastY();
-            double lastZ = player.getLastZ();
-
-            if (lastX != -1 && !player.isInTeleportGrace()) {
-                double diffX = x - lastX;
-                double diffY = y - lastY;
-                double diffZ = z - lastZ;
-
-                if (diffY > 0 && Math.abs(diffY - 0.1) < 1e-4) {
-                    if (!player.isGliding()) {
-                        return false;
-                    }
-                }
-
-                double epsilon = 1e-5;
-                boolean isXInteger = Math.abs(Math.abs(diffX) - Math.round(Math.abs(diffX))) < epsilon;
-                boolean isYInteger = Math.abs(Math.abs(diffY) - Math.round(Math.abs(diffY))) < epsilon;
-                boolean isZInteger = Math.abs(Math.abs(diffZ) - Math.round(Math.abs(diffZ))) < epsilon;
-
-                if ((Math.abs(diffX) >= 10.0 && isXInteger) ||
-                        (Math.abs(diffZ) >= 10.0 && isZInteger) ||
-                        (Math.abs(diffY) >= 10.0 && isYInteger)) {
-                    return false;
-                }
-
-                double horizontalDistSq = (diffX * diffX) + (diffZ * diffZ);
-                double verticalDist = Math.abs(diffY);
-
-                if (horizontalDistSq > maxOffsetSq) {
-                    if (!player.isGliding()) {
-                        return false;
-                    } else if (horizontalDistSq > maxElytraOffsetSq) {
-                        return false;
-                    }
-                }
-
-                if (verticalDist > maxVerticalDist) {
-                    return false;
-                }
-
-                double totalDistSq = horizontalDistSq + (diffY * diffY);
-                if (totalDistSq > maxElytraOffsetSq) {
-                    return false;
-                }
-            }
-
-            if (!player.isInTeleportGrace()) {
-                player.setLastLocation(x, y, z);
-            }
+            player.setLastLocation(x, y, z);
 
         } catch (Throwable t) {
-            return false;
+            return true;
         }
 
         return true;

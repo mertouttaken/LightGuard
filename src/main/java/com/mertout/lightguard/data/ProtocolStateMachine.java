@@ -1,42 +1,46 @@
 package com.mertout.lightguard.data;
 
+import net.minecraft.server.v1_16_R3.PacketPlayInCustomPayload;
+import net.minecraft.server.v1_16_R3.PacketPlayInHeldItemSlot;
+import net.minecraft.server.v1_16_R3.PacketPlayInTabComplete;
+import net.minecraft.server.v1_16_R3.PacketPlayInWindowClick;
+
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicLong;
 
 public class ProtocolStateMachine {
 
+    private volatile long lastGhostAction = 0;
+
     private final AtomicInteger ghostWindowClicks = new AtomicInteger(0);
     private final AtomicInteger ghostHotbarSwaps = new AtomicInteger(0);
-    private final AtomicLong lastGhostAction = new AtomicLong(0);
-
-    private final AtomicLong lastTabComplete = new AtomicLong(-1);
-    private final AtomicLong lastPayload = new AtomicLong(-1);
     private final AtomicInteger comboSpamCount = new AtomicInteger(0);
 
-    public boolean isActionValid(String packetName, ProtocolPlayer pp) {
+    private volatile long lastTabComplete = -1;
+    private volatile long lastPayload = -1;
+
+    private static final int MAX_WINDOW_CLICKS_PER_SECOND = 20;
+    private static final int MAX_HOTBAR_SWAPS_PER_SECOND = 15;
+    private static final int MAX_COMBO_SPAM = 15;
+    private static final long GHOST_RESET_INTERVAL = 1000L;
+
+    public boolean isActionValid(Class<?> packetClass, ProtocolPlayer pp) {
         long now = System.currentTimeMillis();
 
-        if (now - lastGhostAction.get() > 1000) {
+        if (now - lastGhostAction > GHOST_RESET_INTERVAL) {
             ghostWindowClicks.set(0);
             ghostHotbarSwaps.set(0);
+            lastGhostAction = now;
         }
 
         if (!pp.isInventoryOpen()) {
-            if (packetName.equals("PacketPlayInWindowClick")) {
-                lastGhostAction.set(now);
-                int clicks = ghostWindowClicks.incrementAndGet();
-
-                if (clicks > 100) ghostWindowClicks.set(100);
-
-                if (clicks > 5) return false;
-            }
-            else if (packetName.equals("PacketPlayInHeldItemSlot")) {
-                lastGhostAction.set(now);
-                int swaps = ghostHotbarSwaps.incrementAndGet();
-
-                if (swaps > 100) ghostHotbarSwaps.set(100);
-
-                if (swaps > 8) return false;
+            if (packetClass == PacketPlayInWindowClick.class) {
+                if (ghostWindowClicks.incrementAndGet() > MAX_WINDOW_CLICKS_PER_SECOND) {
+                    return false;
+                }
+            } else if (packetClass == PacketPlayInHeldItemSlot.class) {
+                if (ghostHotbarSwaps.incrementAndGet() > MAX_HOTBAR_SWAPS_PER_SECOND) {
+                    return false;
+                }
             }
         } else {
             ghostWindowClicks.set(0);
@@ -46,29 +50,45 @@ public class ProtocolStateMachine {
         return true;
     }
 
-    public boolean analyzeCrashCombo(String packetName) {
+    public boolean analyzeCrashCombo(Class<?> packetClass) {
         long now = System.currentTimeMillis();
 
-        if (packetName.equals("PacketPlayInTabComplete")) {
-            lastTabComplete.set(now);
-        } else if (packetName.equals("PacketPlayInCustomPayload")) {
-            lastPayload.set(now);
+        if (packetClass == PacketPlayInTabComplete.class) {
+            lastTabComplete = now;
+        } else if (packetClass == PacketPlayInCustomPayload.class) {
+            lastPayload = now;
+        } else {
+            return true;
         }
 
-        long tabTime = lastTabComplete.get();
-        long payloadTime = lastPayload.get();
+        long tabTime = lastTabComplete;
+        long payloadTime = lastPayload;
 
         if (tabTime == -1 || payloadTime == -1) {
             return true;
         }
 
         if (Math.abs(tabTime - payloadTime) < 50) {
-            int spam = comboSpamCount.incrementAndGet();
-            if (spam > 10) return false;
+            if (comboSpamCount.incrementAndGet() > MAX_COMBO_SPAM) {
+                return false;
+            }
         } else {
-            comboSpamCount.updateAndGet(current -> Math.max(0, current - 3));
+            int current;
+            int next;
+            do {
+                current = comboSpamCount.get();
+                if (current == 0) break;
+                next = Math.max(0, current - 3);
+            } while (!comboSpamCount.compareAndSet(current, next));
         }
 
         return true;
+    }
+
+    public void reset() {
+        ghostWindowClicks.set(0);
+        ghostHotbarSwaps.set(0);
+        lastGhostAction = 0;
+        comboSpamCount.set(0);
     }
 }
