@@ -20,6 +20,7 @@ public class CreativeCheck extends Check {
         VarHandle item = null;
         try {
             MethodHandles.Lookup lookup = MethodHandles.privateLookupIn(PacketPlayInSetCreativeSlot.class, MethodHandles.lookup());
+
             for (Field field : PacketPlayInSetCreativeSlot.class.getDeclaredFields()) {
                 field.setAccessible(true);
                 if (field.getType() == int.class && slot == null) {
@@ -29,6 +30,7 @@ public class CreativeCheck extends Check {
                 }
             }
         } catch (Exception ignored) {}
+
         SLOT_FIELD = slot;
         ITEM_FIELD = item;
     }
@@ -62,9 +64,8 @@ public class CreativeCheck extends Check {
             }
 
             int count = item.getCount();
-            int maxStack = item.getMaxStackSize();
 
-            if (count > maxStack || count < 1) {
+            if (count > 127 || count < 1) {
                 return false;
             }
 

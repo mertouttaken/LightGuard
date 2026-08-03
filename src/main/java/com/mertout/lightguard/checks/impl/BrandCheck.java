@@ -86,7 +86,6 @@ public class BrandCheck extends Check {
                 }
 
                 if (blockInvalidChars) {
-                    // Regex kullanmak yerine sıfır çöp (Zero-Allocation) karakter kontrolü
                     int brandLen = brand.length();
                     for (int i = 0; i < brandLen; i++) {
                         char c = brand.charAt(i);

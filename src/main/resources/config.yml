@@ -40,6 +40,11 @@ settings:
       - "Flood"
       - "PacketSize"
 
+  # Central Radar
+  radar:
+    burst-threshold: 12
+    window-ms: 4000
+
 # ============================================================== #
 #                     PACKET & EXPLOIT CHECKS                    #
 # ============================================================== #
@@ -65,6 +70,7 @@ checks:
     per-packet-limit: 32000
     excluded-packets:
       - "PacketPlayInBEdit"
+      - "PacketPlayInCustomPayload"
 
   window:
     enabled: true

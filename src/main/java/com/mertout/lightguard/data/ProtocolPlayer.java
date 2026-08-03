@@ -32,6 +32,7 @@ public class ProtocolPlayer {
     private volatile boolean brandSent = false;
     private volatile boolean isBedrock = false;
     private volatile boolean isPrinterMode = false;
+    private volatile boolean inLiquid = false;
 
     private volatile double lastX = -1, lastY = -1, lastZ = -1;
     private volatile double lastVehicleX = -1, lastVehicleY = -1, lastVehicleZ = -1;
@@ -170,6 +171,7 @@ public class ProtocolPlayer {
     public boolean isAnvilOpen() { return isAnvilOpen; }
     public void setAnvilOpen(boolean anvilOpen) { isAnvilOpen = anvilOpen; }
     public boolean isAdmin() { return isAdmin; }
+    public boolean isInLiquid() { return inLiquid; }
     public void setAdmin(boolean admin) { isAdmin = admin; }
     public boolean isCreativeOrSpectator() { return isCreativeOrSpectator; }
     public void setCreativeOrSpectator(boolean val) { isCreativeOrSpectator = val; }
@@ -184,6 +186,7 @@ public class ProtocolPlayer {
     public void setHoldingBook(boolean holdingBook) { isHoldingBook = holdingBook; }
     public boolean isBrandSent() { return brandSent; }
     public void setBrandSent(boolean brandSent) { this.brandSent = brandSent; }
+    public void setInLiquid(boolean inLiquid) { this.inLiquid = inLiquid; }
     public boolean isBedrock() { return isBedrock; }
     public void setBedrock(boolean bedrock) { isBedrock = bedrock; }
     public void setPrinterMode(boolean mode) { this.isPrinterMode = mode; }

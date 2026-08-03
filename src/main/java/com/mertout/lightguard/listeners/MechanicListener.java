@@ -1,5 +1,7 @@
 package com.mertout.lightguard.listeners;
 
+import com.google.common.cache.Cache;
+import com.google.common.cache.CacheBuilder;
 import com.mertout.lightguard.LightGuard;
 import com.mertout.lightguard.data.ProtocolPlayer;
 import org.bukkit.*;
@@ -20,12 +22,17 @@ import org.bukkit.inventory.ItemStack;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
 
 public class MechanicListener implements Listener {
 
     private final LightGuard plugin;
+
     private final Map<UUID, Long> cooldowns = new ConcurrentHashMap<>();
-    private final Map<Location, Long> dispenserCooldowns = new ConcurrentHashMap<>();
+
+    private final Cache<String, Long> dispenserCooldowns = CacheBuilder.newBuilder()
+            .expireAfterWrite(1, TimeUnit.SECONDS)
+            .build();
 
     private static final Set<Material> NOISY_BLOCKS = EnumSet.of(
             Material.NOTE_BLOCK, Material.BELL, Material.OAK_TRAPDOOR, Material.SPRUCE_TRAPDOOR,
@@ -56,12 +63,6 @@ public class MechanicListener implements Listener {
 
         Bukkit.getScheduler().runTaskTimerAsynchronously(plugin, () -> {
             long now = System.currentTimeMillis();
-
-            Iterator<Map.Entry<Location, Long>> dispIter = dispenserCooldowns.entrySet().iterator();
-            while (dispIter.hasNext()) {
-                if (now - dispIter.next().getValue() > 60000) dispIter.remove();
-            }
-
             Iterator<Map.Entry<UUID, Long>> cdIter = cooldowns.entrySet().iterator();
             while (cdIter.hasNext()) {
                 if (now - cdIter.next().getValue() > 300000) cdIter.remove();
@@ -94,7 +95,7 @@ public class MechanicListener implements Listener {
         plugin.getProtocolManager().remove(uuid);
         plugin.getPacketInjector().removePlayer(event.getPlayer());
 
-        plugin.getDispatcher().clearViolations(uuid);
+        plugin.getViolationRadar().clearViolations(uuid);
     }
 
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
@@ -335,11 +336,24 @@ public class MechanicListener implements Listener {
 
     @EventHandler(priority = EventPriority.LOWEST)
     public void onMove(PlayerMoveEvent event) {
-        if (!plugin.getConfig().getBoolean("mechanics.null-chunk", true)) return;
-
         Location to = event.getTo();
-        if (to != null && !plugin.getWorldChunkManager().isChunkLoadedAsynchronously(to.getWorld().getName(), to.getBlockX() >> 4, to.getBlockZ() >> 4)) {
-            event.setCancelled(true);
+        Location from = event.getFrom();
+
+        if (to == null) return;
+
+        if (plugin.getConfig().getBoolean("mechanics.null-chunk", true)) {
+            if (!plugin.getWorldChunkManager().isChunkLoadedAsynchronously(to.getWorld().getName(), to.getBlockX() >> 4, to.getBlockZ() >> 4)) {
+                event.setCancelled(true);
+                return;
+            }
+        }
+
+        if (from.getBlockX() != to.getBlockX() || from.getBlockY() != to.getBlockY() || from.getBlockZ() != to.getBlockZ()) {
+            ProtocolPlayer pp = plugin.getProtocolManager().get(event.getPlayer().getUniqueId());
+            if (pp != null) {
+                boolean inWater = to.getBlock().isLiquid() || event.getPlayer().getEyeLocation().getBlock().isLiquid();
+                pp.setInLiquid(inWater);
+            }
         }
     }
 
@@ -513,9 +527,9 @@ public class MechanicListener implements Listener {
     }
 
     private boolean checkDispenserCooldown(Location loc, long ms) {
-        long now = System.currentTimeMillis();
-        if (now - dispenserCooldowns.getOrDefault(loc, 0L) < ms) return true;
-        dispenserCooldowns.put(loc, now);
+        String key = loc.getWorld().getName() + ":" + loc.getBlockX() + ":" + loc.getBlockY() + ":" + loc.getBlockZ();
+        if (dispenserCooldowns.getIfPresent(key) != null) return true;
+        dispenserCooldowns.put(key, System.currentTimeMillis());
         return false;
     }
 

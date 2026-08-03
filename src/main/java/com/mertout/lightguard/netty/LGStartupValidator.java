@@ -10,6 +10,8 @@ import org.bukkit.Bukkit;
 import org.bukkit.craftbukkit.v1_16_R3.CraftServer;
 
 import java.lang.reflect.Field;
+import java.lang.reflect.ParameterizedType;
+import java.lang.reflect.Type;
 import java.util.List;
 
 public class LGStartupValidator {
@@ -28,10 +30,11 @@ public class LGStartupValidator {
                 for (Field f : ServerConnection.class.getDeclaredFields()) {
                     if (List.class.isAssignableFrom(f.getType())) {
                         f.setAccessible(true);
-                        Object val = f.get(serverConnection);
-                        if (val instanceof List && !((List<?>) val).isEmpty()) {
-                            Object first = ((List<?>) val).get(0);
-                            if (first instanceof ChannelFuture) {
+
+                        Type genericType = f.getGenericType();
+                        if (genericType instanceof ParameterizedType) {
+                            Type[] typeArgs = ((ParameterizedType) genericType).getActualTypeArguments();
+                            if (typeArgs.length > 0 && typeArgs[0].getTypeName().contains("ChannelFuture")) {
                                 CHANNELS_FIELD = f;
                                 break;
                             }

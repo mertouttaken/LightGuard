@@ -6,6 +6,7 @@ import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 
 import java.util.Queue;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
 public class ActionQueue {
@@ -26,32 +27,39 @@ public class ActionQueue {
 
     public void pushKick(Player player, String reason) {
         plugin.getMetrics().recordViolation(player.getName(), reason);
-        queue.offer(new Action(player, reason, ActionType.KICK));
+        queue.offer(new Action(player.getUniqueId(), player.getName(), reason, ActionType.KICK));
     }
 
     private void startConsumerTask() {
         Bukkit.getScheduler().runTaskTimer(plugin, () -> {
             Action action;
             while ((action = queue.poll()) != null) {
-                if (action.player.isOnline()) {
+
+                Player targetPlayer = Bukkit.getPlayer(action.uuid);
+
+                if (targetPlayer != null && targetPlayer.isOnline()) {
                     StringBuilder sb = new StringBuilder(256);
                     String pingStr = "0";
 
                     try {
-                        ProtocolPlayer pp = plugin.getProtocolManager().get(action.player.getUniqueId());
+                        ProtocolPlayer pp = plugin.getProtocolManager().get(action.uuid);
                         if (pp != null) {
                             pingStr = String.valueOf(pp.getKeepAliveTracker().getPing());
                         }
                     } catch (Exception ignored) {}
 
-                    for (String line : cachedKickLayout) {
-                        String formatted = line.replace("&", "§")
-                                .replace("%player%", action.player.getName())
+                    for (int i = 0; i < cachedKickLayout.length; i++) {
+                        String formatted = cachedKickLayout[i].replace("&", "§")
+                                .replace("%player%", action.playerName)
                                 .replace("%check%", action.reason)
                                 .replace("%ping%", pingStr);
-                        sb.append(formatted).append("\n");
+
+                        sb.append(formatted);
+                        if (i < cachedKickLayout.length - 1) {
+                            sb.append("\n");
+                        }
                     }
-                    action.player.kickPlayer(sb.toString());
+                    targetPlayer.kickPlayer(sb.toString());
                 }
             }
         }, 1L, 1L);
@@ -60,12 +68,14 @@ public class ActionQueue {
     private enum ActionType { KICK }
 
     private static class Action {
-        final Player player;
+        final UUID uuid;
+        final String playerName;
         final String reason;
         final ActionType type;
 
-        Action(Player player, String reason, ActionType type) {
-            this.player = player;
+        Action(UUID uuid, String playerName, String reason, ActionType type) {
+            this.uuid = uuid;
+            this.playerName = playerName;
             this.reason = reason;
             this.type = type;
         }

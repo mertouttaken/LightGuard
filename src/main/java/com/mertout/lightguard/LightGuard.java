@@ -1,6 +1,7 @@
 package com.mertout.lightguard;
 
 import com.mertout.lightguard.checks.Dispatcher;
+import com.mertout.lightguard.checks.ViolationRadar;
 import com.mertout.lightguard.commands.LGCommand;
 import com.mertout.lightguard.commands.subcommands.LGProfileCommand;
 import com.mertout.lightguard.config.ConfigManager;
@@ -32,6 +33,7 @@ public class LightGuard extends JavaPlugin {
     private WorldChunkManager worldChunkManager;
     private ProtocolManager protocolManager;
     private Dispatcher checkDispatcher;
+    private ViolationRadar violationRadar;
 
     private double currentTps = 20.0;
     private Method getTpsMethod = null;
@@ -56,6 +58,7 @@ public class LightGuard extends JavaPlugin {
         this.protocolManager = new ProtocolManager(this);
         this.worldChunkManager = new WorldChunkManager(this);
         this.checkDispatcher = new Dispatcher(this);
+        this.violationRadar = new ViolationRadar(this);
         this.packetInjector = new LGPacketInjector(this);
         this.packetLoggerManager = new PacketLoggerManager(this);
         this.performanceMonitor = new PerformanceMonitor(this);
@@ -120,5 +123,6 @@ public class LightGuard extends JavaPlugin {
     public ProtocolManager getProtocolManager() { return protocolManager; }
     public LGPacketInjector getPacketInjector() { return packetInjector; }
     public Dispatcher getDispatcher() { return checkDispatcher; }
+    public ViolationRadar getViolationRadar() { return violationRadar; }
     public double getTPS() { return currentTps; }
 }
