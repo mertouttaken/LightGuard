@@ -351,8 +351,14 @@ public class MechanicListener implements Listener {
         if (from.getBlockX() != to.getBlockX() || from.getBlockY() != to.getBlockY() || from.getBlockZ() != to.getBlockZ()) {
             ProtocolPlayer pp = plugin.getProtocolManager().get(event.getPlayer().getUniqueId());
             if (pp != null) {
-                boolean inWater = to.getBlock().isLiquid() || event.getPlayer().getEyeLocation().getBlock().isLiquid();
-                pp.setInLiquid(inWater);
+                int chunkX = to.getBlockX() >> 4;
+                int chunkZ = to.getBlockZ() >> 4;
+                if (to.getWorld().isChunkLoaded(chunkX, chunkZ)) {
+                    boolean inWater = to.getBlock().isLiquid() || event.getPlayer().getEyeLocation().getBlock().isLiquid();
+                    pp.setInLiquid(inWater);
+                } else {
+                    pp.setInLiquid(false);
+                }
             }
         }
     }

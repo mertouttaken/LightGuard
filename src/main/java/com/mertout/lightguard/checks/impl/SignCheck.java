@@ -9,7 +9,6 @@ import net.minecraft.server.v1_16_R3.PacketPlayInUpdateSign;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.VarHandle;
 import java.lang.reflect.Field;
-import java.util.regex.Pattern;
 
 public class SignCheck extends Check {
 
@@ -34,7 +33,17 @@ public class SignCheck extends Check {
         LINES_FIELD = lines;
     }
 
-    private static final Pattern JSON_EXPLOIT_PATTERN = Pattern.compile("[\"'](text|score|selector|extra|translate|clickEvent|hoverEvent|run_command|nbt)[\"']\\s*:");
+    private static final String[] JSON_KEYS = {
+            "\"text\"", "'text'",
+            "\"score\"", "'score'",
+            "\"selector\"", "'selector'",
+            "\"extra\"", "'extra'",
+            "\"translate\"", "'translate'",
+            "\"clickEvent\"", "'clickEvent'",
+            "\"hoverEvent\"", "'hoverEvent'",
+            "\"run_command\"", "'run_command'",
+            "\"nbt\"", "'nbt'"
+    };
 
     private final int maxLineLength;
     private final boolean blockJson;
@@ -95,7 +104,7 @@ public class SignCheck extends Check {
                     }
                 }
 
-                if (blockJson && JSON_EXPLOIT_PATTERN.matcher(line).find()) {
+                if (blockJson && containsJsonExploit(line)) {
                     return false;
                 }
             }
@@ -104,5 +113,15 @@ public class SignCheck extends Check {
             return false;
         }
         return true;
+    }
+
+    private boolean containsJsonExploit(String line) {
+        String lowerLine = line.toLowerCase();
+        for (String key : JSON_KEYS) {
+            if (lowerLine.contains(key)) {
+                return true;
+            }
+        }
+        return false;
     }
 }

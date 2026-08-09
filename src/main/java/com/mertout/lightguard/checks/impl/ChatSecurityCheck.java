@@ -8,7 +8,6 @@ import net.minecraft.server.v1_16_R3.PacketPlayInChat;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.VarHandle;
 import java.lang.reflect.Field;
-import java.util.regex.Pattern;
 
 public class ChatSecurityCheck extends Check {
 
@@ -29,7 +28,6 @@ public class ChatSecurityCheck extends Check {
         MSG_FIELD = msg;
     }
 
-    private static final Pattern ZALGO_PATTERN = Pattern.compile("[\\u0300-\\u036F\\u0483-\\u0489\\u1DC0-\\u1DFF\\u20D0-\\u20FF\\uFE20-\\uFE2F]{3,}");
     private final boolean blockZalgo;
 
     public ChatSecurityCheck(LightGuard plugin) {
@@ -51,11 +49,11 @@ public class ChatSecurityCheck extends Check {
                 return false;
             }
 
-            if (blockZalgo && ZALGO_PATTERN.matcher(message).find()) {
+            if (containsBlockedUnicode(message)) {
                 return false;
             }
 
-            if (containsBlockedUnicode(message)) {
+            if (blockZalgo && containsZalgo(message)) {
                 return false;
             }
 
@@ -82,6 +80,30 @@ public class ChatSecurityCheck extends Check {
         for (int i = 0; i < len; i++) {
             char c = message.charAt(i);
             if ((c >= 0x202A && c <= 0x202E) || (c >= 0x200B && c <= 0x200D) || c >= 0xFFF0) return true;
+        }
+        return false;
+    }
+
+    private boolean containsZalgo(String message) {
+        int consecutiveCombiningMarks = 0;
+        int len = message.length();
+
+        for (int i = 0; i < len; i++) {
+            char c = message.charAt(i);
+
+            if ((c >= '\u0300' && c <= '\u036F') ||
+                    (c >= '\u0483' && c <= '\u0489') ||
+                    (c >= '\u1DC0' && c <= '\u1DFF') ||
+                    (c >= '\u20D0' && c <= '\u20FF') ||
+                    (c >= '\uFE20' && c <= '\uFE2F')) {
+
+                consecutiveCombiningMarks++;
+                if (consecutiveCombiningMarks >= 3) {
+                    return true;
+                }
+            } else {
+                consecutiveCombiningMarks = 0;
+            }
         }
         return false;
     }

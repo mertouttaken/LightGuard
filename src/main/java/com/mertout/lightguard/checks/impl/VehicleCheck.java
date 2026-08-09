@@ -83,7 +83,11 @@ public class VehicleCheck extends Check {
                 if (!Double.isFinite(pX) || !Double.isFinite(pY) || !Double.isFinite(pZ)) return false;
 
                 String worldName = player.getCurrentWorldName();
-                if (!plugin.getWorldChunkManager().isChunkLoadedAsynchronously(worldName, (int) pX >> 4, (int) pZ >> 4)) {
+
+                int chunkX = (int) Math.floor(pX) >> 4;
+                int chunkZ = (int) Math.floor(pZ) >> 4;
+
+                if (!plugin.getWorldChunkManager().isChunkLoadedAsynchronously(worldName, chunkX, chunkZ)) {
                     return false;
                 }
 

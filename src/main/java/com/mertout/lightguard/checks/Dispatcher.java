@@ -71,12 +71,12 @@ public class Dispatcher {
 
         try {
 
-            if (!player.getStateMachine().analyzeCrashCombo(packet.getClass())) {
+            if (!player.getStateMachine().analyzeCrashCombo(packet.getClass().getName())) {
                 plugin.getActionQueue().pushKick(player.getPlayer(), "Exploit Combo Pattern (Crash Attempt)");
                 return false;
             }
 
-            if (!player.getStateMachine().isActionValid(packet.getClass(), player)) {
+            if (!player.getStateMachine().isActionValid(packet.getClass().getName(), player)) {
                 plugin.getActionQueue().pushKick(player.getPlayer(), "Invalid Sequence / State Action");
                 return false;
             }
@@ -110,7 +110,7 @@ public class Dispatcher {
     private boolean runCheck(Check check, Object packet, ProtocolPlayer player) {
         String checkName = check.getClass().getSimpleName();
 
-        if (!safeModeManager.isCheckEnabled(checkName)) return true;
+        if (!safeModeManager.isCheckEnabled(checkName, player.getUuid())) return true;
 
         boolean geyserSupport = plugin.getConfig().getBoolean("settings.sentinel.geyser-support", true);
         if (geyserSupport && player.isBedrock() && !check.isBedrockCompatible()) {
@@ -126,7 +126,7 @@ public class Dispatcher {
             return isPassed;
 
         } catch (Throwable t) {
-            safeModeManager.recordException(checkName, t);
+            safeModeManager.recordException(checkName, player.getUuid(), t);
 
             boolean silent = plugin.getConfig().getBoolean("settings.sentinel.silent-failures", false);
             if (!silent) {
@@ -142,6 +142,11 @@ public class Dispatcher {
 
             return true;
         }
+    }
+
+    public void clearViolations(UUID uuid) {
+        violationRadar.clearViolations(uuid);
+        safeModeManager.clear(uuid);
     }
 
     public SafeModeManager getSafeModeManager() {

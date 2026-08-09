@@ -1,18 +1,22 @@
 package com.mertout.lightguard.checks;
 
 import com.mertout.lightguard.LightGuard;
+
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArraySet;
 
 public class SafeModeManager {
 
     private final LightGuard plugin;
-    private final Map<String, ExceptionData> exceptionTracker = new ConcurrentHashMap<>();
-    private final Set<String> disabledChecks = ConcurrentHashMap.newKeySet();
+
+    private final Map<UUID, Map<String, ExceptionData>> exceptionTracker = new ConcurrentHashMap<>();
+    private final Map<UUID, Set<String>> disabledChecks = new ConcurrentHashMap<>();
+
     private final Set<String> criticalPatterns = new CopyOnWriteArraySet<>();
 
     private final int errorThreshold;
@@ -20,7 +24,7 @@ public class SafeModeManager {
 
     public SafeModeManager(LightGuard plugin) {
         this.plugin = plugin;
-        this.errorThreshold = plugin.getConfig().getInt("settings.sentinel.safe-mode-threshold", 50);
+        this.errorThreshold = plugin.getConfig().getInt("settings.sentinel.safe-mode-threshold", 10);
         loadCriticalPatterns();
     }
 
@@ -28,41 +32,41 @@ public class SafeModeManager {
         criticalPatterns.clear();
         List<String> list = plugin.getConfig().getStringList("settings.sentinel.critical-checks");
 
-        if (list == null || list.isEmpty()) {
-            list = Arrays.asList("ItemExploitCheck", "PayloadCheck", "PacketSizeCheck", "ProtocolExploitCheck", "CreativeCheck");
-            plugin.getLogger().warning("[Sentinel] 'critical-checks' not found in config! Using safe defaults.");
+        if (list != null) {
+            for (String s : list) {
+                criticalPatterns.add(s.toLowerCase());
+            }
         }
 
-        for (String s : list) {
-            criticalPatterns.add(s.toLowerCase());
-        }
+        criticalPatterns.addAll(Arrays.asList("itemexploit", "payload", "packetsize", "protocolexploit", "creative"));
     }
 
-    public boolean isCheckEnabled(String checkName) {
+    public boolean isCheckEnabled(String checkName, UUID uuid) {
         if (isCritical(checkName)) return true;
-        return !disabledChecks.contains(checkName);
+
+        Set<String> disabledForPlayer = disabledChecks.get(uuid);
+        return disabledForPlayer == null || !disabledForPlayer.contains(checkName);
     }
 
     public boolean isCritical(String checkName) {
         if (checkName == null) return false;
         String lowerName = checkName.toLowerCase();
         for (String pattern : criticalPatterns) {
-            if (lowerName.contains(pattern.toLowerCase())) {
+            if (lowerName.contains(pattern)) {
                 return true;
             }
         }
         return false;
     }
 
-    public void recordException(String checkName, Throwable t) {
+    public void recordException(String checkName, UUID uuid, Throwable t) {
         if (isCritical(checkName)) {
-            plugin.getLogger().warning("[Sentinel] Critical check '" + checkName + "' threw an error but will stay ENABLED for security.");
             return;
         }
 
         long now = System.currentTimeMillis();
-
-        ExceptionData data = exceptionTracker.computeIfAbsent(checkName, k -> new ExceptionData(now));
+        Map<String, ExceptionData> playerTracker = exceptionTracker.computeIfAbsent(uuid, k -> new ConcurrentHashMap<>());
+        ExceptionData data = playerTracker.computeIfAbsent(checkName, k -> new ExceptionData(now));
 
         synchronized (data) {
             if (now - data.startTime > timeWindowMillis) {
@@ -72,17 +76,21 @@ public class SafeModeManager {
                 data.count++;
             }
 
-            if (data.count >= errorThreshold && !disabledChecks.contains(checkName)) {
-                disabledChecks.add(checkName);
-                plugin.getLogger().severe("╔══════════════════════════════════════════╗");
-                plugin.getLogger().severe("║        SAFE MODE CRITICAL ALERT          ║");
-                plugin.getLogger().severe("╠══════════════════════════════════════════╣");
-                plugin.getLogger().severe("║  ✗ Check: " + checkName);
-                plugin.getLogger().severe("║  ✗ Action: AUTOMATICALLY DISABLED        ║");
-                plugin.getLogger().severe("║  ✗ Reason: " + errorThreshold + " errors within 60s!  ║");
-                plugin.getLogger().severe("╚══════════════════════════════════════════╝");
+            if (data.count >= errorThreshold) {
+                Set<String> disabledForPlayer = disabledChecks.computeIfAbsent(uuid, k -> ConcurrentHashMap.newKeySet());
+                if (!disabledForPlayer.contains(checkName)) {
+                    disabledForPlayer.add(checkName);
+
+                    plugin.getLogger().warning("[Sentinel] Check '" + checkName + "' threw " + errorThreshold
+                            + " errors for player " + uuid.toString().substring(0,8) + "... -> Disabled ONLY for this player.");
+                }
             }
         }
+    }
+
+    public void clear(UUID uuid) {
+        exceptionTracker.remove(uuid);
+        disabledChecks.remove(uuid);
     }
 
     public void reset() {
@@ -95,10 +103,6 @@ public class SafeModeManager {
         reset();
     }
 
-    public Set<String> getDisabledChecks() {
-        return disabledChecks;
-    }
-
     private static class ExceptionData {
         long startTime;
         int count;
@@ -107,11 +111,5 @@ public class SafeModeManager {
             this.startTime = startTime;
             this.count = 0;
         }
-    }
-
-    public Map<String, Integer> getExceptionCounts() {
-        Map<String, Integer> counts = new java.util.HashMap<>();
-        exceptionTracker.forEach((name, data) -> counts.put(name, data.count));
-        return counts;
     }
 }

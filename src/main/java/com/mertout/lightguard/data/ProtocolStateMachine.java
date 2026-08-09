@@ -1,43 +1,41 @@
 package com.mertout.lightguard.data;
 
-import net.minecraft.server.v1_16_R3.PacketPlayInCustomPayload;
-import net.minecraft.server.v1_16_R3.PacketPlayInHeldItemSlot;
-import net.minecraft.server.v1_16_R3.PacketPlayInTabComplete;
-import net.minecraft.server.v1_16_R3.PacketPlayInWindowClick;
-
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 
 public class ProtocolStateMachine {
 
-    private volatile long lastGhostAction = 0;
+    private final AtomicLong lastGhostAction = new AtomicLong(0);
 
     private final AtomicInteger ghostWindowClicks = new AtomicInteger(0);
     private final AtomicInteger ghostHotbarSwaps = new AtomicInteger(0);
     private final AtomicInteger comboSpamCount = new AtomicInteger(0);
 
-    private volatile long lastTabComplete = -1;
-    private volatile long lastPayload = -1;
+    private final AtomicLong lastTabComplete = new AtomicLong(-1);
+    private final AtomicLong lastPayload = new AtomicLong(-1);
 
     private static final int MAX_WINDOW_CLICKS_PER_SECOND = 20;
     private static final int MAX_HOTBAR_SWAPS_PER_SECOND = 15;
     private static final int MAX_COMBO_SPAM = 15;
     private static final long GHOST_RESET_INTERVAL = 1000L;
 
-    public boolean isActionValid(Class<?> packetClass, ProtocolPlayer pp) {
+    public boolean isActionValid(String packetName, ProtocolPlayer pp) {
         long now = System.currentTimeMillis();
 
-        if (now - lastGhostAction > GHOST_RESET_INTERVAL) {
-            ghostWindowClicks.set(0);
-            ghostHotbarSwaps.set(0);
-            lastGhostAction = now;
+        long lastAction = lastGhostAction.get();
+        if (now - lastAction > GHOST_RESET_INTERVAL) {
+            if (lastGhostAction.compareAndSet(lastAction, now)) {
+                ghostWindowClicks.set(0);
+                ghostHotbarSwaps.set(0);
+            }
         }
 
         if (!pp.isInventoryOpen()) {
-            if (packetClass == PacketPlayInWindowClick.class) {
+            if (packetName.equals("PacketPlayInWindowClick")) {
                 if (ghostWindowClicks.incrementAndGet() > MAX_WINDOW_CLICKS_PER_SECOND) {
                     return false;
                 }
-            } else if (packetClass == PacketPlayInHeldItemSlot.class) {
+            } else if (packetName.equals("PacketPlayInHeldItemSlot")) {
                 if (ghostHotbarSwaps.incrementAndGet() > MAX_HOTBAR_SWAPS_PER_SECOND) {
                     return false;
                 }
@@ -50,19 +48,19 @@ public class ProtocolStateMachine {
         return true;
     }
 
-    public boolean analyzeCrashCombo(Class<?> packetClass) {
+    public boolean analyzeCrashCombo(String packetName) {
         long now = System.currentTimeMillis();
 
-        if (packetClass == PacketPlayInTabComplete.class) {
-            lastTabComplete = now;
-        } else if (packetClass == PacketPlayInCustomPayload.class) {
-            lastPayload = now;
+        if (packetName.equals("PacketPlayInTabComplete")) {
+            lastTabComplete.set(now);
+        } else if (packetName.equals("PacketPlayInCustomPayload")) {
+            lastPayload.set(now);
         } else {
             return true;
         }
 
-        long tabTime = lastTabComplete;
-        long payloadTime = lastPayload;
+        long tabTime = lastTabComplete.get();
+        long payloadTime = lastPayload.get();
 
         if (tabTime == -1 || payloadTime == -1) {
             return true;
@@ -88,7 +86,9 @@ public class ProtocolStateMachine {
     public void reset() {
         ghostWindowClicks.set(0);
         ghostHotbarSwaps.set(0);
-        lastGhostAction = 0;
+        lastGhostAction.set(0);
         comboSpamCount.set(0);
+        lastTabComplete.set(-1);
+        lastPayload.set(-1);
     }
 }

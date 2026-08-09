@@ -4,6 +4,7 @@ import com.mertout.lightguard.LightGuard;
 import com.mertout.lightguard.checks.Check;
 import com.mertout.lightguard.data.ProtocolPlayer;
 import io.netty.buffer.ByteBuf;
+import io.netty.util.ReferenceCountUtil;
 import net.minecraft.server.v1_16_R3.*;
 
 import java.lang.invoke.MethodHandles;
@@ -82,7 +83,10 @@ public class PacketSizeCheck extends Check {
             }
             else if (packet instanceof PacketPlayInCustomPayload && PAYLOAD_DATA != null) {
                 ByteBuf data = (ByteBuf) PAYLOAD_DATA.get(packet);
-                if (data != null && data.readableBytes() > globalLimit) return false;
+                if (data != null && data.readableBytes() > globalLimit) {
+                    ReferenceCountUtil.release(data);
+                    return false;
+                }
             }
             else if (packet instanceof PacketPlayInUpdateSign && SIGN_LINES != null) {
                 String[] lines = (String[]) SIGN_LINES.get(packet);
@@ -95,6 +99,12 @@ public class PacketSizeCheck extends Check {
                 }
             }
         } catch (Throwable t) {
+            if (packet instanceof PacketPlayInCustomPayload && PAYLOAD_DATA != null) {
+                try {
+                    ByteBuf data = (ByteBuf) PAYLOAD_DATA.get(packet);
+                    if (data != null) ReferenceCountUtil.release(data);
+                } catch (Throwable ignored) {}
+            }
             return false;
         }
         return true;

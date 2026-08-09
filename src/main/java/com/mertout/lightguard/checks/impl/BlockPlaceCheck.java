@@ -103,7 +103,7 @@ public class BlockPlaceCheck extends Check {
                 }
             }
         } catch (Throwable t) {
-            return true;
+            return false;
         }
 
         return true;

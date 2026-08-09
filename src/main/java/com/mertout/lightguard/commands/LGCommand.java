@@ -58,39 +58,6 @@ public class LGCommand implements CommandExecutor {
                 new LGStatsCommand(plugin).execute(sender, args);
                 break;
 
-            case "safemode":
-                SafeModeManager smm = plugin.getDispatcher().getSafeModeManager();
-
-                if (args.length > 1 && args[1].equalsIgnoreCase("reset")) {
-                    smm.reset();
-                    sender.sendMessage("§a[LightGuard] Safe Mode data reset. All checks re-enabled.");
-                } else {
-                    Set<String> disabled = smm.getDisabledChecks();
-                    Map<String, Integer> counts = smm.getExceptionCounts();
-
-                    sender.sendMessage("§8§m----------§r §cSafe Mode Status §8§m----------");
-
-                    if (!counts.isEmpty()) {
-                        sender.sendMessage("§eRecorded Internal Errors (Last 60s):");
-                        int threshold = plugin.getConfig().getInt("settings.sentinel.safe-mode-threshold", 50);
-
-                        counts.forEach((name, count) -> {
-                            String status = smm.isCritical(name) ? "§c[CRITICAL-ALWAYS-ON]" : "§7[" + count + "/" + threshold + "]";
-                            sender.sendMessage(" §7- " + name + ": " + status);
-                        });
-                        sender.sendMessage("");
-                    }
-
-                    if (disabled.isEmpty()) {
-                        sender.sendMessage("§aNo checks have been disabled yet.");
-                    } else {
-                        sender.sendMessage("§cAutomatically Disabled Checks:");
-                        disabled.forEach(name -> sender.sendMessage(" §7- §4" + name));
-                        sender.sendMessage("");
-                        sender.sendMessage("§7Use §f/lg safemode reset §7to re-enable.");
-                    }
-                }
-                break;
             default:
                 sendHelp(sender);
                 break;
@@ -104,7 +71,6 @@ public class LGCommand implements CommandExecutor {
         sender.sendMessage(" §4/lg reload §8» §fReload configurations");
         sender.sendMessage(" §4/lg stats §8» §fShow security metrics");
         sender.sendMessage(" §4/lg profile §8» §fLive packet monitoring");
-        sender.sendMessage(" §4/lg safemode §8» §fSafe mode.");
         sender.sendMessage(" §4/lg tps §8» §fInternal server heartbeat");
         sender.sendMessage("§8§m------------------------------------------");
     }
