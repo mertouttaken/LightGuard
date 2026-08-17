@@ -1,7 +1,6 @@
 package com.mertout.lightguard.config;
 
 import com.mertout.lightguard.LightGuard;
-import com.mertout.lightguard.utils.NBTChecker;
 import net.minecraft.server.v1_16_R3.IRegistry;
 import net.minecraft.server.v1_16_R3.Item;
 import net.minecraft.server.v1_16_R3.Items;
@@ -57,10 +56,16 @@ public class ConfigManager {
         plugin.reloadConfig();
         cachedIllegalBlocks = null;
 
-        NBTChecker.reload();
-
         if (plugin.getActionQueue() != null) {
             plugin.getActionQueue().loadConfig();
+        }
+
+        if (plugin.getViolationRadar() != null) {
+            plugin.getViolationRadar().loadConfig();
+        }
+
+        if (plugin.getMechanicListener() != null) {
+            plugin.getMechanicListener().loadConfig();
         }
 
         if (plugin.getDispatcher() != null) {

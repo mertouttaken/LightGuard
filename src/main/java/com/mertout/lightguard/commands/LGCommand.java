@@ -1,15 +1,11 @@
 package com.mertout.lightguard.commands;
 
 import com.mertout.lightguard.LightGuard;
-import com.mertout.lightguard.checks.SafeModeManager;
 import com.mertout.lightguard.commands.subcommands.LGProfileCommand;
 import com.mertout.lightguard.commands.subcommands.LGStatsCommand;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
-
-import java.util.Map;
-import java.util.Set;
 
 public class LGCommand implements CommandExecutor {
     private final LightGuard plugin;
@@ -71,6 +67,7 @@ public class LGCommand implements CommandExecutor {
         sender.sendMessage(" §4/lg reload §8» §fReload configurations");
         sender.sendMessage(" §4/lg stats §8» §fShow security metrics");
         sender.sendMessage(" §4/lg profile §8» §fLive packet monitoring");
+        sender.sendMessage(" §4/lg benchmark §8» §fPer-check timings (console)");
         sender.sendMessage(" §4/lg tps §8» §fInternal server heartbeat");
         sender.sendMessage("§8§m------------------------------------------");
     }

@@ -12,13 +12,17 @@ public class ViolationRadar {
 
     private final LightGuard plugin;
 
-    private final int burstThreshold;
-    private final long windowMillis;
+    private volatile int burstThreshold;
+    private volatile long windowMillis;
 
     private final ConcurrentHashMap<UUID, PlayerRadar> radars = new ConcurrentHashMap<>();
 
     public ViolationRadar(LightGuard plugin) {
         this.plugin = plugin;
+        loadConfig();
+    }
+
+    public void loadConfig() {
         this.burstThreshold = Math.max(1, plugin.getConfig().getInt("settings.radar.burst-threshold", 12));
         this.windowMillis = Math.max(250L, plugin.getConfig().getLong("settings.radar.window-ms", 4000L));
     }

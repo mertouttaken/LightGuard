@@ -27,7 +27,7 @@ public class ActionQueue {
 
     public void pushKick(Player player, String reason) {
         plugin.getMetrics().recordViolation(player.getName(), reason);
-        queue.offer(new Action(player.getUniqueId(), player.getName(), reason, ActionType.KICK));
+        queue.offer(new Action(player.getUniqueId(), player.getName(), reason));
     }
 
     private void startConsumerTask() {
@@ -65,19 +65,15 @@ public class ActionQueue {
         }, 1L, 1L);
     }
 
-    private enum ActionType { KICK }
-
     private static class Action {
         final UUID uuid;
         final String playerName;
         final String reason;
-        final ActionType type;
 
-        Action(UUID uuid, String playerName, String reason, ActionType type) {
+        Action(UUID uuid, String playerName, String reason) {
             this.uuid = uuid;
             this.playerName = playerName;
             this.reason = reason;
-            this.type = type;
         }
     }
 }

@@ -4,7 +4,6 @@ import com.mertout.lightguard.LightGuard;
 import com.mertout.lightguard.checks.Check;
 import com.mertout.lightguard.data.ProtocolPlayer;
 import io.netty.buffer.ByteBuf;
-import io.netty.util.ReferenceCountUtil;
 import net.minecraft.server.v1_16_R3.*;
 
 import java.lang.invoke.MethodHandles;
@@ -82,9 +81,10 @@ public class PacketSizeCheck extends Check {
                 if (text != null && text.length() > 256) return false;
             }
             else if (packet instanceof PacketPlayInCustomPayload && PAYLOAD_DATA != null) {
+                // Do not release here: LGPacketInjector owns the buffer lifetime and releases
+                // any packet a check rejects. Releasing in both places over-decrements refCnt.
                 ByteBuf data = (ByteBuf) PAYLOAD_DATA.get(packet);
                 if (data != null && data.readableBytes() > globalLimit) {
-                    ReferenceCountUtil.release(data);
                     return false;
                 }
             }
@@ -99,12 +99,6 @@ public class PacketSizeCheck extends Check {
                 }
             }
         } catch (Throwable t) {
-            if (packet instanceof PacketPlayInCustomPayload && PAYLOAD_DATA != null) {
-                try {
-                    ByteBuf data = (ByteBuf) PAYLOAD_DATA.get(packet);
-                    if (data != null) ReferenceCountUtil.release(data);
-                } catch (Throwable ignored) {}
-            }
             return false;
         }
         return true;

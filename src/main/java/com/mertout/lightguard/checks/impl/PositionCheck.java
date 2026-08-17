@@ -81,8 +81,10 @@ public class PositionCheck extends Check {
                 return false;
             }
 
-            int chunkX = (int) x >> 4;
-            int chunkZ = (int) z >> 4;
+            // Math.floor, not a cast: casting truncates toward zero, so any coordinate in
+            // (-16, 0) would resolve to chunk 0 instead of -1 and look unloaded.
+            int chunkX = (int) Math.floor(x) >> 4;
+            int chunkZ = (int) Math.floor(z) >> 4;
 
             String worldName = player.getCurrentWorldName();
 

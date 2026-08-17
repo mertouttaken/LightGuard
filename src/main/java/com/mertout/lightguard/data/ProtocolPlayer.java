@@ -10,7 +10,6 @@ import java.util.concurrent.atomic.AtomicLong;
 public class ProtocolPlayer {
     private final Player player;
     private final UUID uuid;
-    private final int entityId;
 
     private volatile String currentWorldName = "world";
 
@@ -69,7 +68,6 @@ public class ProtocolPlayer {
     public ProtocolPlayer(Player player, LightGuard plugin) {
         this.player = player;
         this.uuid = player.getUniqueId();
-        this.entityId = player.getEntityId();
         this.rateLimiter = new HybridRateLimiter(plugin);
     }
 
@@ -157,7 +155,6 @@ public class ProtocolPlayer {
 
     public Player getPlayer() { return player; }
     public UUID getUuid() { return uuid; }
-    public int getEntityId() { return entityId; }
     public ProtocolStateMachine getStateMachine() { return stateMachine; }
     public HybridRateLimiter getRateLimiter() { return rateLimiter; }
     public KeepAliveTracker getKeepAliveTracker() { return keepAliveTracker; }

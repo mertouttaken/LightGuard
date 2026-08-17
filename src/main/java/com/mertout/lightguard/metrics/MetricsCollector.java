@@ -6,7 +6,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 
 public class MetricsCollector {
-    private final LightGuard plugin;
     private final long startTime;
     private final AtomicLong totalPackets = new AtomicLong(0);
     private final AtomicLong blockedPackets = new AtomicLong(0);
@@ -15,7 +14,6 @@ public class MetricsCollector {
     private final Map<String, AtomicLong> violationsByPlayer = new ConcurrentHashMap<>();
 
     public MetricsCollector(LightGuard plugin) {
-        this.plugin = plugin;
         this.startTime = System.currentTimeMillis();
     }
 

@@ -34,6 +34,7 @@ public class LightGuard extends JavaPlugin {
     private ProtocolManager protocolManager;
     private Dispatcher checkDispatcher;
     private ViolationRadar violationRadar;
+    private MechanicListener mechanicListener;
 
     private double currentTps = 20.0;
     private Method getTpsMethod = null;
@@ -54,17 +55,18 @@ public class LightGuard extends JavaPlugin {
         } catch (Exception ignored) {}
 
         this.configManager = new ConfigManager(this);
+        this.metrics = new MetricsCollector(this);
         this.actionQueue = new ActionQueue(this);
         this.protocolManager = new ProtocolManager(this);
         this.worldChunkManager = new WorldChunkManager(this);
-        this.checkDispatcher = new Dispatcher(this);
-        this.violationRadar = new ViolationRadar(this);
-        this.packetInjector = new LGPacketInjector(this);
-        this.packetLoggerManager = new PacketLoggerManager(this);
         this.performanceMonitor = new PerformanceMonitor(this);
-        this.metrics = new MetricsCollector(this);
+        this.packetLoggerManager = new PacketLoggerManager(this);
+        this.violationRadar = new ViolationRadar(this);
+        this.checkDispatcher = new Dispatcher(this, violationRadar);
+        this.packetInjector = new LGPacketInjector(this);
 
-        getServer().getPluginManager().registerEvents(new MechanicListener(this), this);
+        this.mechanicListener = new MechanicListener(this);
+        getServer().getPluginManager().registerEvents(mechanicListener, this);
         getCommand("lg").setExecutor(new LGCommand(this));
 
         getServer().getScheduler().runTaskTimer(this, () -> {
@@ -110,7 +112,7 @@ public class LightGuard extends JavaPlugin {
     }
 
     public void reloadCheckDispatcher() {
-        this.checkDispatcher = new Dispatcher(this);
+        this.checkDispatcher = new Dispatcher(this, violationRadar);
     }
 
     public static LightGuard getInstance() { return instance; }
@@ -124,5 +126,6 @@ public class LightGuard extends JavaPlugin {
     public LGPacketInjector getPacketInjector() { return packetInjector; }
     public Dispatcher getDispatcher() { return checkDispatcher; }
     public ViolationRadar getViolationRadar() { return violationRadar; }
+    public MechanicListener getMechanicListener() { return mechanicListener; }
     public double getTPS() { return currentTps; }
 }

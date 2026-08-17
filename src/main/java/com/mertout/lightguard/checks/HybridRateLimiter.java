@@ -29,7 +29,6 @@ public class HybridRateLimiter {
     public boolean addAndCheck(double baseWeight) {
         long now = System.currentTimeMillis();
 
-        lastPacketTime.compareAndSet(0, now);
         lastViolationDecayTime.compareAndSet(0, now);
 
         long previousTime = lastPacketTime.getAndSet(now);
@@ -82,13 +81,5 @@ public class HybridRateLimiter {
         }
 
         return false;
-    }
-
-    public double getThreatScore() {
-        return Double.longBitsToDouble(threatScoreBits.get());
-    }
-
-    public int getViolationLevel() {
-        return violationLevel.get();
     }
 }

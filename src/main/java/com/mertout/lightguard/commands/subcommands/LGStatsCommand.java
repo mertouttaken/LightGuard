@@ -9,7 +9,8 @@ public class LGStatsCommand {
     public LGStatsCommand(LightGuard plugin) { this.plugin = plugin; }
 
     public void execute(CommandSender sender, String[] args) {
-        if (args.length > 0 && args[0].equalsIgnoreCase("reset")) {
+        // args[0] is the "stats" label itself; the modifier is args[1].
+        if (args.length > 1 && args[1].equalsIgnoreCase("reset")) {
             plugin.getMetrics().reset();
             sender.sendMessage("§a[LightGuard] Statistics have been reset.");
             return;

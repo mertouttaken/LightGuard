@@ -155,11 +155,6 @@ public class LGPacketInjector {
 
                     super.write(ctx, msg, promise);
                 }
-
-                @Override
-                public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
-                    super.exceptionCaught(ctx, cause);
-                }
             };
 
             if (channel.pipeline().get("decoder") != null) {

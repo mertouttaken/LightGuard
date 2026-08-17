@@ -3,6 +3,7 @@ package com.mertout.lightguard.checks;
 import com.mertout.lightguard.LightGuard;
 import com.mertout.lightguard.checks.impl.*;
 import com.mertout.lightguard.data.ProtocolPlayer;
+import com.mertout.lightguard.logger.PacketLoggerManager;
 import net.minecraft.server.v1_16_R3.*;
 
 import java.util.*;
@@ -15,10 +16,10 @@ public class Dispatcher {
     private final SafeModeManager safeModeManager;
     private final ViolationRadar violationRadar;
 
-    public Dispatcher(LightGuard plugin) {
+    public Dispatcher(LightGuard plugin, ViolationRadar violationRadar) {
         this.plugin = plugin;
         this.safeModeManager = new SafeModeManager(plugin);
-        this.violationRadar = new ViolationRadar(plugin);
+        this.violationRadar = violationRadar;
         loadChecks();
     }
 
@@ -70,31 +71,26 @@ public class Dispatcher {
         boolean blocked = true;
 
         try {
+            String packetName = packet.getClass().getSimpleName();
 
-            if (!player.getStateMachine().analyzeCrashCombo(packet.getClass().getName())) {
+            if (!player.getStateMachine().analyzeCrashCombo(packetName)) {
                 plugin.getActionQueue().pushKick(player.getPlayer(), "Exploit Combo Pattern (Crash Attempt)");
                 return false;
             }
 
-            if (!player.getStateMachine().isActionValid(packet.getClass().getName(), player)) {
+            if (!player.getStateMachine().isActionValid(packetName, player)) {
                 plugin.getActionQueue().pushKick(player.getPlayer(), "Invalid Sequence / State Action");
                 return false;
             }
 
             for (Check check : globalChecks) {
-                long checkStart = System.nanoTime();
-                boolean result = runCheck(check, packet, player);
-                plugin.getPerformanceMonitor().recordCheck(packet.getClass(), System.nanoTime() - checkStart);
-                if (!result) return false;
+                if (!timedCheck(check, packet, player)) return false;
             }
 
             List<Check> specificChecks = packetMap.get(packet.getClass());
             if (specificChecks != null) {
                 for (Check check : specificChecks) {
-                    long checkStart = System.nanoTime();
-                    boolean result = runCheck(check, packet, player);
-                    plugin.getPerformanceMonitor().recordCheck(packet.getClass(), System.nanoTime() - checkStart);
-                    if (!result) return false;
+                    if (!timedCheck(check, packet, player)) return false;
                 }
             }
 
@@ -104,7 +100,19 @@ public class Dispatcher {
         } finally {
             long totalDuration = System.nanoTime() - startTime;
             plugin.getMetrics().recordPacket(blocked, totalDuration);
+
+            PacketLoggerManager logger = plugin.getPacketLoggerManager();
+            if (logger.getConfig().isEnabled()) {
+                logger.processPacket(player.getPlayer().getName(), packet, totalDuration);
+            }
         }
+    }
+
+    private boolean timedCheck(Check check, Object packet, ProtocolPlayer player) {
+        long checkStart = System.nanoTime();
+        boolean result = runCheck(check, packet, player);
+        plugin.getPerformanceMonitor().recordCheck(check.getClass(), System.nanoTime() - checkStart);
+        return result;
     }
 
     private boolean runCheck(Check check, Object packet, ProtocolPlayer player) {
@@ -151,9 +159,5 @@ public class Dispatcher {
 
     public SafeModeManager getSafeModeManager() {
         return safeModeManager;
-    }
-
-    public ViolationRadar getViolationRadar() {
-        return violationRadar;
     }
 }

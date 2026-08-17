@@ -15,10 +15,7 @@ public class PerformanceMonitor {
     }
 
     public void recordCheck(Class<?> checkClass, long durationNs) {
-        CheckData data = statsMap.get(checkClass);
-        if (data == null) {
-            data = statsMap.computeIfAbsent(checkClass, k -> new CheckData());
-        }
+        CheckData data = statsMap.computeIfAbsent(checkClass, k -> new CheckData());
 
         data.totalDuration.add(durationNs);
         data.callCount.increment();

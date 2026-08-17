@@ -15,7 +15,11 @@ public class ProtocolStateMachine {
     private final AtomicLong lastPayload = new AtomicLong(-1);
 
     private static final int MAX_WINDOW_CLICKS_PER_SECOND = 20;
-    private static final int MAX_HOTBAR_SWAPS_PER_SECOND = 15;
+
+    // Only counted while no inventory is open. A fast scroll wheel can legitimately emit well over
+    // 15 slot changes per second, and a crasher emits thousands, so the limit is set where no human
+    // input can reach it without weakening detection.
+    private static final int MAX_HOTBAR_SWAPS_PER_SECOND = 45;
     private static final int MAX_COMBO_SPAM = 15;
     private static final long GHOST_RESET_INTERVAL = 1000L;
 
@@ -81,14 +85,5 @@ public class ProtocolStateMachine {
         }
 
         return true;
-    }
-
-    public void reset() {
-        ghostWindowClicks.set(0);
-        ghostHotbarSwaps.set(0);
-        lastGhostAction.set(0);
-        comboSpamCount.set(0);
-        lastTabComplete.set(-1);
-        lastPayload.set(-1);
     }
 }

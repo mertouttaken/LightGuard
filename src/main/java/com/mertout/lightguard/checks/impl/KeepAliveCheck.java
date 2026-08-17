@@ -39,7 +39,11 @@ public class KeepAliveCheck extends Check {
         try {
             if (ID_FIELD != null) {
                 long id = (long) ID_FIELD.get(packet);
-                player.getKeepAliveTracker().onKeepAliveReceived(id);
+
+                // An id the server never sent is a spoofed/replayed KeepAlive.
+                if (!player.getKeepAliveTracker().onKeepAliveReceived(id)) {
+                    return false;
+                }
             }
         } catch (Throwable t) {
             return false;

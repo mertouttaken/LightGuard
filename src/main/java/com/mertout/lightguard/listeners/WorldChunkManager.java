@@ -16,9 +16,11 @@ import java.util.concurrent.ConcurrentHashMap;
 
 public class WorldChunkManager implements Listener {
 
+    private final LightGuard plugin;
     private final Map<String, Set<Long>> loadedChunks = new ConcurrentHashMap<>();
 
     public WorldChunkManager(LightGuard plugin) {
+        this.plugin = plugin;
         Bukkit.getScheduler().runTaskLater(plugin, this::bootstrap, 20L);
         Bukkit.getPluginManager().registerEvents(this, plugin);
     }
@@ -36,7 +38,7 @@ public class WorldChunkManager implements Listener {
                 cachedCount++;
             }
         }
-        Bukkit.getLogger().info("LightGuard: " + cachedCount + " pre-loaded chunks cached for async inspection.");
+        plugin.getLogger().info(cachedCount + " loaded chunks cached for async inspection.");
     }
 
     public static long getChunkKey(int x, int z) {
@@ -68,7 +70,20 @@ public class WorldChunkManager implements Listener {
         return chunks != null && chunks.contains(getChunkKey(chunkX, chunkZ));
     }
 
+    /**
+     * Rebuilds the cache from the currently loaded chunks. Clearing without rebuilding would make
+     * every chunk look unloaded, which cancels all movement and kicks players on position packets.
+     */
     public void clearCache() {
+        if (Bukkit.isPrimaryThread()) {
+            rebuild();
+        } else {
+            Bukkit.getScheduler().runTask(plugin, this::rebuild);
+        }
+    }
+
+    private void rebuild() {
         loadedChunks.clear();
+        bootstrap();
     }
 }
