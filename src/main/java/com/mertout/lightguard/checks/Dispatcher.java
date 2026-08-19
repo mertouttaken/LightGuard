@@ -4,7 +4,12 @@ import com.mertout.lightguard.LightGuard;
 import com.mertout.lightguard.checks.impl.*;
 import com.mertout.lightguard.data.ProtocolPlayer;
 import com.mertout.lightguard.logger.PacketLoggerManager;
-import net.minecraft.server.v1_16_R3.*;
+
+import net.minecraft.network.protocol.common.ServerboundClientInformationPacket;
+import net.minecraft.network.protocol.common.ServerboundCustomPayloadPacket;
+import net.minecraft.network.protocol.common.ServerboundKeepAlivePacket;
+import net.minecraft.network.protocol.common.ServerboundResourcePackPacket;
+import net.minecraft.network.protocol.game.*;
 
 import java.util.*;
 
@@ -27,39 +32,45 @@ public class Dispatcher {
         globalChecks.add(new PacketSizeCheck(plugin));
         globalChecks.add(new ProtocolExploitCheck(plugin));
 
-        register(PacketPlayInChat.class, new CommandCheck(plugin), new ChatSecurityCheck(plugin));
-        register(PacketPlayInTabComplete.class, new TabCheck(plugin));
+        register(ServerboundChatPacket.class, new CommandCheck(plugin), new ChatSecurityCheck(plugin));
+        register(ServerboundChatCommandPacket.class, new CommandCheck(plugin));
 
-        register(PacketPlayInWindowClick.class, new ItemExploitCheck(plugin), new WindowCheck(plugin));
-        register(PacketPlayInSetCreativeSlot.class, new ItemExploitCheck(plugin), new MapExploitCheck(plugin), new CreativeCheck(plugin));
-        register(PacketPlayInItemName.class, new AnvilCheck(plugin));
-        register(PacketPlayInHeldItemSlot.class, new HeldItemSlotCheck(plugin));
-        register(PacketPlayInBEdit.class, new BookExploitCheck(plugin));
+        register(ServerboundCommandSuggestionPacket.class, new TabCheck(plugin));
+
+        register(ServerboundContainerClickPacket.class, new ItemExploitCheck(plugin), new WindowCheck(plugin));
+        register(ServerboundSetCreativeModeSlotPacket.class, new ItemExploitCheck(plugin), new MapExploitCheck(plugin), new CreativeCheck(plugin));
+        register(ServerboundRenameItemPacket.class, new AnvilCheck(plugin));
+        register(ServerboundSetCarriedItemPacket.class, new HeldItemSlotCheck(plugin));
+        register(ServerboundEditBookPacket.class, new BookExploitCheck(plugin));
 
         PositionCheck posCheck = new PositionCheck(plugin);
-        register(PacketPlayInFlying.class, posCheck);
-        register(PacketPlayInFlying.PacketPlayInPosition.class, posCheck);
-        register(PacketPlayInFlying.PacketPlayInLook.class, posCheck);
-        register(PacketPlayInFlying.PacketPlayInPositionLook.class, posCheck);
-        register(PacketPlayInKeepAlive.class, new KeepAliveCheck(plugin));
+        register(ServerboundMovePlayerPacket.class, posCheck);
+        register(ServerboundMovePlayerPacket.Pos.class, posCheck);
+        register(ServerboundMovePlayerPacket.Rot.class, posCheck);
+        register(ServerboundMovePlayerPacket.PosRot.class, posCheck);
+        register(ServerboundMovePlayerPacket.StatusOnly.class, posCheck);
+
+        register(ServerboundKeepAlivePacket.class, new KeepAliveCheck(plugin));
 
         VehicleCheck vehicleCheck = new VehicleCheck(plugin);
-        register(PacketPlayInSteerVehicle.class, vehicleCheck);
-        register(PacketPlayInVehicleMove.class, vehicleCheck);
+        register(ServerboundPlayerInputPacket.class, vehicleCheck);
+        register(ServerboundMoveVehiclePacket.class, vehicleCheck);
 
-        register(PacketPlayInUseItem.class, new BlockPlaceCheck(plugin));
-        register(PacketPlayInUpdateSign.class, new SignCheck(plugin));
-        register(PacketPlayInBlockDig.class, new NoComCheck(plugin));
+        register(ServerboundUseItemOnPacket.class, new BlockPlaceCheck(plugin));
+        register(ServerboundUseItemPacket.class, new BlockPlaceCheck(plugin));
 
-        register(PacketPlayInUseEntity.class, new BadPacketCheck(plugin), new EntityCheck(plugin));
+        register(ServerboundSignUpdatePacket.class, new SignCheck(plugin));
+        register(ServerboundPlayerActionPacket.class, new NoComCheck(plugin));
 
-        register(PacketPlayInCustomPayload.class, new PayloadCheck(plugin), new BrandCheck(plugin));
-        register(PacketPlayInSettings.class, new SettingsCheck(plugin));
-        register(PacketPlayInResourcePackStatus.class, new ResourcePackCheck(plugin));
-        register(PacketPlayInAutoRecipe.class, new RecipeCheck(plugin));
-        register(PacketPlayInRecipeDisplayed.class, new RecipeCheck(plugin));
-        register(PacketPlayInAbilities.class, new AbilitiesCheck(plugin));
-        register(PacketPlayInClientCommand.class, new ClientActionCheck(plugin));
+        register(ServerboundInteractPacket.class, new BadPacketCheck(plugin), new EntityCheck(plugin));
+
+        register(ServerboundCustomPayloadPacket.class, new PayloadCheck(plugin), new BrandCheck(plugin));
+        register(ServerboundClientInformationPacket.class, new SettingsCheck(plugin));
+        register(ServerboundResourcePackPacket.class, new ResourcePackCheck(plugin));
+        register(ServerboundPlaceRecipePacket.class, new RecipeCheck(plugin));
+        register(ServerboundRecipeBookSeenRecipePacket.class, new RecipeCheck(plugin));
+        register(ServerboundPlayerAbilitiesPacket.class, new AbilitiesCheck(plugin));
+        register(ServerboundClientCommandPacket.class, new ClientActionCheck(plugin));
     }
 
     private void register(Class<?> packetClass, Check... checks) {

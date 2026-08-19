@@ -3,35 +3,9 @@ package com.mertout.lightguard.checks.impl;
 import com.mertout.lightguard.LightGuard;
 import com.mertout.lightguard.checks.Check;
 import com.mertout.lightguard.data.ProtocolPlayer;
-import net.minecraft.server.v1_16_R3.PacketPlayInUseEntity;
-import net.minecraft.server.v1_16_R3.PacketPlayInUseEntity.EnumEntityUseAction;
-
-import java.lang.invoke.MethodHandles;
-import java.lang.invoke.VarHandle;
-import java.lang.reflect.Field;
+import net.minecraft.network.protocol.game.ServerboundInteractPacket;
 
 public class EntityCheck extends Check {
-
-    private static final VarHandle ENTITY_ID;
-    private static final VarHandle ACTION_FIELD;
-
-    static {
-        VarHandle entityId = null;
-        VarHandle action = null;
-        try {
-            MethodHandles.Lookup lookup = MethodHandles.privateLookupIn(PacketPlayInUseEntity.class, MethodHandles.lookup());
-            for (Field field : PacketPlayInUseEntity.class.getDeclaredFields()) {
-                field.setAccessible(true);
-                if (field.getType() == int.class && entityId == null) {
-                    entityId = lookup.unreflectVarHandle(field);
-                } else if (field.getType() == EnumEntityUseAction.class && action == null) {
-                    action = lookup.unreflectVarHandle(field);
-                }
-            }
-        } catch (Exception ignored) {}
-        ENTITY_ID = entityId;
-        ACTION_FIELD = action;
-    }
 
     private final boolean preventArmorStandSpam;
 
@@ -42,7 +16,7 @@ public class EntityCheck extends Check {
 
     @Override
     public boolean check(Object packet, ProtocolPlayer player) {
-        if (!(packet instanceof PacketPlayInUseEntity)) return true;
+        if (!(packet instanceof ServerboundInteractPacket)) return true;
 
         try {
             if (player.isDead()) {
@@ -53,10 +27,10 @@ public class EntityCheck extends Check {
                 return false;
             }
 
-            if (preventArmorStandSpam && ACTION_FIELD != null) {
-                EnumEntityUseAction action = (EnumEntityUseAction) ACTION_FIELD.get(packet);
+            if (preventArmorStandSpam) {
+                ServerboundInteractPacket interactPacket = (ServerboundInteractPacket) packet;
 
-                if (action == EnumEntityUseAction.ATTACK) {
+                if (interactPacket.isAttack()) {
                     long now = System.currentTimeMillis();
                     if (player.checkAndSetEntityInteractDelay(now, 50)) {
                         return false;

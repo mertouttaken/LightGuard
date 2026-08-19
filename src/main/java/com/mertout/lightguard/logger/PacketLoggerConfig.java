@@ -10,11 +10,17 @@ public class PacketLoggerConfig {
     private long heavyPacketThreshold;
     private OutputMode outputMode;
     private Set<String> playerList = new HashSet<>();
-
     private Set<Class<?>> packetList = new HashSet<>();
-
     private FilterMode playerMode;
     private FilterMode packetMode;
+
+    private static final String[] PACKET_PACKAGES = {
+            "net.minecraft.network.protocol.game.",
+            "net.minecraft.network.protocol.common.",
+            "net.minecraft.network.protocol.handshake.",
+            "net.minecraft.network.protocol.login.",
+            "net.minecraft.network.protocol.status."
+    };
 
     public PacketLoggerConfig(LightGuard plugin) {
         reload(plugin);
@@ -23,7 +29,7 @@ public class PacketLoggerConfig {
     public void reload(LightGuard plugin) {
         FileConfiguration config = plugin.getConfig();
         this.enabled = config.getBoolean("packet-logger.enabled", false);
-        this.heavyPacketThreshold = config.getLong("packet-logger.heavy-packet-threshold", 500000L); // 0.5ms
+        this.heavyPacketThreshold = config.getLong("packet-logger.heavy-packet-threshold", 500000L);
         this.outputMode = OutputMode.valueOf(config.getString("packet-logger.output", "FILE").toUpperCase());
 
         this.playerMode = FilterMode.valueOf(config.getString("packet-logger.player-mode", "WHITELIST").toUpperCase());
@@ -33,9 +39,12 @@ public class PacketLoggerConfig {
 
         Set<Class<?>> tempPacketList = new HashSet<>();
         for (String packetName : config.getStringList("packet-logger.packets")) {
-            try {
-                tempPacketList.add(Class.forName("net.minecraft.server.v1_16_R3." + packetName));
-            } catch (ClassNotFoundException ignored) {}
+            for (String pkg : PACKET_PACKAGES) {
+                try {
+                    tempPacketList.add(Class.forName(pkg + packetName));
+                    break;
+                } catch (ClassNotFoundException ignored) {}
+            }
         }
         this.packetList = tempPacketList;
     }

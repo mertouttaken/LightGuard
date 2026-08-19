@@ -1,14 +1,16 @@
 package com.mertout.lightguard.config;
 
 import com.mertout.lightguard.LightGuard;
-import net.minecraft.server.v1_16_R3.IRegistry;
-import net.minecraft.server.v1_16_R3.Item;
-import net.minecraft.server.v1_16_R3.Items;
-import net.minecraft.server.v1_16_R3.MinecraftKey;
+import net.minecraft.core.Holder;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.Items;
 import org.bukkit.configuration.file.FileConfiguration;
 
 import java.util.HashSet;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 
 public class ConfigManager {
@@ -36,10 +38,14 @@ public class ConfigManager {
 
                     for (String key : list) {
                         try {
-                            MinecraftKey mcKey = new MinecraftKey(key.toLowerCase());
-                            Item item = IRegistry.ITEM.get(mcKey);
-                            if (item != null && item != Items.AIR) {
-                                localBlocks.add(item);
+                            ResourceLocation mcKey = ResourceLocation.parse(key.toLowerCase());
+                            Optional<Holder.Reference<Item>> holder = BuiltInRegistries.ITEM.get(mcKey);
+
+                            if (holder.isPresent()) {
+                                Item item = holder.get().value();
+                                if (item != null && item != Items.AIR) {
+                                    localBlocks.add(item);
+                                }
                             }
                         } catch (Exception e) {
                             plugin.getLogger().warning("Invalid block name in config: " + key);

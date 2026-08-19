@@ -15,10 +15,6 @@ public class ProtocolStateMachine {
     private final AtomicLong lastPayload = new AtomicLong(-1);
 
     private static final int MAX_WINDOW_CLICKS_PER_SECOND = 20;
-
-    // Only counted while no inventory is open. A fast scroll wheel can legitimately emit well over
-    // 15 slot changes per second, and a crasher emits thousands, so the limit is set where no human
-    // input can reach it without weakening detection.
     private static final int MAX_HOTBAR_SWAPS_PER_SECOND = 45;
     private static final int MAX_COMBO_SPAM = 15;
     private static final long GHOST_RESET_INTERVAL = 1000L;
@@ -35,11 +31,11 @@ public class ProtocolStateMachine {
         }
 
         if (!pp.isInventoryOpen()) {
-            if (packetName.equals("PacketPlayInWindowClick")) {
+            if (packetName.equals("ServerboundContainerClickPacket")) {
                 if (ghostWindowClicks.incrementAndGet() > MAX_WINDOW_CLICKS_PER_SECOND) {
                     return false;
                 }
-            } else if (packetName.equals("PacketPlayInHeldItemSlot")) {
+            } else if (packetName.equals("ServerboundSetCarriedItemPacket")) {
                 if (ghostHotbarSwaps.incrementAndGet() > MAX_HOTBAR_SWAPS_PER_SECOND) {
                     return false;
                 }
@@ -55,9 +51,9 @@ public class ProtocolStateMachine {
     public boolean analyzeCrashCombo(String packetName) {
         long now = System.currentTimeMillis();
 
-        if (packetName.equals("PacketPlayInTabComplete")) {
+        if (packetName.equals("ServerboundCommandSuggestionPacket")) {
             lastTabComplete.set(now);
-        } else if (packetName.equals("PacketPlayInCustomPayload")) {
+        } else if (packetName.equals("ServerboundCustomPayloadPacket")) {
             lastPayload.set(now);
         } else {
             return true;

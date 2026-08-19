@@ -5,67 +5,46 @@ import com.mertout.lightguard.data.ProtocolPlayer;
 
 import io.netty.channel.*;
 import io.netty.util.ReferenceCountUtil;
-import org.bukkit.craftbukkit.v1_16_R3.entity.CraftPlayer;
+import net.minecraft.network.protocol.common.ClientboundKeepAlivePacket;
+import net.minecraft.network.protocol.common.ServerboundCustomPayloadPacket;
 import org.bukkit.entity.Player;
 
-import java.lang.invoke.MethodHandles;
-import java.lang.invoke.VarHandle;
-import java.lang.reflect.Field;
+import org.bukkit.craftbukkit.entity.CraftPlayer;
+
+import net.minecraft.network.protocol.game.ClientboundOpenScreenPacket;
+import net.minecraft.network.protocol.game.ClientboundPlayerPositionPacket;
+import net.minecraft.network.protocol.game.ServerboundContainerClosePacket;
+import net.minecraft.network.protocol.game.ServerboundContainerClickPacket;
+import net.minecraft.network.protocol.game.ServerboundMovePlayerPacket;
+import net.minecraft.network.protocol.game.ServerboundSetCreativeModeSlotPacket;
+import net.minecraft.network.protocol.game.ServerboundSignUpdatePacket;
+import net.minecraft.network.protocol.game.ServerboundUseItemOnPacket;
+import net.minecraft.network.protocol.game.ServerboundUseItemPacket;
+
+import net.minecraft.world.entity.Relative;
+
 import java.util.HashMap;
 import java.util.Map;
 
 public class LGPacketInjector {
 
     private final LightGuard plugin;
-    private static final VarHandle KEEPALIVE_ID_FIELD;
-    private static final VarHandle WINDOW_ID_FIELD;
-    private static final VarHandle POS_X_FIELD, POS_Y_FIELD, POS_Z_FIELD, POS_FLAGS_FIELD;
 
     private static final Map<Class<?>, Double> PACKET_WEIGHTS = new HashMap<>();
 
     static {
-        VarHandle kaId = null, wId = null, px = null, py = null, pz = null, pFlags = null;
-        try {
-            MethodHandles.Lookup lookup = MethodHandles.privateLookupIn(net.minecraft.server.v1_16_R3.PacketPlayOutKeepAlive.class, MethodHandles.lookup());
-            for (Field f : net.minecraft.server.v1_16_R3.PacketPlayOutKeepAlive.class.getDeclaredFields()) {
-                if (f.getType() == long.class) { f.setAccessible(true); kaId = lookup.unreflectVarHandle(f); break; }
-            }
+        PACKET_WEIGHTS.put(ServerboundContainerClickPacket.class, 15.0);
+        PACKET_WEIGHTS.put(ServerboundSetCreativeModeSlotPacket.class, 30.0);
+        PACKET_WEIGHTS.put(ServerboundCustomPayloadPacket.class, 25.0);
+        PACKET_WEIGHTS.put(ServerboundSignUpdatePacket.class, 30.0);
+        PACKET_WEIGHTS.put(ServerboundUseItemPacket.class, 5.0);
+        PACKET_WEIGHTS.put(ServerboundUseItemOnPacket.class, 10.0);
 
-            MethodHandles.Lookup wLookup = MethodHandles.privateLookupIn(net.minecraft.server.v1_16_R3.PacketPlayOutOpenWindow.class, MethodHandles.lookup());
-            for (Field f : net.minecraft.server.v1_16_R3.PacketPlayOutOpenWindow.class.getDeclaredFields()) {
-                if (f.getType() == int.class) { f.setAccessible(true); wId = wLookup.unreflectVarHandle(f); break; }
-            }
-
-            MethodHandles.Lookup pLookup = MethodHandles.privateLookupIn(net.minecraft.server.v1_16_R3.PacketPlayOutPosition.class, MethodHandles.lookup());
-            int doubleCount = 0;
-            for (Field f : net.minecraft.server.v1_16_R3.PacketPlayOutPosition.class.getDeclaredFields()) {
-                f.setAccessible(true);
-                if (f.getType() == double.class) {
-                    if (doubleCount == 0) px = pLookup.unreflectVarHandle(f);
-                    else if (doubleCount == 1) py = pLookup.unreflectVarHandle(f);
-                    else if (doubleCount == 2) pz = pLookup.unreflectVarHandle(f);
-                    doubleCount++;
-                } else if (f.getType() == java.util.Set.class) {
-                    pFlags = pLookup.unreflectVarHandle(f);
-                }
-            }
-
-            PACKET_WEIGHTS.put(net.minecraft.server.v1_16_R3.PacketPlayInWindowClick.class, 15.0);
-            PACKET_WEIGHTS.put(net.minecraft.server.v1_16_R3.PacketPlayInSetCreativeSlot.class, 30.0);
-            PACKET_WEIGHTS.put(net.minecraft.server.v1_16_R3.PacketPlayInCustomPayload.class, 25.0);
-            PACKET_WEIGHTS.put(net.minecraft.server.v1_16_R3.PacketPlayInUpdateSign.class, 30.0);
-            PACKET_WEIGHTS.put(net.minecraft.server.v1_16_R3.PacketPlayInUseItem.class, 5.0);
-            PACKET_WEIGHTS.put(net.minecraft.server.v1_16_R3.PacketPlayInBlockPlace.class, 10.0);
-
-            PACKET_WEIGHTS.put(net.minecraft.server.v1_16_R3.PacketPlayInFlying.class, 1.0);
-            PACKET_WEIGHTS.put(net.minecraft.server.v1_16_R3.PacketPlayInFlying.PacketPlayInPosition.class, 1.0);
-            PACKET_WEIGHTS.put(net.minecraft.server.v1_16_R3.PacketPlayInFlying.PacketPlayInPositionLook.class, 1.0);
-            PACKET_WEIGHTS.put(net.minecraft.server.v1_16_R3.PacketPlayInFlying.PacketPlayInLook.class, 1.0);
-
-        } catch (Exception ignored) {}
-
-        KEEPALIVE_ID_FIELD = kaId; WINDOW_ID_FIELD = wId;
-        POS_X_FIELD = px; POS_Y_FIELD = py; POS_Z_FIELD = pz; POS_FLAGS_FIELD = pFlags;
+        PACKET_WEIGHTS.put(ServerboundMovePlayerPacket.class, 1.0);
+        PACKET_WEIGHTS.put(ServerboundMovePlayerPacket.Pos.class, 1.0);
+        PACKET_WEIGHTS.put(ServerboundMovePlayerPacket.PosRot.class, 1.0);
+        PACKET_WEIGHTS.put(ServerboundMovePlayerPacket.Rot.class, 1.0);
+        PACKET_WEIGHTS.put(ServerboundMovePlayerPacket.StatusOnly.class, 1.0);
     }
 
     public LGPacketInjector(LightGuard plugin) {
@@ -73,7 +52,7 @@ public class LGPacketInjector {
     }
 
     public void injectPlayer(Player player, final ProtocolPlayer protocolPlayer) {
-        Channel channel = ((CraftPlayer) player).getHandle().playerConnection.networkManager.channel;
+        Channel channel = ((CraftPlayer) player).getHandle().connection.connection.channel;
 
         if (channel.pipeline().get("lg_prelogin_raw") != null) {
             channel.pipeline().remove("lg_prelogin_raw");
@@ -81,16 +60,16 @@ public class LGPacketInjector {
 
         if (channel.pipeline().get("lg_check") == null) {
             ChannelDuplexHandler checkHandler = new ChannelDuplexHandler() {
+
                 @Override
                 public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
 
-                    if (msg instanceof net.minecraft.server.v1_16_R3.PacketPlayInCloseWindow) {
+                    if (msg instanceof ServerboundContainerClosePacket) {
                         protocolPlayer.setInventoryState(false, -1);
-                    } else if (msg instanceof net.minecraft.server.v1_16_R3.PacketPlayInWindowClick) {
-                        net.minecraft.server.v1_16_R3.PacketPlayInWindowClick clickPacket =
-                                (net.minecraft.server.v1_16_R3.PacketPlayInWindowClick) msg;
+                    } else if (msg instanceof ServerboundContainerClickPacket) {
+                        ServerboundContainerClickPacket clickPacket = (ServerboundContainerClickPacket) msg;
 
-                        if (clickPacket.b() == 0) {
+                        if (clickPacket.getContainerId() == 0) {
                             protocolPlayer.setInventoryState(true, 0);
                         }
                     }
@@ -100,7 +79,7 @@ public class LGPacketInjector {
                     if (protocolPlayer.getRateLimiter().addAndCheck(weight)) {
                         plugin.getLogger().warning("Rate Limit Exceeded: " + player.getName());
                         plugin.getActionQueue().pushKick(player, "Excessive Packet Sending (Rate Limit)");
-                        releaseMessage(msg);
+                        ReferenceCountUtil.safeRelease(msg);
                         return;
                     }
 
@@ -108,7 +87,7 @@ public class LGPacketInjector {
 
                     try {
                         if (!plugin.getDispatcher().dispatch(msg, protocolPlayer)) {
-                            releaseMessage(msg);
+                            ReferenceCountUtil.safeRelease(msg);
                             return;
                         }
                     } catch (Exception e) {
@@ -121,35 +100,29 @@ public class LGPacketInjector {
                 @Override
                 public void write(ChannelHandlerContext ctx, Object msg, ChannelPromise promise) throws Exception {
                     try {
-                        if (msg instanceof net.minecraft.server.v1_16_R3.PacketPlayOutOpenWindow && WINDOW_ID_FIELD != null) {
-                            int windowId = (int) WINDOW_ID_FIELD.get(msg);
-                            protocolPlayer.setInventoryState(true, windowId);
+                        if (msg instanceof ClientboundOpenScreenPacket) {
+                            ClientboundOpenScreenPacket openScreen = (ClientboundOpenScreenPacket) msg;
+                            protocolPlayer.setInventoryState(true, openScreen.getContainerId());
 
-                        } else if (msg instanceof net.minecraft.server.v1_16_R3.PacketPlayOutPosition && POS_X_FIELD != null) {
-                            java.util.Set<?> flags = (java.util.Set<?>) POS_FLAGS_FIELD.get(msg);
-                            boolean hasRelativeCoord = false;
+                        } else if (msg instanceof ClientboundPlayerPositionPacket) {
+                            ClientboundPlayerPositionPacket posPacket = (ClientboundPlayerPositionPacket) msg;
 
-                            if (flags != null) {
-                                for (Object f : flags) {
-                                    String name = f.toString();
-                                    if (name.equals("X") || name.equals("Y") || name.equals("Z")) {
-                                        hasRelativeCoord = true;
-                                        break;
-                                    }
-                                }
-                            }
+                            boolean hasRelativeCoord = posPacket.relatives().contains(Relative.X) ||
+                                    posPacket.relatives().contains(Relative.Y) ||
+                                    posPacket.relatives().contains(Relative.Z);
 
                             if (!hasRelativeCoord) {
-                                double safeX = (double) POS_X_FIELD.get(msg);
-                                double safeY = (double) POS_Y_FIELD.get(msg);
-                                double safeZ = (double) POS_Z_FIELD.get(msg);
-                                protocolPlayer.setLastLocation(safeX, safeY, safeZ);
+                                protocolPlayer.setLastLocation(
+                                        posPacket.change().position().x,
+                                        posPacket.change().position().y,
+                                        posPacket.change().position().z
+                                );
                             }
                             protocolPlayer.markTeleport();
 
-                        } else if (msg instanceof net.minecraft.server.v1_16_R3.PacketPlayOutKeepAlive && KEEPALIVE_ID_FIELD != null) {
-                            long id = (long) KEEPALIVE_ID_FIELD.get(msg);
-                            protocolPlayer.getKeepAliveTracker().onKeepAliveSent(id);
+                        } else if (msg instanceof ClientboundKeepAlivePacket) {
+                            ClientboundKeepAlivePacket keepAlive = (ClientboundKeepAlivePacket) msg;
+                            protocolPlayer.getKeepAliveTracker().onKeepAliveSent(keepAlive.getId());
                         }
                     } catch (Throwable ignored) {}
 
@@ -167,23 +140,10 @@ public class LGPacketInjector {
 
     public void removePlayer(Player player) {
         try {
-            Channel channel = ((CraftPlayer) player).getHandle().playerConnection.networkManager.channel;
+            Channel channel = ((CraftPlayer) player).getHandle().connection.connection.channel;
             if (channel != null && channel.pipeline().get("lg_check") != null) {
                 channel.pipeline().remove("lg_check");
             }
         } catch (Exception ignored) { }
-    }
-
-    private void releaseMessage(Object msg) {
-        try {
-            if (msg instanceof net.minecraft.server.v1_16_R3.PacketPlayInCustomPayload) {
-                net.minecraft.server.v1_16_R3.PacketPlayInCustomPayload p = (net.minecraft.server.v1_16_R3.PacketPlayInCustomPayload) msg;
-                if (p.data != null) {
-                    ReferenceCountUtil.safeRelease(p.data);
-                }
-            } else {
-                ReferenceCountUtil.safeRelease(msg);
-            }
-        } catch (Exception ignored) {}
     }
 }

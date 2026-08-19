@@ -3,7 +3,7 @@ package com.mertout.lightguard.checks.impl;
 import com.mertout.lightguard.LightGuard;
 import com.mertout.lightguard.checks.Check;
 import com.mertout.lightguard.data.ProtocolPlayer;
-import net.minecraft.server.v1_16_R3.PacketPlayInAbilities;
+import net.minecraft.network.protocol.game.ServerboundPlayerAbilitiesPacket;
 
 public class AbilitiesCheck extends Check {
 
@@ -13,10 +13,10 @@ public class AbilitiesCheck extends Check {
 
     @Override
     public boolean check(Object packet, ProtocolPlayer player) {
-        if (!(packet instanceof PacketPlayInAbilities)) return true;
+        if (!(packet instanceof ServerboundPlayerAbilitiesPacket)) return true;
 
         try {
-            PacketPlayInAbilities abilities = (PacketPlayInAbilities) packet;
+            ServerboundPlayerAbilitiesPacket abilities = (ServerboundPlayerAbilitiesPacket) packet;
 
             if (!player.isCreativeOrSpectator()) {
                 if (abilities.isFlying() && !player.isAllowedFlight()) {

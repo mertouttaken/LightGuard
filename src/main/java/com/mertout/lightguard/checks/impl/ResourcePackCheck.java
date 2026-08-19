@@ -3,7 +3,7 @@ package com.mertout.lightguard.checks.impl;
 import com.mertout.lightguard.LightGuard;
 import com.mertout.lightguard.checks.Check;
 import com.mertout.lightguard.data.ProtocolPlayer;
-import net.minecraft.server.v1_16_R3.PacketPlayInResourcePackStatus;
+import net.minecraft.network.protocol.common.ServerboundResourcePackPacket;
 
 public class ResourcePackCheck extends Check {
 
@@ -13,11 +13,11 @@ public class ResourcePackCheck extends Check {
 
     @Override
     public boolean check(Object packet, ProtocolPlayer player) {
-        if (!(packet instanceof PacketPlayInResourcePackStatus)) return true;
+        if (!(packet instanceof ServerboundResourcePackPacket)) return true;
 
         try {
-            PacketPlayInResourcePackStatus statusPacket = (PacketPlayInResourcePackStatus) packet;
-            if (statusPacket.status == null) {
+            ServerboundResourcePackPacket statusPacket = (ServerboundResourcePackPacket) packet;
+            if (statusPacket.action() == null) {
                 return false;
             }
         } catch (Throwable t) {

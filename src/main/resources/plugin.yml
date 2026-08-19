@@ -1,9 +1,9 @@
 name: LightGuard
-version: 2.0
+version: 3.0
 main: com.mertout.lightguard.LightGuard
-api-version: 1.16
+api-version: "1.21"
 authors: [mertout]
-description: Advanced Packet-Based Anti-Crash & Exploit Protection System By AI
+description: Advanced Packet-Based Anti-Crash & Exploit Protection System By AI (1.21.4 Native)
 
 commands:
   lg:

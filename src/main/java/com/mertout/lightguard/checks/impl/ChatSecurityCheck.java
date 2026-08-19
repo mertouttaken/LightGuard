@@ -3,30 +3,9 @@ package com.mertout.lightguard.checks.impl;
 import com.mertout.lightguard.LightGuard;
 import com.mertout.lightguard.checks.Check;
 import com.mertout.lightguard.data.ProtocolPlayer;
-import net.minecraft.server.v1_16_R3.PacketPlayInChat;
-
-import java.lang.invoke.MethodHandles;
-import java.lang.invoke.VarHandle;
-import java.lang.reflect.Field;
+import net.minecraft.network.protocol.game.ServerboundChatPacket;
 
 public class ChatSecurityCheck extends Check {
-
-    private static final VarHandle MSG_FIELD;
-
-    static {
-        VarHandle msg = null;
-        try {
-            MethodHandles.Lookup lookup = MethodHandles.privateLookupIn(PacketPlayInChat.class, MethodHandles.lookup());
-            for (Field field : PacketPlayInChat.class.getDeclaredFields()) {
-                if (field.getType() == String.class) {
-                    field.setAccessible(true);
-                    msg = lookup.unreflectVarHandle(field);
-                    break;
-                }
-            }
-        } catch (Exception ignored) {}
-        MSG_FIELD = msg;
-    }
 
     private final boolean blockZalgo;
 
@@ -37,12 +16,12 @@ public class ChatSecurityCheck extends Check {
 
     @Override
     public boolean check(Object packet, ProtocolPlayer player) {
-        if (!(packet instanceof PacketPlayInChat)) return true;
+        if (!(packet instanceof ServerboundChatPacket)) return true;
 
         try {
-            if (MSG_FIELD == null) return true;
+            ServerboundChatPacket chatPacket = (ServerboundChatPacket) packet;
+            String message = chatPacket.message();
 
-            String message = (String) MSG_FIELD.get(packet);
             if (message == null || message.isEmpty()) return true;
 
             if (containsControlChars(message)) {

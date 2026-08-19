@@ -3,30 +3,9 @@ package com.mertout.lightguard.checks.impl;
 import com.mertout.lightguard.LightGuard;
 import com.mertout.lightguard.checks.Check;
 import com.mertout.lightguard.data.ProtocolPlayer;
-import net.minecraft.server.v1_16_R3.PacketPlayInTabComplete;
-
-import java.lang.invoke.MethodHandles;
-import java.lang.invoke.VarHandle;
-import java.lang.reflect.Field;
+import net.minecraft.network.protocol.game.ServerboundCommandSuggestionPacket;
 
 public class TabCheck extends Check {
-
-    private static final VarHandle BUFFER_FIELD;
-
-    static {
-        VarHandle buffer = null;
-        try {
-            MethodHandles.Lookup lookup = MethodHandles.privateLookupIn(PacketPlayInTabComplete.class, MethodHandles.lookup());
-            for (Field field : PacketPlayInTabComplete.class.getDeclaredFields()) {
-                if (field.getType() == String.class) {
-                    field.setAccessible(true);
-                    buffer = lookup.unreflectVarHandle(field);
-                    break;
-                }
-            }
-        } catch (Exception ignored) {}
-        BUFFER_FIELD = buffer;
-    }
 
     private final int maxLength;
     private final String[] blockedSubstringsArray;
@@ -47,18 +26,18 @@ public class TabCheck extends Check {
 
     @Override
     public boolean check(Object packet, ProtocolPlayer player) {
-        if (!(packet instanceof PacketPlayInTabComplete)) return true;
+        if (!(packet instanceof ServerboundCommandSuggestionPacket)) return true;
 
         try {
-            if (BUFFER_FIELD == null) return true;
-
             long now = System.currentTimeMillis();
 
             if (player.incrementAndGetTabCount(now) > 50) {
                 return false;
             }
 
-            String buffer = (String) BUFFER_FIELD.get(packet);
+            ServerboundCommandSuggestionPacket tabPacket = (ServerboundCommandSuggestionPacket) packet;
+            String buffer = tabPacket.getCommand();
+
             if (buffer == null || buffer.isEmpty()) return true;
 
             if (buffer.length() > maxLength) {

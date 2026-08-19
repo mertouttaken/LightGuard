@@ -1,16 +1,14 @@
 # ============================================================== #
 #                                                                #
-#                🛡️ LIGHTGUARD SECURITY V2 🛡️                 #
+#                🛡️ LIGHTGUARD SECURITY V3.0 🛡️                #
 #            Advanced Anti-Crash & Exploit Protection            #
+#                 [1.21.4 Paperweight Native]                    #
 #                                                                #
 # ============================================================== #
 
 settings:
-  # The prefix used in LightGuard's console and in-game messages.
   prefix: "&8[&cLightGuard&8] &7"
 
-  # The layout used when a player is kicked for a security violation.
-  # Available placeholders: %player%, %check%, %ping%
   kick-layout:
     - "&4&m-----------------------------------------"
     - "&c&lLIGHTGUARD SECURITY"
@@ -23,24 +21,18 @@ settings:
     - "&7You have violated server security."
     - "&4&m-----------------------------------------"
 
-  # The Sentinel system monitors LightGuard's internal health.
-  # If a check throws too many errors, it disables it automatically to prevent TPS loss.
   sentinel:
     enabled: true
     safe-mode-threshold: 10
-    silent-failures: false # If true, errors are hidden from the console.
-    geyser-support: true # Relaxes certain movement/packet checks for Bedrock players.
+    silent-failures: false
+    geyser-support: true
 
-    # Checks listed here are considered "Critical".
-    # Sentinel will NEVER disable these checks, even if they throw errors.
     critical-checks:
-      - "NBTExploit"
-      - "ItemExploit"
-      - "Payload"
-      - "Flood"
-      - "PacketSize"
+      - "ItemExploitCheck"
+      - "PayloadCheck"
+      - "PacketSizeCheck"
+      - "WindowCheck"
 
-  # Central Radar
   radar:
     burst-threshold: 12
     window-ms: 4000
@@ -66,11 +58,10 @@ checks:
   packet-size:
     enabled: true
     max-string-length: 256
-    max-buffer-size: 16384
     per-packet-limit: 32000
     excluded-packets:
-      - "PacketPlayInBEdit"
-      - "PacketPlayInCustomPayload"
+      - "ServerboundEditBookPacket"
+      - "ServerboundCustomPayloadPacket"
 
   window:
     enabled: true
@@ -121,7 +112,6 @@ checks:
     prevent-invalid-entity: true
     prevent-armorstand-spam: true
 
-  # Hybrid Rate Limiter
   flood:
     max-threshold: 500.0
     decay-per-second: 150.0
@@ -135,26 +125,22 @@ checks:
     printer-threshold: 6
     prevent-illegal-blocks: true
     illegal-blocks:
-      - "COMMAND_BLOCK"
-      - "REPEATING_COMMAND_BLOCK"
-      - "CHAIN_COMMAND_BLOCK"
-      - "STRUCTURE_VOID"
-      - "STRUCTURE_BLOCK"
-      - "JIGSAW"
-      - "END_PORTAL_FRAME"
-      - "LIGHT"
+      - "minecraft:command_block"
+      - "minecraft:repeating_command_block"
+      - "minecraft:chain_command_block"
+      - "minecraft:structure_void"
+      - "minecraft:structure_block"
+      - "minecraft:jigsaw"
+      - "minecraft:end_portal_frame"
+      - "minecraft:light"
 
   item-exploit:
     enabled: true
-    max-nbt-size: 2048
     max-string-len: 100
     max-lore-size: 10
-    max-list-size: 100
-    max-array-size: 256
-    max-total-nodes: 1000
     max-depth: 7
     max-attributes: 7
-    max-attribute-value: 100
+    max-attribute-value: 100.0
     max-enchant-level: 20
     illegal-keys:
       - "run_command"
@@ -163,11 +149,6 @@ checks:
       - "Score"
       - "Selector"
       - "translation.test.invalid"
-    nbt-occurrences:
-      - "extra:15"
-      - "{:50"
-      - "translate:5"
-      - "score:5"
 
   position:
     enabled: true
@@ -186,13 +167,6 @@ checks:
     enabled: true
     max-size: 1024
     blocked-channels:
-      - "MC|BEdit"
-      - "MC|BSign"
-      - "MC|BOpen"
-      - "PacketPlayInUpdateSign"
-      - "WDL|INIT"
-      - "PERMISSIONS_REPL"
-      - "MC|TrList"
       - "minecraft:bedit"
       - "minecraft:bsign"
       - "minecraft:bopen"
@@ -267,18 +241,17 @@ packet-logger:
   players: []
   packet-mode: BLACKLIST
   packets:
-    - "PacketPlayInKeepAlive"
-    - "PacketPlayInFlying"
-    - "PacketPlayInPosition"
-    - "PacketPlayInLook"
-    - "PacketPlayInPositionLook"
+    - "ServerboundKeepAlivePacket"
+    - "ServerboundMovePlayerPacket"
+    - "ServerboundMovePlayerPacket$Pos"
+    - "ServerboundMovePlayerPacket$Rot"
+    - "ServerboundMovePlayerPacket$PosRot"
+    - "ServerboundMovePlayerPacket$StatusOnly"
 
 # ============================================================== #
 #                     GAMEPLAY MECHANICS                         #
 # ============================================================== #
 mechanics:
-
-  # --- Dupe & Economy Protections ---
   prevent-mule-dupe: true
   bed-duplication: true
   prevent-invalid-trade: true
@@ -287,7 +260,6 @@ mechanics:
   prevent-hopper-dupe: true
   prevent-bed-crop-dupe: true
 
-  # --- Exploit & Crash Protections ---
   max-arrow-velocity: 12.0
   prevent-portal-break: true
   null-chunk: true
@@ -298,7 +270,6 @@ mechanics:
   prevent-piston-crash: true
   prevent-end-teleport-exploits: true
 
-  # --- Lag & Spam Mitigations ---
   nether-portal-delay: true
   shears-cooldown: true
   break-close-inventory: true

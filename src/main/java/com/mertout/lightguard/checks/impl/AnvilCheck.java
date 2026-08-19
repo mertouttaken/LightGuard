@@ -3,30 +3,9 @@ package com.mertout.lightguard.checks.impl;
 import com.mertout.lightguard.LightGuard;
 import com.mertout.lightguard.checks.Check;
 import com.mertout.lightguard.data.ProtocolPlayer;
-import net.minecraft.server.v1_16_R3.PacketPlayInItemName;
-
-import java.lang.invoke.MethodHandles;
-import java.lang.invoke.VarHandle;
-import java.lang.reflect.Field;
+import net.minecraft.network.protocol.game.ServerboundRenameItemPacket;
 
 public class AnvilCheck extends Check {
-
-    private static final VarHandle NAME_FIELD;
-
-    static {
-        VarHandle name = null;
-        try {
-            MethodHandles.Lookup lookup = MethodHandles.privateLookupIn(PacketPlayInItemName.class, MethodHandles.lookup());
-            for (Field field : PacketPlayInItemName.class.getDeclaredFields()) {
-                if (field.getType() == String.class) {
-                    field.setAccessible(true);
-                    name = lookup.unreflectVarHandle(field);
-                    break;
-                }
-            }
-        } catch (Exception ignored) {}
-        NAME_FIELD = name;
-    }
 
     public AnvilCheck(LightGuard plugin) {
         super(plugin);
@@ -34,16 +13,16 @@ public class AnvilCheck extends Check {
 
     @Override
     public boolean check(Object packet, ProtocolPlayer player) {
-        if (!(packet instanceof PacketPlayInItemName)) return true;
+        if (!(packet instanceof ServerboundRenameItemPacket)) return true;
 
         try {
-            if (NAME_FIELD == null) return true;
-
             if (!player.isAnvilOpen()) {
                 return false;
             }
 
-            String newName = (String) NAME_FIELD.get(packet);
+            ServerboundRenameItemPacket renamePacket = (ServerboundRenameItemPacket) packet;
+            String newName = renamePacket.getName();
+
             if (newName == null) return true;
 
             int len = newName.length();
@@ -93,9 +72,8 @@ public class AnvilCheck extends Check {
 
     private boolean containsLog4Shell(String msg) {
         if (msg == null || msg.isEmpty()) return false;
-        return msg.contains("${jndi:") || msg.contains("${JNDI:") ||
-                msg.contains("${ldap:") || msg.contains("${LDAP:") ||
-                msg.contains("${rmi:")  || msg.contains("${RMI:")  ||
-                msg.contains("${dns:")  || msg.contains("${DNS:");
+        String lower = msg.toLowerCase();
+        return lower.contains("${jndi:") || lower.contains("${ldap:") ||
+                lower.contains("${rmi:")  || lower.contains("${dns:");
     }
 }

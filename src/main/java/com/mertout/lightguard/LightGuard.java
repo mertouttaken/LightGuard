@@ -88,7 +88,7 @@ public class LightGuard extends JavaPlugin {
             }
         }, 20L, 20L);
 
-        getLogger().info("§aLightGuard V2 (mert.out) Protection ACTIVE!");
+        getLogger().info("§aLightGuard V3.0 (1.21.4 Zero-Latency) Protection ACTIVE!");
     }
 
     @Override

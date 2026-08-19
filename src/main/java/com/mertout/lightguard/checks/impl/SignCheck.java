@@ -3,35 +3,10 @@ package com.mertout.lightguard.checks.impl;
 import com.mertout.lightguard.LightGuard;
 import com.mertout.lightguard.checks.Check;
 import com.mertout.lightguard.data.ProtocolPlayer;
-import net.minecraft.server.v1_16_R3.BlockPosition;
-import net.minecraft.server.v1_16_R3.PacketPlayInUpdateSign;
-
-import java.lang.invoke.MethodHandles;
-import java.lang.invoke.VarHandle;
-import java.lang.reflect.Field;
+import net.minecraft.core.BlockPos;
+import net.minecraft.network.protocol.game.ServerboundSignUpdatePacket;
 
 public class SignCheck extends Check {
-
-    private static final VarHandle LINES_FIELD;
-    private static final VarHandle POS_FIELD;
-
-    static {
-        VarHandle pos = null;
-        VarHandle lines = null;
-        try {
-            MethodHandles.Lookup lookup = MethodHandles.privateLookupIn(PacketPlayInUpdateSign.class, MethodHandles.lookup());
-            for (Field field : PacketPlayInUpdateSign.class.getDeclaredFields()) {
-                field.setAccessible(true);
-                if (field.getType() == BlockPosition.class && pos == null) {
-                    pos = lookup.unreflectVarHandle(field);
-                } else if (field.getType() == String[].class && lines == null) {
-                    lines = lookup.unreflectVarHandle(field);
-                }
-            }
-        } catch (Exception ignored) {}
-        POS_FIELD = pos;
-        LINES_FIELD = lines;
-    }
 
     private static final String[] JSON_KEYS = {
             "\"text\"", "'text'",
@@ -56,12 +31,12 @@ public class SignCheck extends Check {
 
     @Override
     public boolean check(Object packet, ProtocolPlayer player) {
-        if (!(packet instanceof PacketPlayInUpdateSign)) return true;
+        if (!(packet instanceof ServerboundSignUpdatePacket)) return true;
 
         try {
-            if (POS_FIELD == null || LINES_FIELD == null) return true;
+            ServerboundSignUpdatePacket signPacket = (ServerboundSignUpdatePacket) packet;
+            BlockPos pos = signPacket.getPos();
 
-            BlockPosition pos = (BlockPosition) POS_FIELD.get(packet);
             if (pos == null) return true;
 
             double pX = player.getLastX();
@@ -83,11 +58,14 @@ public class SignCheck extends Check {
 
             String worldName = player.getCurrentWorldName();
 
-            if (!plugin.getWorldChunkManager().isChunkLoadedAsynchronously(worldName, pos.getX() >> 4, pos.getZ() >> 4)) {
+            int chunkX = (int) Math.floor(pos.getX()) >> 4;
+            int chunkZ = (int) Math.floor(pos.getZ()) >> 4;
+
+            if (!plugin.getWorldChunkManager().isChunkLoadedAsynchronously(worldName, chunkX, chunkZ)) {
                 return false;
             }
 
-            String[] lines = (String[]) LINES_FIELD.get(packet);
+            String[] lines = signPacket.getLines();
             if (lines == null || lines.length != 4) return true;
 
             for (String line : lines) {

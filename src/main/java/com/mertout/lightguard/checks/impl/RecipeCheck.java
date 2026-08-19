@@ -3,7 +3,8 @@ package com.mertout.lightguard.checks.impl;
 import com.mertout.lightguard.LightGuard;
 import com.mertout.lightguard.checks.Check;
 import com.mertout.lightguard.data.ProtocolPlayer;
-import net.minecraft.server.v1_16_R3.*;
+import net.minecraft.network.protocol.game.ServerboundPlaceRecipePacket;
+import net.minecraft.network.protocol.game.ServerboundRecipeBookSeenRecipePacket;
 
 public class RecipeCheck extends Check {
 
@@ -15,7 +16,7 @@ public class RecipeCheck extends Check {
 
     @Override
     public boolean check(Object packet, ProtocolPlayer player) {
-        if (packet instanceof PacketPlayInAutoRecipe || packet instanceof PacketPlayInRecipeDisplayed) {
+        if (packet instanceof ServerboundPlaceRecipePacket || packet instanceof ServerboundRecipeBookSeenRecipePacket) {
             try {
                 if (player.incrementAndGetRecipeCount(System.currentTimeMillis()) > MAX_RECIPE_PACKETS) {
                     return false;

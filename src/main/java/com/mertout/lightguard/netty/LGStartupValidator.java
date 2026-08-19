@@ -5,9 +5,9 @@ import io.netty.channel.Channel;
 import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
-import net.minecraft.server.v1_16_R3.ServerConnection;
+import net.minecraft.server.network.ServerConnectionListener;
 import org.bukkit.Bukkit;
-import org.bukkit.craftbukkit.v1_16_R3.CraftServer;
+import org.bukkit.craftbukkit.CraftServer;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.ParameterizedType;
@@ -21,13 +21,13 @@ public class LGStartupValidator {
 
     public static boolean validateAndInject(LightGuard plugin) {
         try {
-            ServerConnection serverConnection = ((CraftServer) Bukkit.getServer()).getServer().getServerConnection();
+            ServerConnectionListener serverConnection = ((CraftServer) Bukkit.getServer()).getServer().getConnection();
             if (serverConnection == null) {
                 return false;
             }
 
             if (CHANNELS_FIELD == null) {
-                for (Field f : ServerConnection.class.getDeclaredFields()) {
+                for (Field f : ServerConnectionListener.class.getDeclaredFields()) {
                     if (List.class.isAssignableFrom(f.getType())) {
                         f.setAccessible(true);
 
@@ -81,7 +81,7 @@ public class LGStartupValidator {
 
     public static void uninject() {
         try {
-            ServerConnection serverConnection = ((CraftServer) Bukkit.getServer()).getServer().getServerConnection();
+            ServerConnectionListener serverConnection = ((CraftServer) Bukkit.getServer()).getServer().getConnection();
             if (serverConnection == null || CHANNELS_FIELD == null) return;
 
             @SuppressWarnings("unchecked")

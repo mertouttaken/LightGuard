@@ -3,28 +3,9 @@ package com.mertout.lightguard.checks.impl;
 import com.mertout.lightguard.LightGuard;
 import com.mertout.lightguard.checks.Check;
 import com.mertout.lightguard.data.ProtocolPlayer;
-import net.minecraft.server.v1_16_R3.PacketPlayInFlying;
-
-import java.lang.invoke.MethodHandles;
-import java.lang.invoke.VarHandle;
+import net.minecraft.network.protocol.game.ServerboundMovePlayerPacket;
 
 public class PositionCheck extends Check {
-
-    private static final VarHandle X, Y, Z, HAS_POS, YAW, PITCH, HAS_LOOK, ON_GROUND;
-
-    static {
-        try {
-            MethodHandles.Lookup lookup = MethodHandles.lookup();
-            X = MethodHandles.privateLookupIn(PacketPlayInFlying.class, lookup).findVarHandle(PacketPlayInFlying.class, "x", double.class);
-            Y = MethodHandles.privateLookupIn(PacketPlayInFlying.class, lookup).findVarHandle(PacketPlayInFlying.class, "y", double.class);
-            Z = MethodHandles.privateLookupIn(PacketPlayInFlying.class, lookup).findVarHandle(PacketPlayInFlying.class, "z", double.class);
-            HAS_POS = MethodHandles.privateLookupIn(PacketPlayInFlying.class, lookup).findVarHandle(PacketPlayInFlying.class, "hasPos", boolean.class);
-            YAW = MethodHandles.privateLookupIn(PacketPlayInFlying.class, lookup).findVarHandle(PacketPlayInFlying.class, "yaw", float.class);
-            PITCH = MethodHandles.privateLookupIn(PacketPlayInFlying.class, lookup).findVarHandle(PacketPlayInFlying.class, "pitch", float.class);
-            HAS_LOOK = MethodHandles.privateLookupIn(PacketPlayInFlying.class, lookup).findVarHandle(PacketPlayInFlying.class, "hasLook", boolean.class);
-            ON_GROUND = MethodHandles.privateLookupIn(PacketPlayInFlying.class, lookup).findVarHandle(PacketPlayInFlying.class, "f", boolean.class);
-        } catch (Exception e) { throw new ExceptionInInitializerError(e); }
-    }
 
     private final double maxOffsetSq;
     private final double maxElytraOffsetSq;
@@ -45,13 +26,14 @@ public class PositionCheck extends Check {
 
     @Override
     public boolean check(Object packet, ProtocolPlayer player) {
-        if (!(packet instanceof PacketPlayInFlying)) return true;
+        if (!(packet instanceof ServerboundMovePlayerPacket)) return true;
 
         try {
-            boolean hasLook = (boolean) HAS_LOOK.get(packet);
-            if (hasLook) {
-                float yaw = (float) YAW.get(packet);
-                float pitch = (float) PITCH.get(packet);
+            ServerboundMovePlayerPacket movePacket = (ServerboundMovePlayerPacket) packet;
+
+            if (movePacket.hasRotation()) {
+                float yaw = movePacket.getYRot(0);
+                float pitch = movePacket.getXRot(0);
 
                 if (!Float.isFinite(yaw) || !Float.isFinite(pitch)) {
                     return false;
@@ -66,12 +48,11 @@ public class PositionCheck extends Check {
                 }
             }
 
-            boolean hasPos = (boolean) HAS_POS.get(packet);
-            if (!hasPos) return true;
+            if (!movePacket.hasPosition()) return true;
 
-            double x = (double) X.get(packet);
-            double y = (double) Y.get(packet);
-            double z = (double) Z.get(packet);
+            double x = movePacket.getX(player.getLastX());
+            double y = movePacket.getY(player.getLastY());
+            double z = movePacket.getZ(player.getLastZ());
 
             if (!Double.isFinite(x) || !Double.isFinite(y) || !Double.isFinite(z)) {
                 return false;
@@ -81,17 +62,15 @@ public class PositionCheck extends Check {
                 return false;
             }
 
-            // Math.floor, not a cast: casting truncates toward zero, so any coordinate in
-            // (-16, 0) would resolve to chunk 0 instead of -1 and look unloaded.
             int chunkX = (int) Math.floor(x) >> 4;
             int chunkZ = (int) Math.floor(z) >> 4;
 
             String worldName = player.getCurrentWorldName();
 
-            if (!plugin.getWorldChunkManager().isChunkLoadedAsynchronously(worldName, chunkX, chunkZ)) {
-                if (!player.isInTeleportGrace()) {
-                    return false;
-                }
+            boolean chunkLoaded = plugin.getWorldChunkManager().isChunkLoadedAsynchronously(worldName, chunkX, chunkZ);
+
+            if (!chunkLoaded && !player.isInTeleportGrace()) {
+                return false;
             }
 
             double lastX = player.getLastX();
@@ -103,12 +82,6 @@ public class PositionCheck extends Check {
                 double diffY = y - lastY;
                 double diffZ = z - lastZ;
 
-                if (diffY > 0 && Math.abs(diffY - 0.1) < 1e-4) {
-                    if (!player.isGliding() && !player.isInLiquid()) {
-                        return false;
-                    }
-                }
-
                 double epsilon = 1e-5;
                 boolean isXInteger = Math.abs(Math.abs(diffX) - Math.round(Math.abs(diffX))) < epsilon;
                 boolean isYInteger = Math.abs(Math.abs(diffY) - Math.round(Math.abs(diffY))) < epsilon;
@@ -117,6 +90,7 @@ public class PositionCheck extends Check {
                 if ((Math.abs(diffX) >= 10.0 && isXInteger) ||
                         (Math.abs(diffZ) >= 10.0 && isZInteger) ||
                         (Math.abs(diffY) >= 10.0 && isYInteger)) {
+                    player.setLastLocation(x, y, z);
                     return false;
                 }
 
@@ -125,13 +99,16 @@ public class PositionCheck extends Check {
 
                 if (horizontalDistSq > maxOffsetSq) {
                     if (!player.isGliding()) {
+                        player.setLastLocation(x, y, z);
                         return false;
                     } else if (horizontalDistSq > maxElytraOffsetSq) {
+                        player.setLastLocation(x, y, z);
                         return false;
                     }
                 }
 
                 if (verticalDist > maxVerticalDist) {
+                    player.setLastLocation(x, y, z);
                     return false;
                 }
 
@@ -139,14 +116,13 @@ public class PositionCheck extends Check {
                     double totalDistSq = horizontalDistSq + (diffY * diffY);
                     double combinedLimitSq = maxElytraOffsetSq + (maxVerticalDist * maxVerticalDist);
                     if (totalDistSq > combinedLimitSq) {
+                        player.setLastLocation(x, y, z);
                         return false;
                     }
                 }
             }
 
-            if (!player.isInTeleportGrace()) {
-                player.setLastLocation(x, y, z);
-            }
+            player.setLastLocation(x, y, z);
 
         } catch (Throwable t) {
             return false;
