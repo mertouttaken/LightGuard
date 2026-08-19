@@ -7,6 +7,13 @@ import net.minecraft.network.protocol.game.ServerboundMovePlayerPacket;
 
 public class PositionCheck extends Check {
 
+    /** Far outside any legal world height; only a crafted packet reaches it. */
+    private static final double ABSURD_Y = 1_000_000.0;
+
+    /** A whole-block jump of this size or more is the signature of a coordinate-exploit teleport. */
+    private static final double INTEGER_JUMP_THRESHOLD = 10.0;
+    private static final double INTEGER_EPSILON = 1e-5;
+
     private final double maxOffsetSq;
     private final double maxElytraOffsetSq;
     private final double maxVerticalDist;
@@ -32,20 +39,12 @@ public class PositionCheck extends Check {
             ServerboundMovePlayerPacket movePacket = (ServerboundMovePlayerPacket) packet;
 
             if (movePacket.hasRotation()) {
-                float yaw = movePacket.getYRot(0);
-                float pitch = movePacket.getXRot(0);
+                float yaw = movePacket.getYRot(0.0F);
+                float pitch = movePacket.getXRot(0.0F);
 
-                if (!Float.isFinite(yaw) || !Float.isFinite(pitch)) {
-                    return false;
-                }
-
-                if (Math.abs(pitch) > 90.0F) {
-                    return false;
-                }
-
-                if (Math.abs(yaw) > 3.0E7F) {
-                    return false;
-                }
+                if (!Float.isFinite(yaw) || !Float.isFinite(pitch)) return false;
+                if (Math.abs(pitch) > 90.0F) return false;
+                if (Math.abs(yaw) > 3.0E7F) return false;
             }
 
             if (!movePacket.hasPosition()) return true;
@@ -54,74 +53,49 @@ public class PositionCheck extends Check {
             double y = movePacket.getY(player.getLastY());
             double z = movePacket.getZ(player.getLastZ());
 
-            if (!Double.isFinite(x) || !Double.isFinite(y) || !Double.isFinite(z)) {
-                return false;
-            }
+            if (!Double.isFinite(x) || !Double.isFinite(y) || !Double.isFinite(z)) return false;
 
-            if (Math.abs(x) > outOfWorldLimit || Math.abs(z) > outOfWorldLimit || Math.abs(y) > 1000000) {
+            if (Math.abs(x) > outOfWorldLimit || Math.abs(z) > outOfWorldLimit || Math.abs(y) > ABSURD_Y) {
                 return false;
             }
 
             int chunkX = (int) Math.floor(x) >> 4;
             int chunkZ = (int) Math.floor(z) >> 4;
 
-            String worldName = player.getCurrentWorldName();
+            boolean chunkLoaded = plugin.getWorldChunkManager()
+                    .isChunkLoadedAsynchronously(player.getCurrentWorldName(), chunkX, chunkZ);
 
-            boolean chunkLoaded = plugin.getWorldChunkManager().isChunkLoadedAsynchronously(worldName, chunkX, chunkZ);
+            if (!chunkLoaded && !player.isInTeleportGrace()) return false;
 
-            if (!chunkLoaded && !player.isInTeleportGrace()) {
-                return false;
-            }
+            if (player.hasBaseline() && !player.isInTeleportGrace()) {
+                double diffX = x - player.getLastX();
+                double diffY = y - player.getLastY();
+                double diffZ = z - player.getLastZ();
 
-            double lastX = player.getLastX();
-            double lastY = player.getLastY();
-            double lastZ = player.getLastZ();
-
-            if (lastX != -1 && !player.isInTeleportGrace()) {
-                double diffX = x - lastX;
-                double diffY = y - lastY;
-                double diffZ = z - lastZ;
-
-                double epsilon = 1e-5;
-                boolean isXInteger = Math.abs(Math.abs(diffX) - Math.round(Math.abs(diffX))) < epsilon;
-                boolean isYInteger = Math.abs(Math.abs(diffY) - Math.round(Math.abs(diffY))) < epsilon;
-                boolean isZInteger = Math.abs(Math.abs(diffZ) - Math.round(Math.abs(diffZ))) < epsilon;
-
-                if ((Math.abs(diffX) >= 10.0 && isXInteger) ||
-                        (Math.abs(diffZ) >= 10.0 && isZInteger) ||
-                        (Math.abs(diffY) >= 10.0 && isYInteger)) {
-                    player.setLastLocation(x, y, z);
+                if (isIntegerJump(diffX) || isIntegerJump(diffY) || isIntegerJump(diffZ)) {
                     return false;
                 }
 
                 double horizontalDistSq = (diffX * diffX) + (diffZ * diffZ);
-                double verticalDist = Math.abs(diffY);
 
                 if (horizontalDistSq > maxOffsetSq) {
-                    if (!player.isGliding()) {
-                        player.setLastLocation(x, y, z);
-                        return false;
-                    } else if (horizontalDistSq > maxElytraOffsetSq) {
-                        player.setLastLocation(x, y, z);
+                    if (!player.isGliding() || horizontalDistSq > maxElytraOffsetSq) {
                         return false;
                     }
                 }
 
-                if (verticalDist > maxVerticalDist) {
-                    player.setLastLocation(x, y, z);
-                    return false;
-                }
+                if (Math.abs(diffY) > maxVerticalDist) return false;
 
                 if (player.isGliding()) {
                     double totalDistSq = horizontalDistSq + (diffY * diffY);
                     double combinedLimitSq = maxElytraOffsetSq + (maxVerticalDist * maxVerticalDist);
-                    if (totalDistSq > combinedLimitSq) {
-                        player.setLastLocation(x, y, z);
-                        return false;
-                    }
+                    if (totalDistSq > combinedLimitSq) return false;
                 }
             }
 
+            // Only reached when the movement was accepted. Recording a rejected position would
+            // measure the next legitimate packet against a place the server never moved the
+            // player to, turning one rejection into a cascade of them.
             player.setLastLocation(x, y, z);
 
         } catch (Throwable t) {
@@ -129,6 +103,12 @@ public class PositionCheck extends Check {
         }
 
         return true;
+    }
+
+    private static boolean isIntegerJump(double diff) {
+        double abs = Math.abs(diff);
+        if (abs < INTEGER_JUMP_THRESHOLD) return false;
+        return Math.abs(abs - Math.round(abs)) < INTEGER_EPSILON;
     }
 
     @Override

@@ -1,0 +1,37 @@
+plugins {
+    id 'java'
+    id 'io.papermc.paperweight.userdev' version '2.0.0-beta.14'
+}
+
+group = 'com.mertout.lightguard'
+version = '3.0-SNAPSHOT'
+
+java {
+    toolchain.languageVersion = JavaLanguageVersion.of(21)
+}
+
+repositories {
+    mavenCentral()
+    maven { url = 'https://repo.papermc.io/repository/maven-public/' }
+}
+
+dependencies {
+    // Brings in Paper's Mojang-mapped server jar plus its own transitive deps
+    // (Netty, Guava, the Bukkit API). Nothing else is needed: the plugin uses
+    // only NMS, Bukkit and Guava's CacheBuilder.
+    paperweight.paperDevBundle('1.21.4-R0.1-SNAPSHOT')
+}
+
+tasks {
+    compileJava {
+        options.encoding = 'UTF-8'
+        options.release = 21
+    }
+
+    processResources {
+        // Keeps plugin.yml's version in lockstep with the one declared above.
+        filesMatching('plugin.yml') {
+            expand version: project.version
+        }
+    }
+}

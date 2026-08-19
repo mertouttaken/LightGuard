@@ -8,14 +8,15 @@ import net.minecraft.network.protocol.game.ServerboundSignUpdatePacket;
 
 public class SignCheck extends Check {
 
+    /** Lower-case: compared against an already-lower-cased line. */
     private static final String[] JSON_KEYS = {
             "\"text\"", "'text'",
             "\"score\"", "'score'",
             "\"selector\"", "'selector'",
             "\"extra\"", "'extra'",
             "\"translate\"", "'translate'",
-            "\"clickEvent\"", "'clickEvent'",
-            "\"hoverEvent\"", "'hoverEvent'",
+            "\"clickevent\"", "'clickevent'",
+            "\"hoverevent\"", "'hoverevent'",
             "\"run_command\"", "'run_command'",
             "\"nbt\"", "'nbt'"
     };
@@ -43,7 +44,7 @@ public class SignCheck extends Check {
             double pY = player.getLastY();
             double pZ = player.getLastZ();
 
-            if (pX != -1 && !player.isInTeleportGrace()) {
+            if (player.hasBaseline() && !player.isInTeleportGrace()) {
                 double distX = pos.getX() - pX;
                 double distY = pos.getY() - pY;
                 double distZ = pos.getZ() - pZ;

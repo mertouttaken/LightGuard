@@ -5,23 +5,33 @@ import com.mertout.lightguard.checks.Check;
 import com.mertout.lightguard.data.ProtocolPlayer;
 import net.minecraft.network.protocol.game.ServerboundCommandSuggestionPacket;
 
+import java.util.List;
+import java.util.Locale;
+
+/**
+ * Guards command tab-completion.
+ *
+ * <p>The previous version rejected any buffer containing {@code @ = [ ] { }}, which meant
+ * tab-completing {@code /minecraft:give} or any selector argument dropped the packet and recorded a
+ * violation — twelve of those inside four seconds and ViolationRadar kicked the player. Those are
+ * ordinary command syntax, so screening is now limited to expression-evaluator crashers, injection
+ * payloads, a length ceiling and a rate limit, plus whatever the operator lists in config.
+ */
 public class TabCheck extends Check {
 
-    private final int maxLength;
-    private final String[] blockedSubstringsArray;
-    private final String[] blockedCharsArray;
+    private static final int MAX_REQUESTS_PER_SECOND = 50;
 
-    private static final String[] CRASH_CHARS = {"{", "}", "[", "]", "@", "=", "nbt"};
+    /** Plugin commands that evaluate their argument as an expression; the classic tab crashers. */
+    private static final String[] EXPRESSION_COMMANDS = {"//calc", "//eval", "//solve", "//math"};
+
+    private final int maxLength;
+    private final List<String> blockedSubstrings;
 
     public TabCheck(LightGuard plugin) {
         super(plugin);
         this.maxLength = plugin.getConfig().getInt("checks.tab.max-length", 256);
-
-        this.blockedSubstringsArray = plugin.getConfig().getStringList("checks.tab.block-contains")
-                .stream().map(String::toLowerCase).toArray(String[]::new);
-
-        this.blockedCharsArray = plugin.getConfig().getStringList("checks.tab.block-chars")
-                .stream().map(String::toLowerCase).toArray(String[]::new);
+        this.blockedSubstrings = plugin.getConfig().getStringList("checks.tab.block-contains")
+                .stream().map(v -> v.toLowerCase(Locale.ROOT)).toList();
     }
 
     @Override
@@ -29,45 +39,30 @@ public class TabCheck extends Check {
         if (!(packet instanceof ServerboundCommandSuggestionPacket)) return true;
 
         try {
-            long now = System.currentTimeMillis();
-
-            if (player.incrementAndGetTabCount(now) > 50) {
+            if (player.incrementAndGetTabCount(System.currentTimeMillis()) > MAX_REQUESTS_PER_SECOND) {
                 return false;
             }
 
-            ServerboundCommandSuggestionPacket tabPacket = (ServerboundCommandSuggestionPacket) packet;
-            String buffer = tabPacket.getCommand();
-
+            String buffer = ((ServerboundCommandSuggestionPacket) packet).getCommand();
             if (buffer == null || buffer.isEmpty()) return true;
 
-            if (buffer.length() > maxLength) {
+            if (buffer.length() > maxLength) return false;
+
+            String lower = buffer.toLowerCase(Locale.ROOT);
+
+            for (String prefix : EXPRESSION_COMMANDS) {
+                if (lower.startsWith(prefix)) return false;
+            }
+
+            if (lower.contains("${jndi:") || lower.contains("${ldap:")
+                    || lower.contains("${rmi:") || lower.contains("${dns:")) {
                 return false;
             }
 
-            for (String c : CRASH_CHARS) {
-                if (buffer.contains(c)) {
-                    return false;
-                }
+            for (String blocked : blockedSubstrings) {
+                if (lower.contains(blocked)) return false;
             }
 
-            String lowerBuffer = buffer.toLowerCase();
-
-            if (lowerBuffer.startsWith("//calc") || lowerBuffer.startsWith("//eval") ||
-                    lowerBuffer.startsWith("//solve") || lowerBuffer.startsWith("//math")) {
-                return false;
-            }
-
-            for (String c : blockedCharsArray) {
-                if (lowerBuffer.contains(c)) {
-                    return false;
-                }
-            }
-
-            for (String s : blockedSubstringsArray) {
-                if (lowerBuffer.contains(s)) {
-                    return false;
-                }
-            }
         } catch (Throwable t) {
             return false;
         }

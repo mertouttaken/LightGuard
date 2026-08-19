@@ -25,7 +25,7 @@ public class PerformanceMonitor {
         plugin.getLogger().info("=== Performance Benchmark ===");
 
         if (statsMap.isEmpty()) {
-            plugin.getLogger().info("§cNo data collected yet.");
+            plugin.getLogger().info("No data collected yet.");
             return;
         }
 
@@ -40,7 +40,7 @@ public class PerformanceMonitor {
                     long avgNs = count > 0 ? totalNs / count : 0;
 
                     plugin.getLogger().info(String.format(
-                            "§7- §f%-25s §8| §eAvg: %-6dns §8| §7Calls: %d",
+                            "- %-25s | Avg: %-6dns | Calls: %d",
                             name, avgNs, count
                     ));
                 });

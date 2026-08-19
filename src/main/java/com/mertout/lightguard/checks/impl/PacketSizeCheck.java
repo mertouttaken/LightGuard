@@ -4,6 +4,7 @@ import com.mertout.lightguard.LightGuard;
 import com.mertout.lightguard.checks.Check;
 import com.mertout.lightguard.data.ProtocolPlayer;
 import net.minecraft.network.protocol.game.ServerboundChatCommandPacket;
+import net.minecraft.network.protocol.game.ServerboundChatCommandSignedPacket;
 import net.minecraft.network.protocol.game.ServerboundChatPacket;
 import net.minecraft.network.protocol.game.ServerboundCommandSuggestionPacket;
 import net.minecraft.network.protocol.game.ServerboundSignUpdatePacket;
@@ -34,6 +35,10 @@ public class PacketSizeCheck extends Check {
             }
             else if (packet instanceof ServerboundChatCommandPacket) {
                 String cmd = ((ServerboundChatCommandPacket) packet).command();
+                if (cmd != null && cmd.length() > maxStringLength) return false;
+            }
+            else if (packet instanceof ServerboundChatCommandSignedPacket) {
+                String cmd = ((ServerboundChatCommandSignedPacket) packet).command();
                 if (cmd != null && cmd.length() > maxStringLength) return false;
             }
             else if (packet instanceof ServerboundCommandSuggestionPacket) {

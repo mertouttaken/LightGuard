@@ -8,10 +8,10 @@ import com.mertout.lightguard.logger.PacketLoggerManager;
 import net.minecraft.network.protocol.common.ServerboundClientInformationPacket;
 import net.minecraft.network.protocol.common.ServerboundCustomPayloadPacket;
 import net.minecraft.network.protocol.common.ServerboundKeepAlivePacket;
-import net.minecraft.network.protocol.common.ServerboundResourcePackPacket;
 import net.minecraft.network.protocol.game.*;
 
 import java.util.*;
+import java.util.function.Supplier;
 
 public class Dispatcher {
 
@@ -28,53 +28,89 @@ public class Dispatcher {
         loadChecks();
     }
 
+    /**
+     * Disabled checks are never registered, rather than being constructed and then skipped inside
+     * {@link Check#check}. A disabled check therefore costs nothing per packet. The Dispatcher is
+     * rebuilt by {@code LightGuard#reloadCheckDispatcher()}, so toggles apply on /lg reload.
+     */
     private void loadChecks() {
-        globalChecks.add(new PacketSizeCheck(plugin));
-        globalChecks.add(new ProtocolExploitCheck(plugin));
+        addGlobal("packet-size", () -> new PacketSizeCheck(plugin));
+        addGlobal("protocol-exploit", () -> new ProtocolExploitCheck(plugin));
 
-        register(ServerboundChatPacket.class, new CommandCheck(plugin), new ChatSecurityCheck(plugin));
-        register(ServerboundChatCommandPacket.class, new CommandCheck(plugin));
+        Check commandCheck = ifEnabled("command", () -> new CommandCheck(plugin));
+        // Commands arrive unsigned, or signed when any argument is signable (1.20.5+). Registering
+        // only the unsigned form let every signed command skip the blacklist and the Log4Shell filter.
+        register(ServerboundChatCommandPacket.class, commandCheck);
+        register(ServerboundChatCommandSignedPacket.class, commandCheck);
 
-        register(ServerboundCommandSuggestionPacket.class, new TabCheck(plugin));
+        // Chat itself has not carried commands since 1.19, so CommandCheck is not registered here.
+        register(ServerboundChatPacket.class, ifEnabled("chat-unicode", () -> new ChatSecurityCheck(plugin)));
 
-        register(ServerboundContainerClickPacket.class, new ItemExploitCheck(plugin), new WindowCheck(plugin));
-        register(ServerboundSetCreativeModeSlotPacket.class, new ItemExploitCheck(plugin), new MapExploitCheck(plugin), new CreativeCheck(plugin));
-        register(ServerboundRenameItemPacket.class, new AnvilCheck(plugin));
-        register(ServerboundSetCarriedItemPacket.class, new HeldItemSlotCheck(plugin));
-        register(ServerboundEditBookPacket.class, new BookExploitCheck(plugin));
+        register(ServerboundCommandSuggestionPacket.class, ifEnabled("tab", () -> new TabCheck(plugin)));
 
-        PositionCheck posCheck = new PositionCheck(plugin);
+        Check itemExploit = ifEnabled("item-exploit", () -> new ItemExploitCheck(plugin));
+        register(ServerboundContainerClickPacket.class, itemExploit, ifEnabled("window", () -> new WindowCheck(plugin)));
+        register(ServerboundSetCreativeModeSlotPacket.class, itemExploit,
+                ifEnabled("map-exploit", () -> new MapExploitCheck(plugin)),
+                ifEnabled("creative", () -> new CreativeCheck(plugin)));
+
+        register(ServerboundRenameItemPacket.class, ifEnabled("anvil", () -> new AnvilCheck(plugin)));
+        register(ServerboundSetCarriedItemPacket.class, ifEnabled("held-item", () -> new HeldItemSlotCheck(plugin)));
+        register(ServerboundEditBookPacket.class, ifEnabled("book", () -> new BookExploitCheck(plugin)));
+
+        Check posCheck = ifEnabled("position", () -> new PositionCheck(plugin));
         register(ServerboundMovePlayerPacket.class, posCheck);
         register(ServerboundMovePlayerPacket.Pos.class, posCheck);
         register(ServerboundMovePlayerPacket.Rot.class, posCheck);
         register(ServerboundMovePlayerPacket.PosRot.class, posCheck);
         register(ServerboundMovePlayerPacket.StatusOnly.class, posCheck);
 
-        register(ServerboundKeepAlivePacket.class, new KeepAliveCheck(plugin));
+        register(ServerboundKeepAlivePacket.class, ifEnabled("keep-alive", () -> new KeepAliveCheck(plugin)));
 
-        VehicleCheck vehicleCheck = new VehicleCheck(plugin);
-        register(ServerboundPlayerInputPacket.class, vehicleCheck);
-        register(ServerboundMoveVehiclePacket.class, vehicleCheck);
+        // ServerboundPlayerInputPacket is deliberately unregistered: since 1.21.2 it carries all
+        // player input every tick, not just vehicle steering, and holds nothing that can be invalid.
+        register(ServerboundMoveVehiclePacket.class, ifEnabled("vehicle", () -> new VehicleCheck(plugin)));
 
-        register(ServerboundUseItemOnPacket.class, new BlockPlaceCheck(plugin));
-        register(ServerboundUseItemPacket.class, new BlockPlaceCheck(plugin));
+        Check blockPlace = ifEnabled("block-place", () -> new BlockPlaceCheck(plugin));
+        register(ServerboundUseItemOnPacket.class, blockPlace);
+        register(ServerboundUseItemPacket.class, blockPlace);
 
-        register(ServerboundSignUpdatePacket.class, new SignCheck(plugin));
-        register(ServerboundPlayerActionPacket.class, new NoComCheck(plugin));
+        register(ServerboundSignUpdatePacket.class, ifEnabled("sign", () -> new SignCheck(plugin)));
+        register(ServerboundPlayerActionPacket.class, ifEnabled("no-com", () -> new NoComCheck(plugin)));
 
-        register(ServerboundInteractPacket.class, new BadPacketCheck(plugin), new EntityCheck(plugin));
+        register(ServerboundInteractPacket.class,
+                ifEnabled("bad-packets", () -> new BadPacketCheck(plugin)),
+                ifEnabled("entity", () -> new EntityCheck(plugin)));
 
-        register(ServerboundCustomPayloadPacket.class, new PayloadCheck(plugin), new BrandCheck(plugin));
-        register(ServerboundClientInformationPacket.class, new SettingsCheck(plugin));
-        register(ServerboundResourcePackPacket.class, new ResourcePackCheck(plugin));
-        register(ServerboundPlaceRecipePacket.class, new RecipeCheck(plugin));
-        register(ServerboundRecipeBookSeenRecipePacket.class, new RecipeCheck(plugin));
-        register(ServerboundPlayerAbilitiesPacket.class, new AbilitiesCheck(plugin));
-        register(ServerboundClientCommandPacket.class, new ClientActionCheck(plugin));
+        register(ServerboundCustomPayloadPacket.class, ifEnabled("payload", () -> new PayloadCheck(plugin)));
+        register(ServerboundClientInformationPacket.class, ifEnabled("client-settings", () -> new SettingsCheck(plugin)));
+
+        Check recipeCheck = ifEnabled("recipe", () -> new RecipeCheck(plugin));
+        register(ServerboundPlaceRecipePacket.class, recipeCheck);
+        register(ServerboundRecipeBookSeenRecipePacket.class, recipeCheck);
+
+        register(ServerboundPlayerAbilitiesPacket.class, ifEnabled("abilities", () -> new AbilitiesCheck(plugin)));
+        register(ServerboundClientCommandPacket.class, ifEnabled("client-action", () -> new ClientActionCheck(plugin)));
+    }
+
+    /** @return the constructed check, or null when {@code checks.<key>.enabled} is false. */
+    private <T extends Check> T ifEnabled(String key, Supplier<T> factory) {
+        if (!plugin.getConfig().getBoolean("checks." + key + ".enabled", true)) {
+            return null;
+        }
+        return factory.get();
+    }
+
+    private void addGlobal(String key, Supplier<? extends Check> factory) {
+        Check check = ifEnabled(key, factory);
+        if (check != null) globalChecks.add(check);
     }
 
     private void register(Class<?> packetClass, Check... checks) {
-        packetMap.computeIfAbsent(packetClass, k -> new ArrayList<>()).addAll(Arrays.asList(checks));
+        for (Check check : checks) {
+            if (check == null) continue;
+            packetMap.computeIfAbsent(packetClass, k -> new ArrayList<>()).add(check);
+        }
     }
 
     public boolean dispatch(Object packet, ProtocolPlayer player) {
@@ -113,7 +149,7 @@ public class Dispatcher {
             plugin.getMetrics().recordPacket(blocked, totalDuration);
 
             PacketLoggerManager logger = plugin.getPacketLoggerManager();
-            if (logger.getConfig().isEnabled()) {
+            if (logger != null && logger.getConfig().isEnabled()) {
                 logger.processPacket(player.getPlayer().getName(), packet, totalDuration);
             }
         }

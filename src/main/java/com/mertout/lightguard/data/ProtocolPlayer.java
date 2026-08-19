@@ -28,13 +28,15 @@ public class ProtocolPlayer {
     private volatile boolean isGliding = false;
     private volatile boolean isDead = false;
     private volatile boolean isHoldingBook = false;
-    private volatile boolean brandSent = false;
     private volatile boolean isBedrock = false;
-    private volatile boolean isPrinterMode = false;
-    private volatile boolean inLiquid = false;
 
-    private volatile double lastX = -1, lastY = -1, lastZ = -1;
-    private volatile double lastVehicleX = -1, lastVehicleY = -1, lastVehicleZ = -1;
+    // A dedicated flag rather than a -1 sentinel: -1 is a perfectly ordinary coordinate, and a
+    // player standing there would silently skip every position/reach check keyed off it.
+    private volatile boolean hasBaseline = false;
+    private volatile boolean hasVehicleBaseline = false;
+
+    private volatile double lastX = 0, lastY = 0, lastZ = 0;
+    private volatile double lastVehicleX = 0, lastVehicleY = 0, lastVehicleZ = 0;
 
     private final AtomicInteger pps = new AtomicInteger(0);
     private final AtomicInteger packetCounter = new AtomicInteger(0);
@@ -45,17 +47,11 @@ public class ProtocolPlayer {
     private final AtomicLong lastBlockPlaceTime = new AtomicLong(0);
     private final AtomicInteger blockPlaceCount = new AtomicInteger(0);
 
-    private final AtomicLong lastPrinterTime = new AtomicLong(0);
-    private final AtomicInteger printerCount = new AtomicInteger(0);
-
     private final AtomicLong lastRespawnTime = new AtomicLong(0);
     private final AtomicInteger respawnCount = new AtomicInteger(0);
 
     private final AtomicLong lastTabTime = new AtomicLong(0);
     private final AtomicInteger tabCount = new AtomicInteger(0);
-
-    private final AtomicLong lastChannelRegisterTime = new AtomicLong(0);
-    private final AtomicInteger recentChannelRegisters = new AtomicInteger(0);
 
     private final AtomicLong lastRecipeTime = new AtomicLong(0);
     private final AtomicInteger recipeCount = new AtomicInteger(0);
@@ -99,15 +95,6 @@ public class ProtocolPlayer {
         return false;
     }
 
-    public int incrementAndGetPrinterCount(long now) {
-        if (now - lastPrinterTime.get() > 1000) {
-            lastPrinterTime.set(now);
-            printerCount.set(1);
-            return 1;
-        }
-        return printerCount.incrementAndGet();
-    }
-
     public int incrementAndGetRespawnCount(long now) {
         if (now - lastRespawnTime.get() > 1000) {
             lastRespawnTime.set(now);
@@ -124,15 +111,6 @@ public class ProtocolPlayer {
             return 1;
         }
         return tabCount.incrementAndGet();
-    }
-
-    public int incrementAndGetChannelRegisterCount(int amount, long now) {
-        if (now - lastChannelRegisterTime.get() > 60000) {
-            lastChannelRegisterTime.set(now);
-            recentChannelRegisters.set(amount);
-            return amount;
-        }
-        return recentChannelRegisters.addAndGet(amount);
     }
 
     public int incrementAndGetRecipeCount(long now) {
@@ -168,7 +146,6 @@ public class ProtocolPlayer {
     public boolean isAnvilOpen() { return isAnvilOpen; }
     public void setAnvilOpen(boolean anvilOpen) { isAnvilOpen = anvilOpen; }
     public boolean isAdmin() { return isAdmin; }
-    public boolean isInLiquid() { return inLiquid; }
     public void setAdmin(boolean admin) { isAdmin = admin; }
     public boolean isCreativeOrSpectator() { return isCreativeOrSpectator; }
     public void setCreativeOrSpectator(boolean val) { isCreativeOrSpectator = val; }
@@ -181,13 +158,8 @@ public class ProtocolPlayer {
     public void setDead(boolean dead) { isDead = dead; }
     public boolean isHoldingBook() { return isHoldingBook; }
     public void setHoldingBook(boolean holdingBook) { isHoldingBook = holdingBook; }
-    public boolean isBrandSent() { return brandSent; }
-    public void setBrandSent(boolean brandSent) { this.brandSent = brandSent; }
-    public void setInLiquid(boolean inLiquid) { this.inLiquid = inLiquid; }
     public boolean isBedrock() { return isBedrock; }
     public void setBedrock(boolean bedrock) { isBedrock = bedrock; }
-    public void setPrinterMode(boolean mode) { this.isPrinterMode = mode; }
-    public boolean isPrinterMode() { return isPrinterMode; }
 
     public String getCurrentWorldName() { return currentWorldName; }
     public void setCurrentWorldName(String worldName) { this.currentWorldName = worldName; }
@@ -197,13 +169,17 @@ public class ProtocolPlayer {
     public double getLastZ() { return lastZ; }
     public void setLastLocation(double x, double y, double z) {
         this.lastX = x; this.lastY = y; this.lastZ = z;
+        this.hasBaseline = true;
     }
+    public boolean hasBaseline() { return hasBaseline; }
     public double getLastVehicleX() { return lastVehicleX; }
     public double getLastVehicleY() { return lastVehicleY; }
     public double getLastVehicleZ() { return lastVehicleZ; }
     public void setLastVehicleLocation(double x, double y, double z) {
         this.lastVehicleX = x; this.lastVehicleY = y; this.lastVehicleZ = z;
+        this.hasVehicleBaseline = true;
     }
+    public boolean hasVehicleBaseline() { return hasVehicleBaseline; }
 
     public boolean isInTeleportGrace() { return (System.currentTimeMillis() - lastTeleportTime) < 1500; }
     public void markTeleport() { this.lastTeleportTime = System.currentTimeMillis(); }

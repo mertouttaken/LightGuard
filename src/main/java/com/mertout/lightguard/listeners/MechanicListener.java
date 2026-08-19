@@ -53,15 +53,25 @@ public class MechanicListener implements Listener {
             .expireAfterWrite(1, TimeUnit.SECONDS)
             .build();
 
-    private static final Set<Material> NOISY_BLOCKS = EnumSet.of(
-            Material.NOTE_BLOCK, Material.BELL, Material.OAK_TRAPDOOR, Material.SPRUCE_TRAPDOOR,
-            Material.BIRCH_TRAPDOOR, Material.JUNGLE_TRAPDOOR, Material.ACACIA_TRAPDOOR,
-            Material.DARK_OAK_TRAPDOOR, Material.CRIMSON_TRAPDOOR, Material.WARPED_TRAPDOOR,
-            Material.IRON_TRAPDOOR, Material.OAK_DOOR, Material.SPRUCE_DOOR, Material.BIRCH_DOOR,
-            Material.JUNGLE_DOOR, Material.ACACIA_DOOR, Material.DARK_OAK_DOOR, Material.CRIMSON_DOOR,
-            Material.WARPED_DOOR, Material.IRON_DOOR, Material.LEVER, Material.STONE_BUTTON,
-            Material.OAK_BUTTON, Material.REPEATER, Material.COMPARATOR, Material.DAYLIGHT_DETECTOR
-    );
+    // Derived from the enum rather than hand-listed: the previous literal list was written for
+    // 1.16.5 and silently missed every wood type added since (mangrove, cherry, bamboo, copper),
+    // along with all but two of the button variants.
+    private static final Set<Material> NOISY_BLOCKS = buildNoisyBlocks();
+
+    private static Set<Material> buildNoisyBlocks() {
+        Set<Material> set = EnumSet.of(
+                Material.NOTE_BLOCK, Material.BELL, Material.LEVER,
+                Material.REPEATER, Material.COMPARATOR, Material.DAYLIGHT_DETECTOR
+        );
+        for (Material m : Material.values()) {
+            if (!m.isBlock()) continue;
+            String name = m.name();
+            if (name.endsWith("_TRAPDOOR") || name.endsWith("_DOOR") || name.endsWith("_BUTTON")) {
+                set.add(m);
+            }
+        }
+        return Collections.unmodifiableSet(set);
+    }
 
     private static final Set<Material> CROP_BLOCKS = EnumSet.of(
             Material.WHEAT, Material.POTATOES, Material.CARROTS, Material.NETHER_WART, Material.BEETROOTS
@@ -71,10 +81,15 @@ public class MechanicListener implements Listener {
             Material.SHEARS, Material.WATER_BUCKET, Material.LAVA_BUCKET, Material.FLINT_AND_STEEL, Material.FIRE_CHARGE
     );
 
+    // Block entities a piston must not shove. Shulker boxes are deliberately absent: unlike every
+    // entry here they are movable in vanilla, and farms rely on that.
     private static final Set<Material> TILE_ENTITIES = EnumSet.of(
-            Material.CHEST, Material.TRAPPED_CHEST, Material.FURNACE, Material.BLAST_FURNACE,
-            Material.SMOKER, Material.DROPPER, Material.DISPENSER, Material.HOPPER,
-            Material.BEACON, Material.SPAWNER
+            Material.CHEST, Material.TRAPPED_CHEST, Material.ENDER_CHEST, Material.BARREL,
+            Material.FURNACE, Material.BLAST_FURNACE, Material.SMOKER,
+            Material.DROPPER, Material.DISPENSER, Material.HOPPER, Material.CRAFTER,
+            Material.BEACON, Material.SPAWNER, Material.LECTERN,
+            Material.CHISELED_BOOKSHELF, Material.DECORATED_POT,
+            Material.BREWING_STAND, Material.ENCHANTING_TABLE
     );
 
     public MechanicListener(LightGuard plugin) {
@@ -139,10 +154,23 @@ public class MechanicListener implements Listener {
     }
 
     @EventHandler(priority = EventPriority.LOWEST)
-    public void onPlayerJoinFirst(PlayerJoinEvent event) {
-        plugin.getProtocolManager().add(event.getPlayer());
-        ProtocolPlayer pp = plugin.getProtocolManager().get(event.getPlayer().getUniqueId());
-        plugin.getPacketInjector().injectPlayer(event.getPlayer(), pp);
+    public void onPlayerJoin(PlayerJoinEvent event) {
+        Player player = event.getPlayer();
+
+        plugin.getProtocolManager().add(player);
+        ProtocolPlayer pp = plugin.getProtocolManager().get(player.getUniqueId());
+        plugin.getPacketInjector().injectPlayer(player, pp);
+
+        if (pp != null) {
+            pp.setCurrentWorldName(player.getWorld().getName());
+            pp.setBedrock(GeyserUtil.isBedrockPlayer(player));
+            // "lg.admin" is the node declared in plugin.yml; "lightguard.admin" is a legacy alias.
+            pp.setAdmin(player.isOp() || player.hasPermission("lg.admin") || player.hasPermission("lightguard.admin"));
+            pp.setCreativeOrSpectator(player.getGameMode() == GameMode.CREATIVE || player.getGameMode() == GameMode.SPECTATOR);
+            pp.setAllowedFlight(player.getAllowFlight());
+            pp.setHoldingBook(isHoldingBook(player));
+            pp.setDead(player.isDead());
+        }
     }
 
     @EventHandler(priority = EventPriority.HIGHEST)
@@ -166,22 +194,6 @@ public class MechanicListener implements Listener {
         if (!(event.getEntity() instanceof Player)) return;
         ProtocolPlayer pp = plugin.getProtocolManager().get(event.getEntity().getUniqueId());
         if (pp != null) pp.setGliding(event.isGliding());
-    }
-
-    @EventHandler(priority = EventPriority.MONITOR)
-    public void onPlayerJoin(PlayerJoinEvent event) {
-        Player player = event.getPlayer();
-        ProtocolPlayer pp = plugin.getProtocolManager().get(player.getUniqueId());
-        if (pp != null) {
-            pp.setCurrentWorldName(player.getWorld().getName());
-            pp.setBedrock(GeyserUtil.isBedrockPlayer(player));
-            // "lg.admin" is the node declared in plugin.yml; "lightguard.admin" is kept as a legacy alias.
-            pp.setAdmin(player.isOp() || player.hasPermission("lg.admin") || player.hasPermission("lightguard.admin"));
-            pp.setCreativeOrSpectator(player.getGameMode() == GameMode.CREATIVE || player.getGameMode() == GameMode.SPECTATOR);
-            pp.setAllowedFlight(player.getAllowFlight());
-            pp.setHoldingBook(isHoldingBook(player));
-            pp.setDead(player.isDead());
-        }
     }
 
     @EventHandler(priority = EventPriority.MONITOR)
@@ -252,34 +264,52 @@ public class MechanicListener implements Listener {
         }
     }
 
+    /** Single entry point for right-click handling; three separate listeners each paid their own
+     *  dispatch on every interaction. */
     @EventHandler(priority = EventPriority.LOWEST, ignoreCancelled = true)
-    public void onBedCropDupe(PlayerInteractEvent event) {
-        if (!preventBedCropDupe) return;
+    public void onPlayerInteract(PlayerInteractEvent event) {
+        Block clicked = event.getClickedBlock();
+        if (clicked == null) return;
 
-        if (event.getAction() == Action.RIGHT_CLICK_BLOCK) {
+        UUID uuid = event.getPlayer().getUniqueId();
+        Material type = clicked.getType();
+
+        if (preventBedCropDupe && event.getAction() == Action.RIGHT_CLICK_BLOCK) {
             ItemStack item = event.getItem();
+            if (item != null && item.getType().name().endsWith("_BED") && isNextToCrop(clicked, event)) {
+                event.setCancelled(true);
+                return;
+            }
+        }
 
-            if (item != null && item.getType().name().endsWith("_BED")) {
-                Block clicked = event.getClickedBlock();
-                if (clicked != null) {
-                    int baseX = clicked.getX() + event.getBlockFace().getModX();
-                    int baseY = clicked.getY() + event.getBlockFace().getModY();
-                    int baseZ = clicked.getZ() + event.getBlockFace().getModZ();
-                    World world = clicked.getWorld();
+        if (type == Material.CHEST || type == Material.TRAPPED_CHEST || type == Material.ENDER_CHEST) {
+            if (checkCooldown(uuid, Cooldown.CONTAINER, containerDelay)) {
+                event.setCancelled(true);
+                return;
+            }
+        }
 
-                    for (int x = -1; x <= 1; x++) {
-                        for (int y = -1; y <= 1; y++) {
-                            for (int z = -1; z <= 1; z++) {
-                                if (CROP_BLOCKS.contains(world.getBlockAt(baseX + x, baseY + y, baseZ + z).getType())) {
-                                    event.setCancelled(true);
-                                    return;
-                                }
-                            }
-                        }
+        if (NOISY_BLOCKS.contains(type) && checkCooldown(uuid, Cooldown.NOISY_BLOCK, 100)) {
+            event.setCancelled(true);
+        }
+    }
+
+    private boolean isNextToCrop(Block clicked, PlayerInteractEvent event) {
+        int baseX = clicked.getX() + event.getBlockFace().getModX();
+        int baseY = clicked.getY() + event.getBlockFace().getModY();
+        int baseZ = clicked.getZ() + event.getBlockFace().getModZ();
+        World world = clicked.getWorld();
+
+        for (int x = -1; x <= 1; x++) {
+            for (int y = -1; y <= 1; y++) {
+                for (int z = -1; z <= 1; z++) {
+                    if (CROP_BLOCKS.contains(world.getBlockAt(baseX + x, baseY + y, baseZ + z).getType())) {
+                        return true;
                     }
                 }
             }
         }
+        return false;
     }
 
     @EventHandler(priority = EventPriority.MONITOR)
@@ -289,17 +319,6 @@ public class MechanicListener implements Listener {
 
         if (closeInventoryOnTeleport) {
             event.getPlayer().closeInventory();
-        }
-    }
-
-    @EventHandler(priority = EventPriority.LOWEST)
-    public void onBlockInteract(PlayerInteractEvent event) {
-        if (event.getClickedBlock() != null) {
-            int x = event.getClickedBlock().getX() >> 4;
-            int z = event.getClickedBlock().getZ() >> 4;
-            if (!event.getClickedBlock().getWorld().isChunkLoaded(x, z)) {
-                event.setCancelled(true);
-            }
         }
     }
 
@@ -343,36 +362,6 @@ public class MechanicListener implements Listener {
         if (shearsCooldown && checkCooldown(e.getPlayer().getUniqueId(), Cooldown.SHEARS, 500)) e.setCancelled(true);
     }
 
-    @EventHandler(priority = EventPriority.LOWEST, ignoreCancelled = true)
-    public void onDispenserSpam(BlockDispenseEvent event) {
-        if (!preventDispenserSpam) return;
-
-        if (DISPENSER_SPAM_ITEMS.contains(event.getItem().getType())) {
-            if (checkDispenserCooldown(event.getBlock().getLocation(), 500)) {
-                event.setCancelled(true);
-            }
-        }
-    }
-
-    @EventHandler(priority = EventPriority.LOWEST)
-    public void onInteract(PlayerInteractEvent e) {
-        if (e.getClickedBlock() == null) return;
-
-        Material type = e.getClickedBlock().getType();
-        UUID uuid = e.getPlayer().getUniqueId();
-
-        if (type == Material.CHEST || type == Material.TRAPPED_CHEST || type == Material.ENDER_CHEST) {
-            if (checkCooldown(uuid, Cooldown.CONTAINER, containerDelay)) {
-                e.setCancelled(true);
-                return;
-            }
-        }
-
-        if (NOISY_BLOCKS.contains(type) && checkCooldown(uuid, Cooldown.NOISY_BLOCK, 100)) {
-            e.setCancelled(true);
-        }
-    }
-
     @EventHandler(priority = EventPriority.LOWEST)
     public void onBedEnter(PlayerBedEnterEvent event) {
         if (bedDuplication) event.getPlayer().closeInventory();
@@ -404,30 +393,14 @@ public class MechanicListener implements Listener {
 
     @EventHandler(priority = EventPriority.LOWEST)
     public void onMove(PlayerMoveEvent event) {
-        Location to = event.getTo();
-        Location from = event.getFrom();
+        if (!nullChunk) return;
 
+        Location to = event.getTo();
         if (to == null) return;
 
-        if (nullChunk) {
-            if (!plugin.getWorldChunkManager().isChunkLoadedAsynchronously(to.getWorld().getName(), to.getBlockX() >> 4, to.getBlockZ() >> 4)) {
-                event.setCancelled(true);
-                return;
-            }
-        }
-
-        if (from.getBlockX() != to.getBlockX() || from.getBlockY() != to.getBlockY() || from.getBlockZ() != to.getBlockZ()) {
-            ProtocolPlayer pp = plugin.getProtocolManager().get(event.getPlayer().getUniqueId());
-            if (pp != null) {
-                int chunkX = to.getBlockX() >> 4;
-                int chunkZ = to.getBlockZ() >> 4;
-                if (to.getWorld().isChunkLoaded(chunkX, chunkZ)) {
-                    boolean inWater = to.getBlock().isLiquid() || event.getPlayer().getEyeLocation().getBlock().isLiquid();
-                    pp.setInLiquid(inWater);
-                } else {
-                    pp.setInLiquid(false);
-                }
-            }
+        if (!plugin.getWorldChunkManager().isChunkLoadedAsynchronously(
+                to.getWorld().getName(), to.getBlockX() >> 4, to.getBlockZ() >> 4)) {
+            event.setCancelled(true);
         }
     }
 
@@ -463,9 +436,22 @@ public class MechanicListener implements Listener {
     @EventHandler(priority = EventPriority.LOWEST, ignoreCancelled = true)
     public void onBlockDispense(BlockDispenseEvent event) {
         Block block = event.getBlock();
-        if (block.getType() == Material.DISPENSER || block.getType() == Material.DROPPER) {
+        Material type = block.getType();
+
+        if (type == Material.DISPENSER || type == Material.DROPPER) {
             int y = block.getY();
-            if (y <= 0 || y >= block.getWorld().getMaxHeight() - 1) event.setCancelled(true);
+            // World floor is -64 since 1.18; the old "y <= 0" test disabled every dispenser
+            // in the bottom 64 layers of the overworld.
+            if (y <= block.getWorld().getMinHeight() || y >= block.getWorld().getMaxHeight() - 1) {
+                event.setCancelled(true);
+                return;
+            }
+        }
+
+        if (preventDispenserSpam && DISPENSER_SPAM_ITEMS.contains(event.getItem().getType())) {
+            if (checkDispenserCooldown(block.getLocation(), 500)) {
+                event.setCancelled(true);
+            }
         }
     }
 
@@ -508,6 +494,10 @@ public class MechanicListener implements Listener {
             }
         }
 
+        if (preventInvalidTrade && event.getInventory().getType() == InventoryType.MERCHANT) {
+            event.getPlayer().setItemOnCursor(null);
+        }
+
         ProtocolPlayer pp = plugin.getProtocolManager().get(player.getUniqueId());
         if (pp != null && event.getInventory().getType() == InventoryType.ANVIL) {
             pp.setAnvilOpen(true);
@@ -545,20 +535,6 @@ public class MechanicListener implements Listener {
     }
 
     @EventHandler(priority = EventPriority.LOWEST, ignoreCancelled = true)
-    public void onMerchantOpen(InventoryOpenEvent event) {
-        if (preventInvalidTrade && event.getInventory().getType() == InventoryType.MERCHANT) {
-            event.getPlayer().setItemOnCursor(null);
-        }
-    }
-
-    @EventHandler(priority = EventPriority.LOWEST, ignoreCancelled = true)
-    public void onFrameInteract(EntityDamageEvent event) {
-        if (event.getEntity() instanceof ItemFrame && !event.getEntity().isValid()) {
-            event.setCancelled(true);
-        }
-    }
-
-    @EventHandler(priority = EventPriority.LOWEST, ignoreCancelled = true)
     public void onInventoryClick(InventoryClickEvent event) {
         if (event.getInventory().getType() == InventoryType.ANVIL && event.getSlotType() == InventoryType.SlotType.RESULT) {
             if (preventAnvilDupe && (event.getClick() == ClickType.SHIFT_LEFT || event.getClick() == ClickType.SHIFT_RIGHT)) {
@@ -587,10 +563,15 @@ public class MechanicListener implements Listener {
         }
     }
 
+    private static final Set<Material> BOOK_ITEMS = EnumSet.of(
+            Material.BOOK, Material.WRITABLE_BOOK, Material.WRITTEN_BOOK,
+            Material.ENCHANTED_BOOK, Material.KNOWLEDGE_BOOK
+    );
+
+    /** Explicit set: the old name().contains("BOOK") test also matched BOOKSHELF. */
     private boolean isHoldingBook(Player player) {
-        ItemStack main = player.getInventory().getItemInMainHand();
-        ItemStack off = player.getInventory().getItemInOffHand();
-        return (main != null && main.getType().name().contains("BOOK")) || (off != null && off.getType().name().contains("BOOK"));
+        return BOOK_ITEMS.contains(player.getInventory().getItemInMainHand().getType())
+                || BOOK_ITEMS.contains(player.getInventory().getItemInOffHand().getType());
     }
 
     /** @return true if the action is still on cooldown and should be cancelled. */

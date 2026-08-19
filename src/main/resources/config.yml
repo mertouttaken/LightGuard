@@ -1,14 +1,16 @@
 # ============================================================== #
 #                                                                #
-#                🛡️ LIGHTGUARD SECURITY V3.0 🛡️                #
+#                   LIGHTGUARD SECURITY V3.0                     #
 #            Advanced Anti-Crash & Exploit Protection            #
-#                 [1.21.4 Paperweight Native]                    #
+#                    [Paper 1.21.4 Native]                       #
+#                                                                #
+#  Every "enabled" flag below is honoured: a disabled check is    #
+#  never registered, so it costs nothing per packet. Toggles      #
+#  apply on /lg reload.                                           #
 #                                                                #
 # ============================================================== #
 
 settings:
-  prefix: "&8[&cLightGuard&8] &7"
-
   kick-layout:
     - "&4&m-----------------------------------------"
     - "&c&lLIGHTGUARD SECURITY"
@@ -17,7 +19,7 @@ settings:
     - "&fDetection: &c%check%"
     - "&fPing: &e%ping%ms"
     - ""
-    - "&4&l⛔ ACTION BLOCKED ⛔"
+    - "&4&l! ACTION BLOCKED !"
     - "&7You have violated server security."
     - "&4&m-----------------------------------------"
 
@@ -27,12 +29,14 @@ settings:
     silent-failures: false
     geyser-support: true
 
+    # Checks that are never auto-disabled, and that block the packet if they throw.
     critical-checks:
       - "ItemExploitCheck"
       - "PayloadCheck"
       - "PacketSizeCheck"
       - "WindowCheck"
 
+  # Kicks a player after this many blocked packets inside the window.
   radar:
     burst-threshold: 12
     window-ms: 4000
@@ -41,6 +45,19 @@ settings:
 #                     PACKET & EXPLOIT CHECKS                    #
 # ============================================================== #
 checks:
+  # --- Run on every packet ---
+  packet-size:
+    enabled: true
+    max-string-length: 256
+    excluded-packets:
+      - "ServerboundEditBookPacket"
+      - "ServerboundCustomPayloadPacket"
+
+  # Command blocks, structure blocks, jigsaws and command minecarts.
+  protocol-exploit:
+    enabled: true
+
+  # --- Per-packet checks ---
   anvil:
     enabled: true
 
@@ -50,24 +67,27 @@ checks:
   keep-alive:
     enabled: true
 
-  raw-packet:
+  abilities:
     enabled: true
-    max-raw-size: 40960
-    pre-login-max-size: 131072
 
-  packet-size:
+  client-action:
     enabled: true
-    max-string-length: 256
-    per-packet-limit: 32000
-    excluded-packets:
-      - "ServerboundEditBookPacket"
-      - "ServerboundCustomPayloadPacket"
+
+  held-item:
+    enabled: true
+
+  no-com:
+    enabled: true
+
+  creative:
+    enabled: true
+
+  raw-packet:
+    # Raw byte ceiling for a connection before it finishes logging in.
+    pre-login-max-size: 131072
 
   window:
     enabled: true
-    strict-slots: true
-    prevent-lectern-spam: true
-    prevent-swap-in-gui: true
 
   sign:
     enabled: true
@@ -78,13 +98,8 @@ checks:
     enabled: true
     max-length: 128
 
-  eof-exploit:
-    enabled: true
-
   vehicle:
     enabled: true
-    check-steer: true
-    prevent-invalid-move: true
 
   map-exploit:
     enabled: true
@@ -96,22 +111,16 @@ checks:
 
   bad-packets:
     enabled: true
-    check-negative-values: true
     prevent-self-interact: true
-
-  client-brand:
-    enabled: true
-    max-length: 128
-    block-invalid-chars: true
-
-  resource-pack:
-    enabled: true
 
   entity:
     enabled: true
-    prevent-invalid-entity: true
     prevent-armorstand-spam: true
+    # Vanilla has no click-rate cap; this only catches packet-level automation.
+    # 10ms is 100 attacks/second, far above what a human reaches by drag-clicking.
+    min-attack-interval-ms: 10
 
+  # Weight-based flood limiter applied to every inbound packet.
   flood:
     max-threshold: 500.0
     decay-per-second: 150.0
@@ -121,9 +130,6 @@ checks:
     enabled: true
     max-pps: 12
     check-coordinates: true
-    printer-check: true
-    printer-threshold: 6
-    prevent-illegal-blocks: true
     illegal-blocks:
       - "minecraft:command_block"
       - "minecraft:repeating_command_block"
@@ -138,7 +144,6 @@ checks:
     enabled: true
     max-string-len: 100
     max-lore-size: 10
-    max-depth: 7
     max-attributes: 7
     max-attribute-value: 100.0
     max-enchant-level: 20
@@ -148,7 +153,6 @@ checks:
       - "hoverEvent"
       - "Score"
       - "Selector"
-      - "translation.test.invalid"
 
   position:
     enabled: true
@@ -159,18 +163,17 @@ checks:
 
   book:
     enabled: true
-    max-pages: 5
-    max-bytes-per-page: 150
-    strip-ascii: true
+    # Vanilla ceilings. Lowering these will reject books players can legitimately write.
+    max-chars-per-page: 1024
+    max-pages: 100
 
   payload:
     enabled: true
-    max-size: 1024
+    # Payload byte size is enforced by the vanilla codec before this plugin sees the packet;
+    # only the channel is screened here.
     blocked-channels:
-      - "minecraft:bedit"
-      - "minecraft:bsign"
-      - "minecraft:bopen"
       - "wdl:init"
+      - "wdl:control"
       - "world_downloader"
 
   command:
@@ -188,54 +191,25 @@ checks:
       - "/op"
       - "/deop"
       - "/stop"
-      - "/minecraft:me"
-      - "/bukkit:me"
-      - "/me"
-      - "/execute"
-      - "/function"
       - "/reload"
       - "/rl"
 
   tab:
     enabled: true
     max-length: 256
-    block-chars:
-      - "["
-      - "]"
-      - "{"
-      - "}"
-      - "\\"
-      - ":"
-      - ";"
-      - "@"
-      - "="
-      - "\""
-      - "'"
-      - "`"
-      - "$"
+    # Substrings that abort a tab-completion request. Kept narrow on purpose: entries like
+    # "nbt", "tag" or "execute" match ordinary vanilla commands and will kick real players.
     block-contains:
       - "targetoffset"
-      - "for("
-      - "selector"
-      - "run_command"
-      - "^(."
-      - "*."
-      - "execute"
-      - "summon"
-      - "nbt"
-      - "tag"
-      - "uuid"
-      - "score"
-      - "jndi"
-      - "ldap"
-      - "rmi"
+      - "translation.test"
 
 # ============================================================== #
 #                       PACKET LOGGER                            #
 # ============================================================== #
 packet-logger:
   enabled: false
-  heavy-packet-threshold: 5000000
+  # Nanoseconds. Only packets slower than this are logged; -1 logs everything.
+  heavy-packet-threshold: 500000
   output: FILE
   player-mode: WHITELIST
   players: []
@@ -274,8 +248,9 @@ mechanics:
   shears-cooldown: true
   break-close-inventory: true
   interact-container-delay: 300
-  block-dead-packets: true
   close-inventory-on-teleport: true
+  # Randomly drops ~20% of redstone pulses on trapdoors, rails, comparators and observers.
+  # Effective against clock-based lag machines, but it will also break legitimate contraptions.
   trapdoor-rail-redstone: true
   prevent-dispenser-spam: true
   disable-piglin-trading: false

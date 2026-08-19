@@ -19,7 +19,8 @@ public class HeldItemSlotCheck extends Check {
             ServerboundSetCarriedItemPacket slotPacket = (ServerboundSetCarriedItemPacket) packet;
             int slot = slotPacket.getSlot();
 
-            if (slot < 0 || slot >= 36) {
+            // Vanilla hotbar is slots 0-8; anything else is a crafted packet.
+            if (slot < 0 || slot > 8) {
                 return false;
             }
 

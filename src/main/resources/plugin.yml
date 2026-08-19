@@ -1,9 +1,14 @@
 name: LightGuard
-version: 3.0
+version: '${version}'
 main: com.mertout.lightguard.LightGuard
 api-version: "1.21"
 authors: [mertout]
-description: Advanced Packet-Based Anti-Crash & Exploit Protection System By AI (1.21.4 Native)
+description: Advanced Packet-Based Anti-Crash & Exploit Protection System (1.21.4 Native)
+
+# Built against Mojang mappings via paperweight-userdev 2.x, which no longer
+# reobfuscates. Without this Paper assumes a legacy Spigot-mapped plugin and
+# tries to remap the NMS references at load time, which fails.
+paperweight-mappings-namespace: mojang
 
 commands:
   lg:

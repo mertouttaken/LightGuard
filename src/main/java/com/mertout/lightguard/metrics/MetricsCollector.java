@@ -1,6 +1,5 @@
 package com.mertout.lightguard.metrics;
 
-import com.mertout.lightguard.LightGuard;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
@@ -13,7 +12,7 @@ public class MetricsCollector {
     private final Map<String, AtomicLong> violationsByType = new ConcurrentHashMap<>();
     private final Map<String, AtomicLong> violationsByPlayer = new ConcurrentHashMap<>();
 
-    public MetricsCollector(LightGuard plugin) {
+    public MetricsCollector() {
         this.startTime = System.currentTimeMillis();
     }
 

@@ -88,19 +88,41 @@ public class SafeModeManager {
         }
     }
 
+    /** Human-readable dump of Sentinel state, backing /lg safemode. */
+    public String getReport() {
+        StringBuilder sb = new StringBuilder(256);
+        sb.append("\n§8--------- §cLightGuard Sentinel §8---------\n");
+        sb.append("§7Error threshold: §f").append(errorThreshold)
+          .append(" §7per §f").append(timeWindowMillis / 1000).append("s\n");
+
+        int disabledTotal = 0;
+        for (Set<String> checks : disabledChecks.values()) {
+            disabledTotal += checks.size();
+        }
+
+        if (disabledTotal == 0) {
+            sb.append("§aNo checks have been auto-disabled.\n");
+        } else {
+            sb.append("§cAuto-disabled checks (§f").append(disabledTotal).append("§c):\n");
+            disabledChecks.forEach((uuid, checks) -> {
+                if (checks.isEmpty()) return;
+                sb.append("  §7- §f").append(uuid.toString(), 0, 8).append("§7: §e")
+                  .append(String.join(", ", checks)).append("\n");
+            });
+        }
+
+        int erroring = 0;
+        for (Map<String, ExceptionData> perPlayer : exceptionTracker.values()) {
+            erroring += perPlayer.size();
+        }
+        sb.append("§7Checks with recorded errors: §f").append(erroring).append("\n");
+        sb.append("§8------------------------------------");
+        return sb.toString();
+    }
+
     public void clear(UUID uuid) {
         exceptionTracker.remove(uuid);
         disabledChecks.remove(uuid);
-    }
-
-    public void reset() {
-        exceptionTracker.clear();
-        disabledChecks.clear();
-    }
-
-    public void reload() {
-        loadCriticalPatterns();
-        reset();
     }
 
     private static class ExceptionData {

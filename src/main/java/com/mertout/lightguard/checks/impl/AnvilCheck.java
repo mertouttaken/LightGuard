@@ -50,7 +50,9 @@ public class AnvilCheck extends Check {
             for (int i = 0; i < len; i++) {
                 char c = newName.charAt(i);
 
-                if (c == '§' || c == '&') {
+                // Only the section sign actually formats text; "&" is an ordinary character
+                // that appears in plenty of legitimate item names.
+                if (c == '§') {
                     hasColor = true;
                 }
 

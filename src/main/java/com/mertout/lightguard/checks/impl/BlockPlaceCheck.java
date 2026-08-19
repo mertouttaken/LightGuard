@@ -12,15 +12,11 @@ import net.minecraft.world.phys.Vec3;
 public class BlockPlaceCheck extends Check {
 
     private final int maxPPS;
-    private final boolean printerCheckEnabled;
-    private final int printerThreshold;
     private final boolean checkCoordinates;
 
     public BlockPlaceCheck(LightGuard plugin) {
         super(plugin);
         this.maxPPS = plugin.getConfig().getInt("checks.block-place.max-pps", 15);
-        this.printerCheckEnabled = plugin.getConfig().getBoolean("checks.block-place.printer-check");
-        this.printerThreshold = plugin.getConfig().getInt("checks.block-place.printer-threshold", 10);
         this.checkCoordinates = plugin.getConfig().getBoolean("checks.block-place.check-coordinates", true);
     }
 
@@ -40,12 +36,6 @@ public class BlockPlaceCheck extends Check {
 
             if (player.incrementAndGetBlockPlaceCount(now) > maxPPS) {
                 return false;
-            }
-
-            if (printerCheckEnabled) {
-                if (player.incrementAndGetPrinterCount(now) > printerThreshold) {
-                    player.setPrinterMode(true);
-                }
             }
 
             if (isBlockClick) {
@@ -73,7 +63,7 @@ public class BlockPlaceCheck extends Check {
                     double py = player.getLastY();
                     double pz = player.getLastZ();
 
-                    if (px != -1 && !player.isInTeleportGrace()) {
+                    if (player.hasBaseline() && !player.isInTeleportGrace()) {
                         double dx = px - vec.x();
                         double dy = (py + 1.62) - vec.y();
                         double dz = pz - vec.z();

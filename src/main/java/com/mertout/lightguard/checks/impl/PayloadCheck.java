@@ -7,19 +7,33 @@ import net.minecraft.network.protocol.common.ServerboundCustomPayloadPacket;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.ResourceLocation;
 
-import java.util.regex.Pattern;
+import java.util.HashSet;
+import java.util.Locale;
+import java.util.Set;
 
+/**
+ * Validates the channel a custom payload arrives on.
+ *
+ * <p>Payload <em>size</em> is deliberately not checked here. This handler is installed after the
+ * pipeline's decoder, so the packet has already been decoded and the encoded length is gone; vanilla's
+ * own codec caps a custom payload at 32767 bytes and kills the connection before this point. The
+ * raw byte ceiling for pre-login traffic is enforced separately by
+ * {@link com.mertout.lightguard.netty.PreLoginRawFilter}.
+ */
 public class PayloadCheck extends Check {
 
-    private static final Pattern NAMESPACE_PATTERN = Pattern.compile("[a-z0-9_\\-]+:[a-z0-9_\\-.]+");
+    private static final int MAX_CHANNEL_LENGTH = 128;
 
-    private final String[] blockedChannelsArray;
-    private final int maxPayloadSize;
+    private final Set<String> blockedChannels = new HashSet<>();
 
     public PayloadCheck(LightGuard plugin) {
         super(plugin);
-        this.blockedChannelsArray = plugin.getConfig().getStringList("checks.payload.blocked-channels").toArray(new String[0]);
-        this.maxPayloadSize = plugin.getConfig().getInt("checks.payload.max-size", 2048);
+        for (String channel : plugin.getConfig().getStringList("checks.payload.blocked-channels")) {
+            blockedChannels.add(channel.toLowerCase(Locale.ROOT));
+        }
+        // A client claiming to speak BungeeCord's channel is trying to forge proxy messages.
+        blockedChannels.add("bungeecord");
+        blockedChannels.add("bungeecord:main");
     }
 
     @Override
@@ -27,48 +41,22 @@ public class PayloadCheck extends Check {
         if (!(packet instanceof ServerboundCustomPayloadPacket)) return true;
 
         try {
-            ServerboundCustomPayloadPacket payloadPacket = (ServerboundCustomPayloadPacket) packet;
-            CustomPacketPayload payload = payloadPacket.payload();
+            CustomPacketPayload payload = ((ServerboundCustomPayloadPacket) packet).payload();
             ResourceLocation id = payload.type().id();
-            String channel = id.toString();
+            if (id == null) return false;
 
-            if (!isValidChannel(channel)) {
-                return false;
+            String channel = id.toString().toLowerCase(Locale.ROOT);
+
+            if (channel.isEmpty() || channel.length() > MAX_CHANNEL_LENGTH) return false;
+
+            for (int i = 0; i < channel.length(); i++) {
+                if (Character.isISOControl(channel.charAt(i))) return false;
             }
 
-            if (channel.equalsIgnoreCase("bungeecord") || channel.equalsIgnoreCase("bungeecord:main")) {
-                return false;
-            }
-
-            for (String blocked : blockedChannelsArray) {
-                if (channel.equalsIgnoreCase(blocked)) {
-                    return false;
-                }
-            }
-
-            if (channel.equalsIgnoreCase("minecraft:bedit") || channel.equalsIgnoreCase("minecraft:bsign")) {
-                if (!player.isHoldingBook()) {
-                    return false;
-                }
-            }
+            return !blockedChannels.contains(channel);
 
         } catch (Throwable t) {
             return false;
         }
-
-        return true;
-    }
-
-    private boolean isValidChannel(String channel) {
-        if (channel == null || channel.isEmpty() || channel.length() > 128) return false;
-
-        for (int i = 0; i < channel.length(); i++) {
-            if (Character.isISOControl(channel.charAt(i))) return false;
-        }
-
-        if (channel.equals("register") || channel.equals("unregister")) return true;
-        if (channel.startsWith("mc|") || channel.startsWith("fml|")) return true;
-
-        return NAMESPACE_PATTERN.matcher(channel).matches();
     }
 }

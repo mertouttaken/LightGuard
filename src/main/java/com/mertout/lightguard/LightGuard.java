@@ -55,7 +55,7 @@ public class LightGuard extends JavaPlugin {
         } catch (Exception ignored) {}
 
         this.configManager = new ConfigManager(this);
-        this.metrics = new MetricsCollector(this);
+        this.metrics = new MetricsCollector();
         this.actionQueue = new ActionQueue(this);
         this.protocolManager = new ProtocolManager(this);
         this.worldChunkManager = new WorldChunkManager(this);
@@ -88,7 +88,7 @@ public class LightGuard extends JavaPlugin {
             }
         }, 20L, 20L);
 
-        getLogger().info("§aLightGuard V3.0 (1.21.4 Zero-Latency) Protection ACTIVE!");
+        getLogger().info("LightGuard protection active (Paper 1.21.4).");
     }
 
     @Override

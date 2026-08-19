@@ -34,7 +34,7 @@ public class NoComCheck extends Check {
             double pY = player.getLastY();
             double pZ = player.getLastZ();
 
-            if (pX == -1) return true;
+            if (!player.hasBaseline()) return true;
 
             double dx = pX - pos.getX();
             double dy = pY - pos.getY();
