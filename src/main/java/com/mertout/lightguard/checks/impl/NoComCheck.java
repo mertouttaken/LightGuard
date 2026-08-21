@@ -28,21 +28,35 @@ public class NoComCheck extends Check {
             }
 
             BlockPos pos = actionPacket.getPos();
-            if (pos == null) return true;
+            if (pos == null) return false;
 
-            double pX = player.getLastX();
-            double pY = player.getLastY();
-            double pZ = player.getLastZ();
-
-            if (!player.hasBaseline()) return true;
-
-            double dx = pX - pos.getX();
-            double dy = pY - pos.getY();
-            double dz = pZ - pos.getZ();
-            double distSq = (dx * dx) + (dy * dy) + (dz * dz);
-
-            if (distSq > 10000.0) {
+            if (Math.abs(pos.getX()) > 30000000 || Math.abs(pos.getZ()) > 30000000 || pos.getY() < -500 || pos.getY() > 500) {
                 return false;
+            }
+
+            int chunkX = pos.getX() >> 4;
+            int chunkZ = pos.getZ() >> 4;
+
+            if (!plugin.getWorldChunkManager().isChunkLoadedAsynchronously(player.getCurrentWorldName(), chunkX, chunkZ)) {
+                return false;
+            }
+
+            if (player.hasBaseline() && !player.isInTeleportGrace()) {
+                double pX = player.getLastX();
+                double pY = player.getLastY() + 1.62;
+                double pZ = player.getLastZ();
+
+                double dx = pX - (pos.getX() + 0.5);
+                double dy = pY - (pos.getY() + 0.5);
+                double dz = pZ - (pos.getZ() + 0.5);
+                double distSq = (dx * dx) + (dy * dy) + (dz * dz);
+
+                double maxReachSq = player.isCreativeOrSpectator() ? 64.0 : 49.0;
+                if (player.isBedrock()) maxReachSq = 100.0;
+
+                if (distSq > maxReachSq + 15.0) {
+                    return false;
+                }
             }
 
         } catch (Throwable t) {

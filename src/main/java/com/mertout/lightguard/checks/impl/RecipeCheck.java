@@ -16,15 +16,36 @@ public class RecipeCheck extends Check {
 
     @Override
     public boolean check(Object packet, ProtocolPlayer player) {
-        if (packet instanceof ServerboundPlaceRecipePacket || packet instanceof ServerboundRecipeBookSeenRecipePacket) {
+        if (packet instanceof ServerboundPlaceRecipePacket) {
             try {
                 if (player.incrementAndGetRecipeCount(System.currentTimeMillis()) > MAX_RECIPE_PACKETS) {
+                    return false;
+                }
+                ServerboundPlaceRecipePacket placePacket = (ServerboundPlaceRecipePacket) packet;
+                if (placePacket.recipe() == null || placePacket.containerId() < 0) {
                     return false;
                 }
             } catch (Throwable t) {
                 return false;
             }
+            return true;
         }
+
+        if (packet instanceof ServerboundRecipeBookSeenRecipePacket) {
+            try {
+                if (player.incrementAndGetRecipeCount(System.currentTimeMillis()) > MAX_RECIPE_PACKETS) {
+                    return false;
+                }
+                ServerboundRecipeBookSeenRecipePacket seenPacket = (ServerboundRecipeBookSeenRecipePacket) packet;
+                if (seenPacket.recipe() == null) {
+                    return false;
+                }
+            } catch (Throwable t) {
+                return false;
+            }
+            return true;
+        }
+
         return true;
     }
 }

@@ -8,16 +8,32 @@ import net.minecraft.network.protocol.game.ServerboundUseItemOnPacket;
 import net.minecraft.network.protocol.game.ServerboundUseItemPacket;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.Vec3;
+import org.bukkit.Material;
+import org.bukkit.entity.Player;
+import org.bukkit.inventory.ItemStack;
+
+import java.util.HashSet;
+import java.util.Locale;
+import java.util.Set;
 
 public class BlockPlaceCheck extends Check {
 
     private final int maxPPS;
     private final boolean checkCoordinates;
+    private final Set<String> illegalBlocks = new HashSet<>();
 
     public BlockPlaceCheck(LightGuard plugin) {
         super(plugin);
         this.maxPPS = plugin.getConfig().getInt("checks.block-place.max-pps", 15);
         this.checkCoordinates = plugin.getConfig().getBoolean("checks.block-place.check-coordinates", true);
+
+        for (String block : plugin.getConfig().getStringList("checks.block-place.illegal-blocks")) {
+            String name = block.toLowerCase(Locale.ROOT);
+            if (name.startsWith("minecraft:")) {
+                name = name.substring(10);
+            }
+            illegalBlocks.add(name);
+        }
     }
 
     @Override
@@ -38,6 +54,15 @@ public class BlockPlaceCheck extends Check {
                 return false;
             }
 
+            Player bp = player.getPlayer();
+            if (!player.isAdmin() && bp != null) {
+                ItemStack main = bp.getInventory().getItemInMainHand();
+                ItemStack off = bp.getInventory().getItemInOffHand();
+                if (isIllegalItem(main) || isIllegalItem(off)) {
+                    return false;
+                }
+            }
+
             if (isBlockClick) {
                 ServerboundUseItemOnPacket usePacket = (ServerboundUseItemOnPacket) packet;
                 BlockHitResult hitResult = usePacket.getHitResult();
@@ -56,6 +81,12 @@ public class BlockPlaceCheck extends Check {
                     BlockPos pos = hitResult.getBlockPos();
 
                     if (Math.abs(pos.getX()) > 30000000 || Math.abs(pos.getZ()) > 30000000 || pos.getY() < -500 || pos.getY() > 500) {
+                        return false;
+                    }
+
+                    int chunkX = pos.getX() >> 4;
+                    int chunkZ = pos.getZ() >> 4;
+                    if (!plugin.getWorldChunkManager().isChunkLoadedAsynchronously(player.getCurrentWorldName(), chunkX, chunkZ)) {
                         return false;
                     }
 
@@ -82,5 +113,11 @@ public class BlockPlaceCheck extends Check {
         }
 
         return true;
+    }
+
+    private boolean isIllegalItem(ItemStack item) {
+        if (item == null || item.getType() == Material.AIR) return false;
+        String name = item.getType().name().toLowerCase(Locale.ROOT);
+        return illegalBlocks.contains(name);
     }
 }

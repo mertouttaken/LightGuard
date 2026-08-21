@@ -23,11 +23,13 @@ public class CommandCheck extends Check {
     private static final int MAX_COMMAND_LENGTH = 256;
 
     private final boolean blockSyntax;
+    private final int maxCommandsPerSecond;
     private final Set<String> blacklist = new HashSet<>();
 
     public CommandCheck(LightGuard plugin) {
         super(plugin);
         this.blockSyntax = plugin.getConfig().getBoolean("checks.command.block-syntax", true);
+        this.maxCommandsPerSecond = plugin.getConfig().getInt("checks.command.max-commands-per-sec", 20);
 
         for (String entry : plugin.getConfig().getStringList("checks.command.blacklist")) {
             String normalised = entry.toLowerCase(Locale.ROOT);
@@ -53,6 +55,11 @@ public class CommandCheck extends Check {
         try {
             if (rawMsg == null) return true;
             if (rawMsg.length() > MAX_COMMAND_LENGTH) return false;
+
+            long now = System.currentTimeMillis();
+            if (player.incrementAndGetCommandCount(now) > maxCommandsPerSecond) {
+                return false;
+            }
 
             if (containsLog4Shell(rawMsg)) return false;
 

@@ -72,7 +72,7 @@ public class SignCheck extends Check {
             for (String line : lines) {
                 if (line == null || line.isEmpty()) continue;
 
-                if (line.length() > maxLineLength) {
+                if (line.length() > maxLineLength || line.getBytes(java.nio.charset.StandardCharsets.UTF_8).length > 256) {
                     return false;
                 }
 

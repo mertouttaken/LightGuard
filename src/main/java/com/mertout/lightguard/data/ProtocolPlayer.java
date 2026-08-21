@@ -59,6 +59,12 @@ public class ProtocolPlayer {
     private final AtomicLong lastQuickMoveTime = new AtomicLong(0);
     private final AtomicInteger quickMoveCount = new AtomicInteger(0);
 
+    private final AtomicLong lastBookTime = new AtomicLong(0);
+    private final AtomicInteger bookCount = new AtomicInteger(0);
+
+    private final AtomicLong lastCommandTime = new AtomicLong(0);
+    private final AtomicInteger commandCount = new AtomicInteger(0);
+
     private final AtomicLong lastEntityInteractTime = new AtomicLong(0);
 
     public ProtocolPlayer(Player player, LightGuard plugin) {
@@ -129,6 +135,24 @@ public class ProtocolPlayer {
             return 1;
         }
         return quickMoveCount.incrementAndGet();
+    }
+
+    public int incrementAndGetBookCount(long now) {
+        if (now - lastBookTime.get() > 1000) {
+            lastBookTime.set(now);
+            bookCount.set(1);
+            return 1;
+        }
+        return bookCount.incrementAndGet();
+    }
+
+    public int incrementAndGetCommandCount(long now) {
+        if (now - lastCommandTime.get() > 1000) {
+            lastCommandTime.set(now);
+            commandCount.set(1);
+            return 1;
+        }
+        return commandCount.incrementAndGet();
     }
 
     public Player getPlayer() { return player; }

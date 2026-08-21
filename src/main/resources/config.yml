@@ -81,6 +81,8 @@ checks:
 
   creative:
     enabled: true
+    max-stack-size: 64
+    max-lore-total-len: 3000
 
   raw-packet:
     # Raw byte ceiling for a connection before it finishes logging in.
@@ -166,6 +168,8 @@ checks:
     # Vanilla ceilings. Lowering these will reject books players can legitimately write.
     max-chars-per-page: 1024
     max-pages: 100
+    max-page-bytes: 8192
+    max-edits-per-sec: 5
 
   payload:
     enabled: true
@@ -179,6 +183,7 @@ checks:
   command:
     enabled: true
     block-syntax: true
+    max-commands-per-sec: 20
     blacklist:
       - "/calc"
       - "//calc"

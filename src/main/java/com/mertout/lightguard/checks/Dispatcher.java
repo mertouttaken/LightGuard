@@ -49,7 +49,10 @@ public class Dispatcher {
         register(ServerboundCommandSuggestionPacket.class, ifEnabled("tab", () -> new TabCheck(plugin)));
 
         Check itemExploit = ifEnabled("item-exploit", () -> new ItemExploitCheck(plugin));
-        register(ServerboundContainerClickPacket.class, itemExploit, ifEnabled("window", () -> new WindowCheck(plugin)));
+        Check windowCheck = ifEnabled("window", () -> new WindowCheck(plugin));
+        register(ServerboundContainerClickPacket.class, itemExploit, windowCheck);
+        register(ServerboundPickItemFromBlockPacket.class, windowCheck);
+        register(ServerboundPickItemFromEntityPacket.class, windowCheck);
         register(ServerboundSetCreativeModeSlotPacket.class, itemExploit,
                 ifEnabled("map-exploit", () -> new MapExploitCheck(plugin)),
                 ifEnabled("creative", () -> new CreativeCheck(plugin)));

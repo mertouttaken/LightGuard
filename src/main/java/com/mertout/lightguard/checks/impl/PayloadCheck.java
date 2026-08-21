@@ -53,6 +53,17 @@ public class PayloadCheck extends Check {
                 if (Character.isISOControl(channel.charAt(i))) return false;
             }
 
+            // A: PayloadCheckItemInHand - book payloads require holding a book
+            if ((channel.contains("bedit") || channel.contains("bsign")) && !player.isHoldingBook()) {
+                return false;
+            }
+
+            // A: PayloadCheckCoordinates / privilege check for command payloads
+            if ((channel.contains("adv_cmd") || channel.contains("auto_cmd") || channel.contains("advcdm") || channel.contains("autocmd"))
+                    && (!player.isCreativeOrSpectator() || !player.isAdmin())) {
+                return false;
+            }
+
             return !blockedChannels.contains(channel);
 
         } catch (Throwable t) {
