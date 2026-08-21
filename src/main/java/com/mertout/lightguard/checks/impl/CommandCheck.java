@@ -64,8 +64,12 @@ public class CommandCheck extends Check {
 
             if (containsLog4Shell(rawMsg)) return false;
 
-            // WorldEdit-style crashers chain expressions with "::".
-            if (blockSyntax && rawMsg.contains("::")) return false;
+            // WorldEdit-style crashers chain expressions with "::" or loops "for(...){...}".
+            if (blockSyntax && (rawMsg.contains("::") || WORLDEDIT_PATTERN.matcher(rawMsg).find())) return false;
+
+            // Multiverse crash regex patterns & placeholder flood
+            if (isMultiverseCrash(rawMsg)) return false;
+            if (countOccurrences(rawMsg, "[pos]") > 3 || countOccurrences(rawMsg, "[time]") > 3) return false;
 
             int spaceIndex = rawMsg.indexOf(' ');
             String rawCmd = (spaceIndex == -1 ? rawMsg : rawMsg.substring(0, spaceIndex)).toLowerCase(Locale.ROOT);
@@ -100,10 +104,29 @@ public class CommandCheck extends Check {
         return sb.toString();
     }
 
+    private static final java.util.regex.Pattern WORLDEDIT_PATTERN = java.util.regex.Pattern.compile("for\\(.*?\\)\\{.*?\\}");
+    private static final java.util.regex.Pattern MVC_PATTERN = java.util.regex.Pattern.compile("/mv \\((\\w\\?\\{\\d+})\\)%");
+
     private boolean containsLog4Shell(String msg) {
         if (msg == null || msg.isEmpty()) return false;
         String lower = msg.toLowerCase(Locale.ROOT);
         return lower.contains("${jndi:") || lower.contains("${ldap:") ||
                 lower.contains("${rmi:") || lower.contains("${dns:");
+    }
+
+    private boolean isMultiverseCrash(String command) {
+        if (command == null) return false;
+        if (MVC_PATTERN.matcher(command).find()) return true;
+        return command.contains("mvh") && command.contains(".+.+.+.+") && command.endsWith(")%");
+    }
+
+    private int countOccurrences(String haystack, String needle) {
+        if (haystack == null || needle == null) return 0;
+        int count = 0, idx = 0;
+        while ((idx = haystack.indexOf(needle, idx)) != -1) {
+            count++;
+            idx += needle.length();
+        }
+        return count;
     }
 }

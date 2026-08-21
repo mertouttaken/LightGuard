@@ -38,6 +38,12 @@ public class VehicleCheck extends Check {
 
             if (!Double.isFinite(pX) || !Double.isFinite(pY) || !Double.isFinite(pZ)) return false;
 
+            float yRot = movePacket.yRot();
+            float xRot = movePacket.xRot();
+            if (!Float.isFinite(yRot) || !Float.isFinite(xRot) || Math.abs(xRot) > 90.0F || Math.abs(yRot) > 3.0E7F) {
+                return false;
+            }
+
             int chunkX = (int) Math.floor(pX) >> 4;
             int chunkZ = (int) Math.floor(pZ) >> 4;
 
