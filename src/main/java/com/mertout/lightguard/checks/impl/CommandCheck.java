@@ -53,6 +53,7 @@ public class CommandCheck extends Check {
         }
 
         try {
+            if (player.isDead()) return false;
             if (rawMsg == null) return true;
             if (rawMsg.length() > MAX_COMMAND_LENGTH) return false;
 

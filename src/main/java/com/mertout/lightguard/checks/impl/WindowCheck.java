@@ -52,6 +52,8 @@ public class WindowCheck extends Check {
         if (!(packet instanceof ServerboundContainerClickPacket)) return true;
 
         try {
+            if (player.isDead()) return false;
+
             ServerboundContainerClickPacket clickPacket = (ServerboundContainerClickPacket) packet;
 
             int slot = clickPacket.getSlotNum();

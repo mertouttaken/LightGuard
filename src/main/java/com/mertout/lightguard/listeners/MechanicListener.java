@@ -89,7 +89,8 @@ public class MechanicListener implements Listener {
             Material.DROPPER, Material.DISPENSER, Material.HOPPER, Material.CRAFTER,
             Material.BEACON, Material.SPAWNER, Material.LECTERN,
             Material.CHISELED_BOOKSHELF, Material.DECORATED_POT,
-            Material.BREWING_STAND, Material.ENCHANTING_TABLE
+            Material.BREWING_STAND, Material.ENCHANTING_TABLE,
+            Material.VAULT, Material.TRIAL_SPAWNER
     );
 
     public MechanicListener(LightGuard plugin) {
@@ -325,7 +326,16 @@ public class MechanicListener implements Listener {
     @EventHandler(priority = EventPriority.LOWEST)
     public void onEntityPortal(EntityPortalEvent event) {
         Entity entity = event.getEntity();
-        if (preventMuleDupe && entity instanceof ChestedHorse) {
+        if (preventMuleDupe && (entity instanceof ChestedHorse || (entity instanceof Vehicle && entity instanceof InventoryHolder))) {
+            event.setCancelled(true);
+            return;
+        }
+        if (limitFallingBlocks && entity.getType() == EntityType.FALLING_BLOCK) {
+            event.setCancelled(true);
+            entity.remove();
+            return;
+        }
+        if (preventEndTeleportExploits && entity instanceof Item) {
             event.setCancelled(true);
             return;
         }
@@ -460,6 +470,13 @@ public class MechanicListener implements Listener {
         if (breakCloseInventory && e.getPlayer().getOpenInventory().getType() != InventoryType.CRAFTING) {
             e.getPlayer().closeInventory();
         }
+        if (e.getBlock().getState() instanceof InventoryHolder) {
+            InventoryHolder holder = (InventoryHolder) e.getBlock().getState();
+            Inventory inv = holder.getInventory();
+            if (inv != null && !inv.getViewers().isEmpty()) {
+                new ArrayList<>(inv.getViewers()).forEach(org.bukkit.entity.HumanEntity::closeInventory);
+            }
+        }
     }
 
     @EventHandler(priority = EventPriority.LOWEST, ignoreCancelled = true)
@@ -496,6 +513,14 @@ public class MechanicListener implements Listener {
 
         if (preventInvalidTrade && event.getInventory().getType() == InventoryType.MERCHANT) {
             event.getPlayer().setItemOnCursor(null);
+            if (!event.getInventory().getViewers().isEmpty()) {
+                for (HumanEntity viewer : event.getInventory().getViewers()) {
+                    if (!viewer.equals(player)) {
+                        event.setCancelled(true);
+                        return;
+                    }
+                }
+            }
         }
 
         ProtocolPlayer pp = plugin.getProtocolManager().get(player.getUniqueId());
@@ -536,15 +561,31 @@ public class MechanicListener implements Listener {
 
     @EventHandler(priority = EventPriority.LOWEST, ignoreCancelled = true)
     public void onInventoryClick(InventoryClickEvent event) {
-        if (event.getInventory().getType() == InventoryType.ANVIL && event.getSlotType() == InventoryType.SlotType.RESULT) {
-            if (preventAnvilDupe && (event.getClick() == ClickType.SHIFT_LEFT || event.getClick() == ClickType.SHIFT_RIGHT)) {
-                event.setCancelled(true);
+        if (event.getSlotType() == InventoryType.SlotType.RESULT) {
+            InventoryType invType = event.getInventory().getType();
+            ClickType click = event.getClick();
+
+            if (invType == InventoryType.ANVIL) {
+                if (preventAnvilDupe && (click == ClickType.SHIFT_LEFT || click == ClickType.SHIFT_RIGHT || click == ClickType.NUMBER_KEY || click == ClickType.DOUBLE_CLICK)) {
+                    event.setCancelled(true);
+                }
+            } else if (invType == InventoryType.FURNACE || invType == InventoryType.BLAST_FURNACE || invType == InventoryType.SMOKER) {
+                if (preventFurnaceDupe && (click == ClickType.NUMBER_KEY || click == ClickType.DOUBLE_CLICK)) {
+                    event.setCancelled(true);
+                }
+            } else if (invType == InventoryType.GRINDSTONE || invType == InventoryType.STONECUTTER || invType == InventoryType.SMITHING || invType == InventoryType.CARTOGRAPHY || invType == InventoryType.LOOM || invType == InventoryType.CRAFTER) {
+                if (click == ClickType.NUMBER_KEY || click == ClickType.DOUBLE_CLICK) {
+                    event.setCancelled(true);
+                }
             }
         }
-        if (event.getInventory().getType() == InventoryType.FURNACE && event.getSlotType() == InventoryType.SlotType.RESULT) {
-            if (preventFurnaceDupe && event.getClick() == ClickType.NUMBER_KEY) {
-                event.setCancelled(true);
-            }
+    }
+
+    @EventHandler(priority = EventPriority.LOWEST, ignoreCancelled = true)
+    public void onCrafterCraft(org.bukkit.event.block.CrafterCraftEvent event) {
+        Block block = event.getBlock();
+        if (checkDispenserCooldown(block.getLocation(), 200)) {
+            event.setCancelled(true);
         }
     }
 
