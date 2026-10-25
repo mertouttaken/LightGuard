@@ -4,13 +4,11 @@ import com.mertout.lightguard.LightGuard;
 import com.mertout.lightguard.checks.Check;
 import com.mertout.lightguard.data.ProtocolPlayer;
 import net.minecraft.network.protocol.game.ServerboundMovePlayerPacket;
+import org.bukkit.entity.Player;
 
 public class PositionCheck extends Check {
 
-    /** Far outside any legal world height; only a crafted packet reaches it. */
     private static final double ABSURD_Y = 1_000_000.0;
-
-    /** A whole-block jump of this size or more is the signature of a coordinate-exploit teleport. */
     private static final double INTEGER_JUMP_THRESHOLD = 10.0;
     private static final double INTEGER_EPSILON = 1e-5;
 
@@ -33,17 +31,15 @@ public class PositionCheck extends Check {
 
     @Override
     public boolean check(Object packet, ProtocolPlayer player) {
-        if (!(packet instanceof ServerboundMovePlayerPacket)) return true;
+        if (!(packet instanceof ServerboundMovePlayerPacket movePacket)) return true;
 
         try {
-            ServerboundMovePlayerPacket movePacket = (ServerboundMovePlayerPacket) packet;
-
             if (movePacket.hasRotation()) {
                 float yaw = movePacket.getYRot(0.0F);
                 float pitch = movePacket.getXRot(0.0F);
 
                 if (!Float.isFinite(yaw) || !Float.isFinite(pitch)) return false;
-                if (Math.abs(pitch) > 90.0F) return false;
+                if (Math.abs(pitch) > 90.01F) return false;
                 if (Math.abs(yaw) > 3.0E7F) return false;
             }
 
@@ -67,12 +63,18 @@ public class PositionCheck extends Check {
 
             if (!chunkLoaded && !player.isInTeleportGrace()) return false;
 
+            Player bukkitPlayer = player.getPlayer();
+            if (bukkitPlayer != null && bukkitPlayer.isInsideVehicle()) {
+                player.setLastLocation(x, y, z);
+                return true;
+            }
+
             if (player.hasBaseline() && !player.isInTeleportGrace()) {
                 double diffX = x - player.getLastX();
                 double diffY = y - player.getLastY();
                 double diffZ = z - player.getLastZ();
 
-                if (isIntegerJump(diffX) || isIntegerJump(diffY) || isIntegerJump(diffZ)) {
+                if (!player.isGliding() && (isIntegerJump(diffX) || isIntegerJump(diffZ))) {
                     return false;
                 }
 
@@ -93,9 +95,6 @@ public class PositionCheck extends Check {
                 }
             }
 
-            // Only reached when the movement was accepted. Recording a rejected position would
-            // measure the next legitimate packet against a place the server never moved the
-            // player to, turning one rejection into a cascade of them.
             player.setLastLocation(x, y, z);
 
         } catch (Throwable t) {

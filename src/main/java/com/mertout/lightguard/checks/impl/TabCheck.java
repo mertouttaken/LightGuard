@@ -8,21 +8,14 @@ import net.minecraft.network.protocol.game.ServerboundCommandSuggestionPacket;
 import java.util.List;
 import java.util.Locale;
 
-/**
- * Guards command tab-completion.
- *
- * <p>The previous version rejected any buffer containing {@code @ = [ ] { }}, which meant
- * tab-completing {@code /minecraft:give} or any selector argument dropped the packet and recorded a
- * violation — twelve of those inside four seconds and ViolationRadar kicked the player. Those are
- * ordinary command syntax, so screening is now limited to expression-evaluator crashers, injection
- * payloads, a length ceiling and a rate limit, plus whatever the operator lists in config.
- */
 public class TabCheck extends Check {
 
-    private static final int MAX_REQUESTS_PER_SECOND = 50;
+    private static final int MAX_REQUESTS_PER_SECOND = 15;
+    private static final int MAX_BRACKET_DEPTH = 15;
 
-    /** Plugin commands that evaluate their argument as an expression; the classic tab crashers. */
-    private static final String[] EXPRESSION_COMMANDS = {"//calc", "//eval", "//solve", "//math"};
+    private static final String[] EXPRESSION_COMMANDS = {
+            "calc", "eval", "solve", "math", "hd readtext", "pex"
+    };
 
     private final int maxLength;
     private final List<String> blockedSubstrings;
@@ -36,26 +29,41 @@ public class TabCheck extends Check {
 
     @Override
     public boolean check(Object packet, ProtocolPlayer player) {
-        if (!(packet instanceof ServerboundCommandSuggestionPacket)) return true;
+        if (!(packet instanceof ServerboundCommandSuggestionPacket suggestionPacket)) return true;
 
         try {
             if (player.incrementAndGetTabCount(System.currentTimeMillis()) > MAX_REQUESTS_PER_SECOND) {
                 return false;
             }
 
-            String buffer = ((ServerboundCommandSuggestionPacket) packet).getCommand();
+            String buffer = suggestionPacket.getCommand();
             if (buffer == null || buffer.isEmpty()) return true;
 
             if (buffer.length() > maxLength) return false;
 
-            String lower = buffer.toLowerCase(Locale.ROOT);
-
-            for (String prefix : EXPRESSION_COMMANDS) {
-                if (lower.startsWith(prefix)) return false;
+            int bracketCount = 0;
+            for (int i = 0; i < buffer.length(); i++) {
+                char c = buffer.charAt(i);
+                if (c < 32) {
+                    return false;
+                }
+                if (c == '[' || c == '{') {
+                    if (++bracketCount > MAX_BRACKET_DEPTH) {
+                        return false;
+                    }
+                }
             }
 
-            if (lower.contains("${jndi:") || lower.contains("${ldap:")
-                    || lower.contains("${rmi:") || lower.contains("${dns:")) {
+            String lower = buffer.toLowerCase(Locale.ROOT).trim();
+
+            String normalizedCmd = extractBaseCommand(lower);
+            for (String blockedCmd : EXPRESSION_COMMANDS) {
+                if (normalizedCmd.equals(blockedCmd) || normalizedCmd.startsWith(blockedCmd + " ")) {
+                    return false;
+                }
+            }
+
+            if (lower.contains("${")) {
                 return false;
             }
 
@@ -68,5 +76,25 @@ public class TabCheck extends Check {
         }
 
         return true;
+    }
+
+    private String extractBaseCommand(String input) {
+        int start = 0;
+        while (start < input.length() && input.charAt(start) == '/') {
+            start++;
+        }
+        String stripped = input.substring(start);
+        int spaceIdx = stripped.indexOf(' ');
+        String firstToken = spaceIdx == -1 ? stripped : stripped.substring(0, spaceIdx);
+        String rest = spaceIdx == -1 ? "" : stripped.substring(spaceIdx);
+
+        int colonIdx = firstToken.lastIndexOf(':');
+        if (colonIdx != -1 && colonIdx + 1 < firstToken.length()) {
+            firstToken = firstToken.substring(colonIdx + 1);
+            while (firstToken.startsWith("/")) {
+                firstToken = firstToken.substring(1);
+            }
+        }
+        return firstToken + rest;
     }
 }
