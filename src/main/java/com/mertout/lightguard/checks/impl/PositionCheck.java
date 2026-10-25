@@ -4,7 +4,6 @@ import com.mertout.lightguard.LightGuard;
 import com.mertout.lightguard.checks.Check;
 import com.mertout.lightguard.data.ProtocolPlayer;
 import net.minecraft.network.protocol.game.ServerboundMovePlayerPacket;
-import org.bukkit.entity.Player;
 
 public class PositionCheck extends Check {
 
@@ -62,12 +61,6 @@ public class PositionCheck extends Check {
                     .isChunkLoadedAsynchronously(player.getCurrentWorldName(), chunkX, chunkZ);
 
             if (!chunkLoaded && !player.isInTeleportGrace()) return false;
-
-            Player bukkitPlayer = player.getPlayer();
-            if (bukkitPlayer != null && bukkitPlayer.isInsideVehicle()) {
-                player.setLastLocation(x, y, z);
-                return true;
-            }
 
             if (player.hasBaseline() && !player.isInTeleportGrace()) {
                 double diffX = x - player.getLastX();

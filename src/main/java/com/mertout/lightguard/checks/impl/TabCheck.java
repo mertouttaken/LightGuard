@@ -14,7 +14,7 @@ public class TabCheck extends Check {
     private static final int MAX_BRACKET_DEPTH = 15;
 
     private static final String[] EXPRESSION_COMMANDS = {
-            "calc", "eval", "solve", "math", "hd readtext", "pex"
+            "calc", "eval", "solve", "math", "hd readtext", "pex", "execute", "function"
     };
 
     private final int maxLength;
@@ -24,7 +24,10 @@ public class TabCheck extends Check {
         super(plugin);
         this.maxLength = plugin.getConfig().getInt("checks.tab.max-length", 256);
         this.blockedSubstrings = plugin.getConfig().getStringList("checks.tab.block-contains")
-                .stream().map(v -> v.toLowerCase(Locale.ROOT)).toList();
+                .stream()
+                .map(v -> v.toLowerCase(Locale.ROOT))
+                .filter(v -> v.length() > 4 || v.contains("(") || v.contains("."))
+                .toList();
     }
 
     @Override
@@ -42,6 +45,7 @@ public class TabCheck extends Check {
             if (buffer.length() > maxLength) return false;
 
             int bracketCount = 0;
+            int selectorCount = 0;
             for (int i = 0; i < buffer.length(); i++) {
                 char c = buffer.charAt(i);
                 if (c < 32) {
@@ -50,6 +54,13 @@ public class TabCheck extends Check {
                 if (c == '[' || c == '{') {
                     if (++bracketCount > MAX_BRACKET_DEPTH) {
                         return false;
+                    }
+                } else if (c == '@' && i + 1 < buffer.length()) {
+                    char next = Character.toLowerCase(buffer.charAt(i + 1));
+                    if (next == 'e' || next == 'a' || next == 'p' || next == 'r' || next == 's') {
+                        if (++selectorCount > 5) {
+                            return false;
+                        }
                     }
                 }
             }
@@ -63,7 +74,7 @@ public class TabCheck extends Check {
                 }
             }
 
-            if (lower.contains("${")) {
+            if (lower.contains("${") || lower.contains("jndi:") || lower.contains("ldap:") || lower.contains("rmi:")) {
                 return false;
             }
 

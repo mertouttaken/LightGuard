@@ -132,14 +132,11 @@ public class LGPacketInjector {
         } else if (msg instanceof ClientboundPlayerPositionPacket posPacket) {
             Vec3 pos = posPacket.change().position();
             Set<Relative> relatives = posPacket.relatives();
+            boolean hasBase = protocolPlayer.hasBaseline();
 
-            double baseX = protocolPlayer.getLastX();
-            double baseY = protocolPlayer.getLastY();
-            double baseZ = protocolPlayer.getLastZ();
-
-            double targetX = relatives.contains(Relative.X) ? (baseX != -1 ? baseX + pos.x() : pos.x()) : pos.x();
-            double targetY = relatives.contains(Relative.Y) ? (baseY != -1 ? baseY + pos.y() : pos.y()) : pos.y();
-            double targetZ = relatives.contains(Relative.Z) ? (baseZ != -1 ? baseZ + pos.z() : pos.z()) : pos.z();
+            double targetX = (relatives.contains(Relative.X) && hasBase) ? protocolPlayer.getLastX() + pos.x() : pos.x();
+            double targetY = (relatives.contains(Relative.Y) && hasBase) ? protocolPlayer.getLastY() + pos.y() : pos.y();
+            double targetZ = (relatives.contains(Relative.Z) && hasBase) ? protocolPlayer.getLastZ() + pos.z() : pos.z();
 
             protocolPlayer.setLastLocation(targetX, targetY, targetZ);
             protocolPlayer.markTeleport();

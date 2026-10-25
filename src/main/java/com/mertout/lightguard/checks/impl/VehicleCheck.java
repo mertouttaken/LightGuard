@@ -38,28 +38,19 @@ public class VehicleCheck extends Check {
                     return false;
                 }
 
-                double lX = player.getLastVehicleX();
-                double lY = player.getLastVehicleY();
-                double lZ = player.getLastVehicleZ();
+                if (player.hasBaseline() && !player.isInTeleportGrace()) {
+                    double dx = pX - player.getLastX();
+                    double dy = pY - player.getLastY();
+                    double dz = pZ - player.getLastZ();
+                    double distSqFromPlayer = (dx * dx) + (dy * dy) + (dz * dz);
 
-                if (lX != -1.0 || lY != -1.0 || lZ != -1.0) {
-                    double distSq = Math.pow(pX - lX, 2) + Math.pow(pY - lY, 2) + Math.pow(pZ - lZ, 2);
-
-                    if (distSq > 2500.0) {
-                        player.setLastVehicleLocation(pX, pY, pZ);
-                        double playerDistSq = Math.pow(pX - player.getLastX(), 2) + Math.pow(pZ - player.getLastZ(), 2);
-                        if (player.getLastX() != -1.0 && playerDistSq > 400.0 && !player.isInTeleportGrace()) {
-                            return false;
-                        }
-                        return true;
-                    }
-
-                    if (distSq > 225.0 && !player.isInTeleportGrace()) {
+                    if (distSqFromPlayer > 225.0) {
                         return false;
                     }
                 }
 
                 player.setLastVehicleLocation(pX, pY, pZ);
+                player.setLastLocation(pX, pY, pZ);
             } catch (Throwable t) {
                 return false;
             }
